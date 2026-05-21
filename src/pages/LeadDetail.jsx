@@ -202,7 +202,7 @@ export default function LeadDetail() {
     setNotizenSaving(true);
     await base44.entities.Company.update(id, { notizen });
     setCompany(prev => ({ ...prev, notizen }));
-    toast.success("Notizen gespeichert");
+    toast.success("Notiz gespeichert • " + moment().format("HH:mm"));
     setNotizenSaving(false);
   };
 
@@ -479,12 +479,17 @@ export default function LeadDetail() {
               onChange={e => setNotizen(e.target.value)}
               rows={4}
               placeholder="Notizen, Beobachtungen, interne Hinweise…"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-blue-500 resize-none"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent resize-none shadow-sm"
             />
             {notizen !== (company.notizen || "") && (
-              <Button size="sm" onClick={handleSaveNotizen} disabled={notizenSaving} className="w-full mt-2">
-                {notizenSaving ? "Speichert..." : "Speichern"}
-              </Button>
+              <div className="flex items-center gap-2 mt-2">
+                <Button size="sm" onClick={handleSaveNotizen} disabled={notizenSaving} className="flex-1">
+                  {notizenSaving ? "Speichert..." : "Speichern"}
+                </Button>
+                <span className="text-xs text-slate-500">
+                  {notizenSaving ? "Wird gespeichert…" : "Ungespeicherte Änderung"}
+                </span>
+              </div>
             )}
           </div>
 

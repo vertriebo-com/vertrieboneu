@@ -105,7 +105,7 @@ export default function Dashboard() {
       });
   }, [orgData?.id, dashboardData?.user?.full_name]);
 
-  if (orgLoading || (isLoading && !dashboardData)) return <DashboardSkeleton />;
+  if (orgLoading || isLoading) return <DashboardSkeleton />;
 
   if (error) {
     return (
@@ -149,7 +149,7 @@ export default function Dashboard() {
             {greeting}{displayName ? `, ${displayName}` : ""} 👋
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {moment().locale("de").format("dddd, D. MMMM")}
+            {moment().locale("de").format("dddd, D. MMMM YYYY")}
           </p>
         </div>
         <button
@@ -328,13 +328,13 @@ export default function Dashboard() {
                 </p>
                 {totalLeads > 0 ? (
                   <div className="flex flex-col items-center gap-2">
-                    <Link to="/leads">
+                    <Link to="/leads?analyze=true">
                       <Button size="sm" className="gap-2 text-xs bg-orange-500 hover:bg-orange-600 text-white">
                         <Zap className="w-3.5 h-3.5" />
-                        Leads analysieren
+                        Jetzt analysieren
                       </Button>
                     </Link>
-                    <p className="text-[10px] text-slate-400">KI-Analyse in der Lead-Übersicht starten</p>
+                    <p className="text-[10px] text-slate-400">Startet die KI-Analyse für Ihre neuesten Leads</p>
                   </div>
                 ) : (
                   <Link to="/leads">

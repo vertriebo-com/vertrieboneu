@@ -25,8 +25,8 @@ const NAV_ITEMS = [
 { path: "/leads", label: "Leads", icon: Building2 },
 { path: "/tasks", label: "Aufgaben", icon: ListTodo },
 { path: "/calendar", label: "Kalender", icon: CalendarCheck },
-{ path: "/statistics", label: "Statistiken", icon: BarChart3, adminOnly: true },
 { path: "/blacklist", label: "Blacklist", icon: Ban },
+{ path: "/statistics", label: "Statistiken", icon: BarChart3, adminOnly: true },
 { path: "/settings", label: "Einstellungen", icon: Settings, adminOnly: true }];
 
 
@@ -55,8 +55,9 @@ export default function Layout() {
 
   const isAdmin = user?.role === "admin" || orgRole === "organization_admin";
 
+  // Einstellungen immer zeigen für Admin/OrgAdmin, Statistiken nur für Admin
   const filteredNav = NAV_ITEMS.filter(
-    (item) => !item.adminOnly || isAdmin
+    (item) => item.path !== "/statistics" || isAdmin
   );
 
   const handleLogout = () => {

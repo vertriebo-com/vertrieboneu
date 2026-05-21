@@ -42,7 +42,7 @@ export default function Leads() {
   const [showOnboardingFailed, setShowOnboardingFailed] = useState(false);
 
   // ═ Effects
-  // Parse query parameters: new_run, search, onboarding_zero_leads, onboarding_failed
+  // Parse query parameters: new_run, search, onboarding_zero_leads, onboarding_failed, analyze
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const newRun = params.get("new_run");
@@ -63,7 +63,16 @@ export default function Leads() {
       // Zeige Recovery-Message
       setShowOnboardingFailed(true);
     }
-  }, [location.search]);
+    
+    // Auto-analyze when coming from Dashboard CTA
+    const analyzeParam = params.get("analyze");
+    if (analyzeParam === 'true' && companies.length > 0 && !researching) {
+      handleAnalyzeLatest();
+      // Clean URL after triggering
+      params.delete("analyze");
+      navigate("/leads?" + params.toString(), { replace: true });
+    }
+  }, [location.search, companies.length]);
 
   const orgId = org?.id || null;
   const { data: companies = [], isLoading: loading, refetch } = useQuery({
@@ -153,7 +162,15 @@ export default function Leads() {
         
         if (search) {
           const s = search.toLowerCase();
-          return (c.name?.toLowerCase().includes(s) || c.branche?.toLowerCase().includes(s) || c.ort?.toLowerCase().includes(s));
+          return (
+            c.name?.toLowerCase().includes(s) ||
+            c.branche?.toLowerCase().includes(s) ||
+            c.ort?.toLowerCase().includes(s) ||
+            c.plz?.toLowerCase().includes(s) ||
+            c.website?.toLowerCase().includes(s) ||
+            c.telefon?.toLowerCase().includes(s) ||
+            c.email?.toLowerCase().includes(s)
+          );
         }
         return true;
       })
@@ -278,7 +295,7 @@ export default function Leads() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Firma, Branche oder Ort suchen..."
+                placeholder="Suche: Name, Branche, Ort, PLZ, Telefon, E-Mail..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 bg-white border border-[#E2E8F0] text-slate-900 placeholder:text-slate-500 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
