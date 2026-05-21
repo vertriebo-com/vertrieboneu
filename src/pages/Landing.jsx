@@ -13,42 +13,42 @@ const PLANS = [
 {
   name: "Starter",
   slug: "starter",
-  planId: "prod_UT5f8AuvWP7NN9",
+  planId: "69fb1b37d7433caf98c34ff9",
   price: "99",
   description: "Für kleine Dienstleister, die regelmäßig neue Firmenkunden gewinnen möchten.",
   popular: false,
-  features: ["300 Firmenkontakte/Monat", "KI-Recherche inklusive", "2 Nutzer", "CRM & Pipeline", "Basis-Reports"],
+  features: ["300 Firmenkontakte/Monat", "100 Recherche-Läufe/Monat", "50 KI-Aktionen/Monat", "2 Nutzer", "CRM & Pipeline", "500 E-Mails/Monat"],
   cta: "14 Tage kostenlos testen"
 },
 {
   name: "Professional",
   slug: "professional",
-  planId: "prod_UT5fKDNYkHuwcM",
+  planId: "69fb1b37d7433caf98c34ffa",
   price: "199",
   description: "Für Teams, die regelmäßig aktiv Vertrieb machen",
   popular: true,
-  features: ["1.500 Firmenkontakte/Monat", "KI-Recherche inklusive", "5 Nutzer", "KI-Priorisierung für heiße Leads", "Eigene E-Mail-Vorlagen", "Erweiterte Reports"],
+  features: ["1.500 Firmenkontakte/Monat", "750 Recherche-Läufe/Monat", "300 KI-Aktionen/Monat", "5 Nutzer", "Eigene E-Mail-Vorlagen", "Erweiterte Reports", "2.000 E-Mails/Monat"],
   cta: "Professional buchen"
 },
 {
   name: "Gold",
   slug: "gold",
-  planId: "prod_UT5fWq2gCCaFgB",
+  planId: "69fb7de571a0504da10ef985",
   price: "349",
   description: "Für wachsende Vertriebsteams mit hohem Kontaktvolumen",
   popular: false,
-  features: ["5.000 Firmenkontakte/Monat", "KI-Recherche inklusive", "10 Nutzer", "Erweiterte Automationen / Professional-Features", "Priority Support"],
+  features: ["5.000 Firmenkontakte/Monat", "2.000 Recherche-Läufe/Monat", "1.000 KI-Aktionen/Monat", "10 Nutzer", "Eigene E-Mail-Vorlagen", "Erweiterte Reports", "5.000 E-Mails/Monat", "Priority Support"],
   cta: "Gold buchen"
 },
 {
   name: "Agency",
   slug: "agency",
-  planId: "prod_UT5faHZrXDuWpc",
+  planId: "69fb1b37d7433caf98c34ffb",
   price: null,
   description: "Für Agenturen & größere Teams",
   popular: false,
   isAgency: true,
-  features: ["Mehrere Kundenorganisationen", "Hohes Kontaktvolumen / Fair-Use", "Unbegrenzte Nutzer oder individuelle Nutzeranzahl", "Persönliches Onboarding", "Eigene Kundenverwaltung"],
+  features: ["Mehrere Kundenorganisationen", "Unbegrenzte Firmenkontakte", "Unbegrenzte Nutzer", "Persönliches Onboarding", "Eigene Kundenverwaltung"],
   cta: "Demo anfragen"
 }];
 
