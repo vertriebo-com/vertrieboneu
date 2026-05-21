@@ -316,7 +316,38 @@ Deno.serve(async (req) => {
     ]);
 
     const plan = planData?.[0] || null;
-    const monthlyLimit = plan?.max_leads_per_month ?? -1;
+
+    // ── LIMIT-AUFLÖSUNG (IDENTISCH zu getUsageSummary) ─────────────────────
+    // PRIORITÄT: custom_monthly_lead_limit (Admin-Override) > Plan-Wert
+    const hasCustomLimit = org.custom_monthly_lead_limit != null;
+    const trialStage = org.trial_stage || 'free_preview';
+    const isPaidCustomer = ['paid'].includes(trialStage) || ['active', 'trialing'].includes(org.billing_status || '');
+
+    let monthlyLimit;
+    let planStatus = 'ok'; // "ok" | "billing_plan_missing" | "billing_plan_invalid" | "trial_limit" | "no_plan_preview" | "custom_limit" | "plan_limit_null"
+
+    if (hasCustomLimit) {
+      monthlyLimit = org.custom_monthly_lead_limit;
+      planStatus = 'custom_limit';
+    } else if (plan) {
+      monthlyLimit = (plan.max_leads_per_month != null) ? plan.max_leads_per_month : 50;
+      if (plan.max_leads_per_month == null) planStatus = 'plan_limit_null';
+    } else if (org.plan_id && !plan) {
+      planStatus = 'billing_plan_missing';
+      monthlyLimit = isPaidCustomer ? 0 : 50;
+    } else {
+      if (isPaidCustomer) {
+        planStatus = 'billing_plan_missing';
+        monthlyLimit = 0;
+      } else if (trialStage === 'verified_trial') {
+        planStatus = 'trial_limit';
+        monthlyLimit = 50;
+      } else {
+        planStatus = 'no_plan_preview';
+        monthlyLimit = 10;
+      }
+    }
+
     const isUnlimited = monthlyLimit === -1;
 
     const committedSlots = quotaSlots.filter(s => s.status === 'committed').length;
@@ -348,6 +379,7 @@ Deno.serve(async (req) => {
     const usage_summary = {
       period_month: periodMonthU,
       plan_name: plan?.name || null,
+      plan_status: planStatus, // IDENTISCH zu getUsageSummary
       monthly_limit: monthlyLimit,
       monthly_used: monthlyUsed,
       monthly_remaining: monthlyRemaining,
