@@ -170,10 +170,50 @@ Deno.serve(async (req) => {
     // ── Monthly Limit Check — SSOT: max(committedSlots, usageLogValue, companiesThisMonth) ──────
     // IDENTISCH zu getDashboardData und getUsageSummary — keine einzelne Quelle allein!
     // Kein functions.invoke → kein Rate-Limit-Risiko.
-    let monthlyContactLimit = -1;
-    if (org.plan_id) {
-      const plans = await base44.asServiceRole.entities.Plan.filter({ id: org.plan_id });
-      if (plans[0]) monthlyContactLimit = plans[0].max_leads_per_month ?? 300;
+    //
+    // WICHTIG: plan_id=null ist KEIN "unlimited". Regeln:
+    // - plan_id vorhanden + max_leads_per_month=-1 → echter Unlimited-Plan → erlaubt
+    // - plan_id vorhanden + max_leads_per_month>0 → Limit gilt
+    // - plan_id=null + trial_stage=free_preview/verified_trial → Trial-Limit (oben bereits geprüft)
+    // - plan_id=null + trial_stage=paid → billing_setup_required → blockieren
+    // - PlatformAdmin → überspringt diesen Block komplett (isPlatformAdmin=true)
+    let monthlyContactLimit = -1; // -1 = wird unten weiter aufgelöst
+
+    if (!isPlatformAdmin && trialStage !== 'free_preview') {
+      if (!org.plan_id) {
+        // Kein Plan gesetzt → prüfen ob das erlaubt ist
+        if (trialStage === 'paid') {
+          // Paid-Kunde ohne Plan: Konfigurationsfehler → blockieren
+          console.warn(`[startResearchRun] billing_setup_required: org=${organization_id} trial_stage=paid plan_id=null`);
+          return Response.json({
+            success: false,
+            error: 'billing_setup_required',
+            message: 'Ihr Abonnement ist aktiv, aber kein Plan zugewiesen. Bitte kontaktieren Sie den Support.',
+          }, { status: 402 });
+        }
+        // verified_trial ohne Plan: Trial-Limit von 50 Leads
+        monthlyContactLimit = 50;
+        console.info(`[startResearchRun] Kein Plan (trial_stage=${trialStage}) → Trial-Limit ${monthlyContactLimit}`);
+      } else {
+        // Plan geladen — max_leads_per_month auslesen
+        const plans = await base44.asServiceRole.entities.Plan.filter({ id: org.plan_id });
+        if (!plans[0]) {
+          // Plan-ID gesetzt aber Plan nicht gefunden → blockieren
+          console.warn(`[startResearchRun] Plan ${org.plan_id} nicht gefunden für org=${organization_id}`);
+          return Response.json({
+            success: false,
+            error: 'billing_plan_missing',
+            message: 'Ihr gebuchter Plan konnte nicht geladen werden. Bitte kontaktieren Sie den Support.',
+          }, { status: 402 });
+        }
+        monthlyContactLimit = plans[0].max_leads_per_month ?? 300;
+        // -1 = echter Unlimited-Plan (explizit in Plan gesetzt)
+        console.info(`[startResearchRun] Plan geladen: ${plans[0].name} max_leads_per_month=${monthlyContactLimit}`);
+      }
+    } else if (isPlatformAdmin) {
+      // Platform-Admin: kein Limit (bewusst erlaubt, klar markiert)
+      monthlyContactLimit = -1;
+      console.info(`[startResearchRun] PlatformAdmin → kein Monatslimit`);
     }
     let monthlyRemaining = -1; // -1 = unbegrenzt
     let monthlyUsedForCheck = 0;
