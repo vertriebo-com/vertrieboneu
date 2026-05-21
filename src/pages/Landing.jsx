@@ -13,7 +13,7 @@ const PLANS = [
 {
   name: "Starter",
   slug: "starter",
-  planId: "69fb1b37d7433caf98c34ff9",
+  planId: "prod_UT5f8AuvWP7NN9",
   price: "99",
   description: "Für kleine Dienstleister, die regelmäßig neue Firmenkunden gewinnen möchten.",
   popular: false,
@@ -23,7 +23,7 @@ const PLANS = [
 {
   name: "Professional",
   slug: "professional",
-  planId: "69fb1b37d7433caf98c34ffa",
+  planId: "prod_UT5fKDNYkHuwcM",
   price: "199",
   description: "Für Teams, die regelmäßig aktiv Vertrieb machen",
   popular: true,
@@ -33,7 +33,7 @@ const PLANS = [
 {
   name: "Gold",
   slug: "gold",
-  planId: "69fb7de571a0504da10ef985",
+  planId: "prod_UT5fWq2gCCaFgB",
   price: "349",
   description: "Für wachsende Vertriebsteams mit hohem Kontaktvolumen",
   popular: false,
@@ -43,7 +43,7 @@ const PLANS = [
 {
   name: "Agency",
   slug: "agency",
-  planId: "69fb1b37d7433caf98c34ffb",
+  planId: "prod_UT5faHZrXDuWpc",
   price: null,
   description: "Für Agenturen & größere Teams",
   popular: false,
