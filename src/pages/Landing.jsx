@@ -17,7 +17,7 @@ const PLANS = [
   price: "99",
   description: "Für kleine Dienstleister, die regelmäßig neue Firmenkunden gewinnen möchten.",
   popular: false,
-  features: ["300 Firmenkontakte/Monat", "100 Recherche-Läufe/Monat", "50 KI-Aktionen/Monat", "2 Nutzer", "CRM & Pipeline", "500 E-Mails/Monat"],
+  features: ["300 Firmenkontakte/Monat", "100 Recherche-Läufe/Monat", "50 KI-Aktionen/Monat", "CRM & Pipeline", "500 E-Mails/Monat"],
   cta: "14 Tage kostenlos testen"
 },
 {
@@ -27,7 +27,7 @@ const PLANS = [
   price: "199",
   description: "Für Teams, die regelmäßig aktiv Vertrieb machen",
   popular: true,
-  features: ["1.500 Firmenkontakte/Monat", "750 Recherche-Läufe/Monat", "300 KI-Aktionen/Monat", "5 Nutzer", "Eigene E-Mail-Vorlagen", "Erweiterte Reports", "2.000 E-Mails/Monat"],
+  features: ["1.500 Firmenkontakte/Monat", "750 Recherche-Läufe/Monat", "300 KI-Aktionen/Monat", "Eigene E-Mail-Vorlagen", "Erweiterte Reports", "2.000 E-Mails/Monat"],
   cta: "Professional buchen"
 },
 {
@@ -37,7 +37,7 @@ const PLANS = [
   price: "349",
   description: "Für wachsende Vertriebsteams mit hohem Kontaktvolumen",
   popular: false,
-  features: ["5.000 Firmenkontakte/Monat", "2.000 Recherche-Läufe/Monat", "1.000 KI-Aktionen/Monat", "10 Nutzer", "Eigene E-Mail-Vorlagen", "Erweiterte Reports", "5.000 E-Mails/Monat", "Priority Support"],
+  features: ["5.000 Firmenkontakte/Monat", "2.000 Recherche-Läufe/Monat", "1.000 KI-Aktionen/Monat", "Eigene E-Mail-Vorlagen", "Erweiterte Reports", "5.000 E-Mails/Monat", "Priority Support"],
   cta: "Gold buchen"
 },
 {
