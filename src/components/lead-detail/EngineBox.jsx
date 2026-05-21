@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { Lightbulb, CheckCircle2, Clock, RefreshCw, AlertTriangle, ChevronRight, Sparkles } from "lucide-react";
+import { Lightbulb, CheckCircle2, Clock, RefreshCw, AlertTriangle, ChevronRight, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
@@ -218,7 +218,7 @@ export default function EngineBox({ company, contactLogs = [], tasks = [], orgId
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm">
-      {/* Header mit Erklärung */}
+      {/* Header mit Temperatur-Legende */}
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
@@ -226,9 +226,23 @@ export default function EngineBox({ company, contactLogs = [], tasks = [], orgId
           </h3>
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${tempConfig.badge}`}>{tempConfig.label}</span>
         </div>
-        <p className="text-[10px] text-slate-500 leading-relaxed">
+        <p className="text-[10px] text-slate-500 leading-relaxed mb-2">
           Vertriebo bewertet diesen Lead anhand von Zielgruppen-Fit, Kontaktdaten, Aufgaben und bisherigen Aktivitäten.
         </p>
+        {/* Temperatur-Legende */}
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="flex items-center gap-1 text-red-700 font-semibold">
+            <span className="w-2 h-2 rounded-full bg-red-500"></span> Heiß
+          </span>
+          <span className="text-slate-300">•</span>
+          <span className="flex items-center gap-1 text-amber-700 font-semibold">
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span> Warm
+          </span>
+          <span className="text-slate-300">•</span>
+          <span className="flex items-center gap-1 text-slate-600 font-semibold">
+            <span className="w-2 h-2 rounded-full bg-slate-400"></span> Kalt
+          </span>
+        </div>
       </div>
 
       {/* Temperatur-Erklärung */}
@@ -288,6 +302,21 @@ export default function EngineBox({ company, contactLogs = [], tasks = [], orgId
                   })}
                 </div>
               )}
+            </div>
+          ) : analysis.nextBestAction.type === 'call' || analysis.nextBestAction.type === 'email' ? (
+            <div className="space-y-2">
+              <Button size="sm" onClick={handleAddTask} className="w-full gap-1.5 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white">
+                <Clock className="w-3.5 h-3.5" /> Als Aufgabe eintragen
+              </Button>
+              {/* Zusätzliche Aktionen für Kontakt */}
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => handleAddTask({ type: 'log', title: 'Gespräch dokumentieren' })}
+                  className="text-[10px] font-semibold bg-white border border-blue-200 text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors flex items-center gap-1"
+                >
+                  <span>📝</span> Gespräch dokumentieren
+                </button>
+              </div>
             </div>
           ) : (
             <Button size="sm" onClick={handleAddTask} className="mt-2 w-full gap-1.5 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white">
@@ -380,14 +409,22 @@ export default function EngineBox({ company, contactLogs = [], tasks = [], orgId
             {analyzing ? "Analysiert…" : "Aktualisieren"}
           </Button>
         </div>
-        <div className="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2">
-          <Sparkles className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="text-[10px] text-slate-600 leading-relaxed">
-              <strong>Aktualisieren</strong> bewertet den Lead neu basierend auf aktuellen Kontaktdaten, Aufgaben und Notizen.
-            </p>
-            <p className="text-[10px] text-slate-500">
-              Ihr Feedback hilft uns, die Lead-Qualität kontinuierlich zu verbessern.
+        <div className="space-y-2">
+          <div className="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-2">
+            <Sparkles className="w-3 h-3 text-slate-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-[10px] text-slate-600 leading-relaxed">
+                <strong>Aktualisieren</strong> bewertet den Lead neu basierend auf aktuellen Kontaktdaten, Aufgaben und Notizen.
+              </p>
+              <p className="text-[10px] text-slate-500">
+                Ihr Feedback wird gespeichert und hilft uns bei der Verbesserung der Lead-Qualität.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+            <Zap className="w-3 h-3 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-[10px] text-amber-800 font-medium">
+              Verbraucht 1 KI-Aktion aus Ihrem Monatskontingent
             </p>
           </div>
         </div>
