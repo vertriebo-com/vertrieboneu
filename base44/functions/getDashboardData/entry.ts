@@ -337,7 +337,7 @@ Deno.serve(async (req) => {
 
     const monthlyUsed = Math.max(committedSlots, usageLogValue, companiesThisMonth);
     const monthlyRemaining = isUnlimited ? null : Math.max(0, monthlyLimit - monthlyUsed);
-    const isOverLimit = !isUnlimited && monthlyUsed > monthlyLimit;
+    const isOverLimit = !isUnlimited && monthlyUsed >= monthlyLimit; // IDENTISCH zu getUsageSummary
 
     const sourceUsed = monthlyUsed === committedSlots && committedSlots >= usageLogValue && committedSlots >= companiesThisMonth
       ? 'quota_reservation'
