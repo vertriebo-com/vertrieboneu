@@ -19,37 +19,28 @@ Deno.serve(async (req) => {
       requestedOrgId = body?.org_id || null;
     } catch {}
 
-    // Organisation ermitteln + Zugehörigkeit validieren
+    // ── MVP: 1 Paket = 1 Account = 1 Organisation ─────────────────────────
+    // Keine OrganizationMember-Lookups mehr. Zugriff nur über owner_email oder PlatformAdmin.
     let org = null;
-    let memberRecord = null;
-
-    const [ownerOrgs, memberships] = await Promise.all([
-      base44.entities.Organization.filter({ owner_email: user.email }),
-      base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" }),
-    ]);
 
     if (requestedOrgId) {
-      // Explizite org_id: Sicherheitscheck – User muss Owner, Member oder PlatformAdmin sein
-      const isOwner = ownerOrgs.some(o => o.id === requestedOrgId);
-      const memberEntry = memberships.find(m => m.organization_id === requestedOrgId);
-      if (isOwner || memberEntry || isPlatformAdmin) {
-        const targetOrgs = await base44.asServiceRole.entities.Organization.filter({ id: requestedOrgId });
-        org = targetOrgs?.[0] || null;
-        memberRecord = memberEntry || null;
+      // Explizite org_id: nur Owner oder PlatformAdmin erlaubt
+      const targetOrgs = await base44.asServiceRole.entities.Organization.filter({ id: requestedOrgId });
+      const targetOrg = targetOrgs?.[0] || null;
+      if (!targetOrg) {
+        return Response.json({ error: 'no_organization_found' }, { status: 404 });
+      }
+      if (targetOrg.owner_email === user.email || isPlatformAdmin) {
+        org = targetOrg;
       } else {
         return Response.json({ error: 'Forbidden: no access to this organization' }, { status: 403 });
       }
     } else {
-      // Fallback: automatische Org-Auflösung (identisch zu useLeadsFilter)
+      // Keine org_id → eigene Org über owner_email laden
+      const ownerOrgs = await base44.entities.Organization.filter({ owner_email: user.email });
       org = ownerOrgs?.[0] || null;
 
-      if (!org && memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        org = memberOrgs?.[0] || null;
-        memberRecord = memberships[0];
-      }
-
-      // Platform-Admin ohne eigene Org: erste Org (Support-Ansicht)
+      // PlatformAdmin ohne eigene Org: Support-Ansicht (erste Org)
       if (!org && isPlatformAdmin) {
         const anyOrg = await base44.asServiceRole.entities.Organization.list("-created_date", 1);
         org = anyOrg?.[0] || null;
@@ -57,15 +48,12 @@ Deno.serve(async (req) => {
     }
 
     if (!org) {
-      return Response.json({ error: 'No organization found' }, { status: 404 });
+      return Response.json({ error: 'no_organization_found' }, { status: 404 });
     }
 
     const orgId = org.id;
     const isOrgOwner = org.owner_email === user.email;
-    const memberRole = memberRecord?.role || null; // 'organization_admin' | 'sales_rep' | null
-    const isOrgAdmin = isPlatformAdmin || isOrgOwner || memberRole === 'organization_admin';
-    const isSalesRep = !isOrgAdmin && memberRole === 'sales_rep';
-    // Legacy-kompatibel: isAdmin = org-weiter Zugriff
+    const isOrgAdmin = isPlatformAdmin || isOrgOwner;
     const isAdmin = isOrgAdmin;
 
     // Blacklist laden für Filter
@@ -390,7 +378,7 @@ Deno.serve(async (req) => {
         email: user.email,
         full_name: user.full_name,
         role: user.role,
-        org_role: isOrgAdmin ? 'organization_admin' : (isSalesRep ? 'sales_rep' : null),
+        org_role: isOrgAdmin ? 'organization_admin' : null,
         is_platform_admin: isPlatformAdmin,
         is_org_admin: isOrgAdmin,
         org,
