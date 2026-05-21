@@ -19,7 +19,7 @@ const HOW_IT_WORKS = [
     step: "Schritt 3",
     icon: Phone,
     title: "Anrufen, nachfassen, dokumentieren und Abschlüsse messen",
-    desc: "Ihr Team arbeitet die täglichen Prioritäten ab. Alle Kontakte werden dokumentiert, Erfolge gemessen.",
+    desc: "Sie arbeiten die täglichen Prioritäten ab. Alle Kontakte werden dokumentiert, Erfolge gemessen.",
     color: "purple",
   },
 ];

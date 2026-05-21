@@ -22,10 +22,10 @@ export default function ProductShowcase() {
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 56 }}>
           <h2 style={{ fontSize: "clamp(28px,5vw,40px)", fontWeight: 900, color: "white", lineHeight: 1.2, marginBottom: 16 }}>
-            So arbeitet Ihr Team mit Vertriebo
+            So arbeiten Sie mit Vertriebo
           </h2>
           <p style={{ fontSize: 16, color: "rgba(148,163,184,1)", maxWidth: 700, margin: "0 auto" }}>
-            Vertriebo führt Ihr Team durch den Vertriebsalltag – von neuen Firmenkontakten über Rückrufe bis zum Nachfassen.
+            Vertriebo führt Sie durch den Vertriebsalltag – von neuen Firmenkontakten über Rückrufe bis zum Nachfassen.
           </p>
         </div>
 

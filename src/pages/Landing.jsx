@@ -469,7 +469,7 @@ export default function Landing() {
 
             {/* Subheadline - Original Text */}
             <p style={{ fontSize: "clamp(16px,2vw,18px)", color: "rgba(148,163,184,1)", lineHeight: 1.7, marginBottom: 32 }}>
-              Vertriebo findet passende B2B-Kontakte, priorisiert heiße Leads und zeigt Ihrem Team, wen es als Nächstes kontaktieren sollte.
+              Vertriebo findet passende B2B-Kontakte, priorisiert heiße Leads und zeigt Ihnen, wen Sie als Nächstes kontaktieren sollten.
             </p>
 
             {/* Context line - Original */}
