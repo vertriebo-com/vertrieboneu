@@ -309,13 +309,24 @@ Deno.serve(async (req) => {
       day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Berlin',
     });
 
-    const [quotaSlots, usageLogsU, planData] = await Promise.all([
+    const [quotaSlots, usageLogsU] = await Promise.all([
       base44.asServiceRole.entities.QuotaReservation.filter({ organization_id: orgId, period_month: periodMonthU }),
       base44.asServiceRole.entities.UsageLog.filter({ organization_id: orgId, period_month: periodMonthU }),
-      org.plan_id ? base44.asServiceRole.entities.Plan.filter({ id: org.plan_id }) : Promise.resolve([]),
     ]);
 
-    const plan = planData?.[0] || null;
+    // Plan-Lookup mit try/catch absichern (ungültige plan_id crasht nicht Dashboard)
+    let plan = null;
+    let planLoadError = null;
+    if (org.plan_id) {
+      try {
+        const planResult = await base44.asServiceRole.entities.Plan.filter({ id: org.plan_id });
+        plan = planResult?.[0] || null;
+        if (!plan) planLoadError = 'missing';
+      } catch {
+        planLoadError = 'invalid';
+        plan = null;
+      }
+    }
 
     // ── LIMIT-AUFLÖSUNG (IDENTISCH zu getUsageSummary) ─────────────────────
     // PRIORITÄT: custom_monthly_lead_limit (Admin-Override) > Plan-Wert
@@ -332,8 +343,11 @@ Deno.serve(async (req) => {
     } else if (plan) {
       monthlyLimit = (plan.max_leads_per_month != null) ? plan.max_leads_per_month : 50;
       if (plan.max_leads_per_month == null) planStatus = 'plan_limit_null';
-    } else if (org.plan_id && !plan) {
+    } else if (planLoadError === 'missing') {
       planStatus = 'billing_plan_missing';
+      monthlyLimit = isPaidCustomer ? 0 : 50;
+    } else if (planLoadError === 'invalid') {
+      planStatus = 'billing_plan_invalid';
       monthlyLimit = isPaidCustomer ? 0 : 50;
     } else {
       if (isPaidCustomer) {
