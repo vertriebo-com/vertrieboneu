@@ -35,7 +35,7 @@ const PLANS = [
   slug: "gold",
   planId: "69fb7de571a0504da10ef985",
   price: "349",
-  description: "Für wachsende Vertriebsteams mit hohem Kontaktvolumen",
+  description: "Für Betriebe mit hohem Kontaktvolumen und maximaler Reichweite",
   popular: false,
   features: ["5.000 Firmenkontakte/Monat", "2.000 Recherche-Läufe/Monat", "1.000 KI-Aktionen/Monat", "Eigene E-Mail-Vorlagen", "Erweiterte Reports", "5.000 E-Mails/Monat", "Priority Support"],
   cta: "Gold buchen"
@@ -70,7 +70,7 @@ const FEATURES = [
 { icon: BarChart3, title: "Vertriebssteuerung & Auswertung", desc: "Sehen Sie Fortschritt, offene Aufgaben, Aktivität und Ergebnisse Ihres Vertriebs auf einen Blick.", accent: "indigo" },
 { icon: Layout, title: "Alles leicht bedienbar", desc: "Keine komplizierte CRM-Einrichtung. Zielgebiet festlegen, Kontakte recherchieren, losarbeiten.", accent: "slate" },
 { icon: Brain, title: "System das mitlernt", desc: "Je mehr Sie nutzen, desto besser wird Vertriebo. Erfolgreiche Branchen werden automatisch priorisiert.", accent: "orange" },
-{ icon: BarChart3, title: "Echtzeit-Erfolgsquoten", desc: "Sehen Sie sofort, wie Ihr Team performt: Quote pro Vertriebler, beste Branchen, ROI der Recherche.", accent: "rose" }];
+{ icon: BarChart3, title: "Echtzeit-Erfolgsquoten", desc: "Sehen Sie sofort, wie Ihr Vertrieb läuft: Kontaktquote, beste Branchen, ROI der Recherche.", accent: "rose" }];
 
 const ACCENT_COLORS = {
   blue: { bg: "rgba(37,99,235,0.06)", border: "rgba(37,99,235,0.2)", iconBg: "rgba(37,99,235,0.1)", iconColor: "#60a5fa" },

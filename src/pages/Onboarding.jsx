@@ -93,13 +93,6 @@ export default function Onboarding() {
           service_area_city: cityName,
           service_area_radius_km: data.radius,
         });
-        await base44.entities.OrganizationMember.create({
-          organization_id: currentOrg.id,
-          user_email: user.email,
-          role: "organization_admin",
-          status: "active",
-          invited_by: user.email,
-        });
         setOrg(currentOrg);
       } else {
         await base44.entities.Organization.update(currentOrg.id, {

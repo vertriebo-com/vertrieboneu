@@ -547,10 +547,10 @@ export default function BillingSettings({ org: orgProp, user }) {
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Plan-Limits im Überblick</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
           {[
-            { label: "Benutzer", value: plan.max_users === -1 ? "∞" : plan.max_users },
             { label: "Leads/Monat", value: plan.max_leads_per_month === -1 ? "∞" : plan.max_leads_per_month },
-            { label: "E-Mails/Monat", value: plan.max_emails_per_month === -1 ? "∞" : plan.max_emails_per_month },
+            { label: "Recherchen/Monat", value: plan.max_lead_generations_per_month === -1 ? "∞" : plan.max_lead_generations_per_month },
             { label: "KI-Aktionen/Monat", value: plan.max_ai_scorings_per_month === -1 ? "∞" : plan.max_ai_scorings_per_month },
+            { label: "E-Mails/Monat", value: plan.max_emails_per_month === -1 ? "∞" : plan.max_emails_per_month },
           ].map(item => (
             <div key={item.label} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
               <div className="text-2xl font-extrabold text-slate-950">{item.value}</div>
