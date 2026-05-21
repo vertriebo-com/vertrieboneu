@@ -48,7 +48,6 @@ export default function LeadDetail() {
   const [showBlacklistConfirm, setShowBlacklistConfirm] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [orgId, setOrgId] = useState(null);
-  const [organizationMember, setOrganizationMember] = useState(null);
 
   useEffect(() => { loadData(); }, [id]);
 
@@ -57,27 +56,20 @@ export default function LeadDetail() {
       const me = await base44.auth.me();
       if (!me) { toast.error("Nicht angemeldet"); navigate("/"); return; }
 
-      let orgId = null;
+      // MVP: 1 Account = 1 Organisation → nur Owner-Org
       const orgs = await base44.entities.Organization.filter({ owner_email: me.email });
-      let org = orgs?.[0] || null;
-      if (!org) {
-        const memberships = await base44.entities.OrganizationMember.filter({ user_email: me.email, status: "active" });
-        if (memberships?.[0]?.organization_id) {
-          const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-          org = memberOrgs?.[0] || null;
-        }
-      }
-      orgId = org?.id || null;
+      const org = orgs?.[0] || null;
+      const orgId = org?.id || null;
+      
       if (!orgId) { toast.error("Keine Organisation gefunden"); navigate("/"); return; }
 
       setCurrentUser(me);
       setOrgId(orgId);
 
-      const [comp, logs, allTasks, members] = await Promise.all([
+      const [comp, logs, allTasks] = await Promise.all([
         base44.entities.Company.filter({ id, organization_id: orgId }),
         base44.entities.ContactLog.filter({ company_id: id, organization_id: orgId }),
         base44.entities.Task.filter({ company_id: id, organization_id: orgId }),
-        base44.entities.OrganizationMember.filter({ organization_id: orgId, user_email: me.email, status: "active" }),
       ]);
 
       if (!comp || comp.length === 0) {
@@ -87,24 +79,21 @@ export default function LeadDetail() {
       }
 
       const loadedCompany = comp[0];
-      const organizationMember = members?.[0] || null;
       const userIsPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(me.role);
-      const userIsOrgAdmin = organizationMember?.role === "organization_admin";
-      const userCanAccessAllLeads = userIsPlatformAdmin || userIsOrgAdmin;
+      const userIsOwner = org.owner_email === me.email;
+      const userCanAccessAllLeads = userIsPlatformAdmin || userIsOwner;
 
-      if (!userCanAccessAllLeads) {
-        if (loadedCompany.assigned_to && loadedCompany.assigned_to !== me.email) {
-          toast.error("Dieses Lead ist einem anderen Vertriebler zugewiesen");
-          navigate("/leads");
-          return;
-        }
+      // MVP: Kein assigned_to-Check für normale Kunden (Owner hat immer Zugriff)
+      if (!userCanAccessAllLeads && loadedCompany.assigned_to && loadedCompany.assigned_to !== me.email) {
+        toast.error("Dieses Lead ist einem anderen Vertriebler zugewiesen");
+        navigate("/leads");
+        return;
       }
 
       setCompany(loadedCompany);
       setNotizen(loadedCompany.notizen || "");
       setContactLogs(logs.sort((a, b) => new Date(b.created_date) - new Date(a.created_date)));
       setTasks(allTasks.sort((a, b) => new Date(a.faellig_am || 0) - new Date(b.faellig_am || 0)));
-      setOrganizationMember(organizationMember);
       setLoading(false);
     } catch (error) {
       console.error("Fehler beim Laden:", error);
@@ -156,8 +145,10 @@ export default function LeadDetail() {
   };
 
   const isPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(currentUser?.role);
-  const isOrganizationAdmin = organizationMember?.role === "organization_admin";
-  const canUseAdminActions = isPlatformAdmin || isOrganizationAdmin;
+  // MVP: Owner = currentUser hat Owner-Rechte für seine Org (orgId ist Owner-Org)
+  const isOwner = orgId !== null;
+  // Admin-Aktionen: PlatformAdmin oder Owner der aktuellen Org
+  const canUseAdminActions = isPlatformAdmin || isOwner;
 
   const handleEnrich = async () => {
     if (enrichingRef.current) return;

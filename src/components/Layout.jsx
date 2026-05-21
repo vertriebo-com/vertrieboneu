@@ -45,11 +45,11 @@ export default function Layout() {
       const me = await base44.auth.me();
       setUser(me);
       if (!me) return;
-      // Plattform-Admin hat immer Zugriff
+      // MVP: 1 Account = 1 Owner → Owner ist automatisch Admin
       if (me.role === "admin") {setOrgRole("organization_admin");return;}
-      // OrganizationMember-Rolle laden
-      const memberships = await base44.entities.OrganizationMember.filter({ user_email: me.email, status: "active" });
-      setOrgRole(memberships?.[0]?.role || "sales_rep");
+      // Owner-Status prüfen
+      const orgs = await base44.entities.Organization.filter({ owner_email: me.email });
+      setOrgRole(orgs?.[0] ? "organization_admin" : "sales_rep");
     })();
   }, []);
 
