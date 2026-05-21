@@ -48,7 +48,7 @@ const PLANS = [
   description: "Für Agenturen & größere Teams",
   popular: false,
   isAgency: true,
-  features: ["Mehrere Kundenorganisationen", "Unbegrenzte Firmenkontakte", "Unbegrenzte Nutzer", "Persönliches Onboarding", "Eigene Kundenverwaltung"],
+  features: ["Mehrere Kundenorganisationen", "Unbegrenzte Firmenkontakte", "Persönliches Onboarding", "Eigene Kundenverwaltung", "Priority Support"],
   cta: "Demo anfragen"
 }];
 
