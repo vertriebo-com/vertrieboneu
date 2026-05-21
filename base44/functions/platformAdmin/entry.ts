@@ -114,6 +114,154 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ── AGENCY AKTIVIEREN / KONFIGURIEREN ───────────────────────────────────
+    if (action === 'activateAgency') {
+      const {
+        plan_id: newPlanId,
+        billing_status: newBillingStatus,
+        trial_stage: newTrialStage,
+        custom_monthly_lead_limit,
+        agency_contract_notes,
+        agency_valid_from,
+        agency_valid_until,
+      } = payload;
+
+      // Validierung: Agency-Plan-ID muss gesetzt sein
+      if (!newPlanId) {
+        return Response.json({ error: 'plan_id ist erforderlich für Agency-Aktivierung' }, { status: 400 });
+      }
+
+      // Plan laden und prüfen
+      const agencyPlans = await base44.asServiceRole.entities.Plan.filter({ id: newPlanId });
+      if (!agencyPlans[0]) {
+        return Response.json({ error: `Plan ${newPlanId} nicht gefunden` }, { status: 404 });
+      }
+      const agencyPlan = agencyPlans[0];
+
+      // custom_monthly_lead_limit validieren: nur Zahlen oder -1 erlaubt
+      let parsedLimit = null;
+      if (custom_monthly_lead_limit !== undefined && custom_monthly_lead_limit !== null && custom_monthly_lead_limit !== '') {
+        parsedLimit = Number(custom_monthly_lead_limit);
+        if (isNaN(parsedLimit)) {
+          return Response.json({ error: 'custom_monthly_lead_limit muss eine Zahl oder -1 sein' }, { status: 400 });
+        }
+        // Sicherheitsregel: 0 ist kein sinnvolles Limit
+        if (parsedLimit === 0) {
+          return Response.json({ error: 'custom_monthly_lead_limit=0 ist nicht erlaubt. Nutze -1 für Unlimited oder einen positiven Wert.' }, { status: 400 });
+        }
+      }
+
+      const updateData = {
+        agency_enabled: true,
+        plan_id: newPlanId,
+        billing_status: newBillingStatus || 'active',
+        trial_stage: newTrialStage || 'paid',
+        organization_type: 'agency',
+        platform_status: 'active',
+        agency_activated_by: user.email,
+        agency_activated_at: new Date().toISOString(),
+      };
+
+      if (parsedLimit !== null) updateData.custom_monthly_lead_limit = parsedLimit;
+      if (agency_contract_notes !== undefined) updateData.agency_contract_notes = agency_contract_notes;
+      if (agency_valid_from) updateData.agency_valid_from = agency_valid_from;
+      if (agency_valid_until) updateData.agency_valid_until = agency_valid_until;
+
+      await base44.asServiceRole.entities.Organization.update(organization_id, updateData);
+
+      // Audit Log
+      await base44.asServiceRole.entities.PlatformAuditLog.create({
+        actor_email: user.email,
+        actor_role: user.role,
+        action: 'activate_agency',
+        target_type: 'agency',
+        target_id: organization_id,
+        organization_id: organization_id,
+        metadata: JSON.stringify({
+          plan_id: newPlanId,
+          plan_name: agencyPlan.name,
+          billing_status: updateData.billing_status,
+          trial_stage: updateData.trial_stage,
+          custom_monthly_lead_limit: parsedLimit,
+          agency_valid_from: agency_valid_from || null,
+          agency_valid_until: agency_valid_until || null,
+          contract_notes_length: agency_contract_notes?.length || 0,
+        }),
+        reason: `Admin ${user.email} aktiviert Agency für ${org.name}. Plan=${agencyPlan.name}, Limit=${parsedLimit ?? 'Plan-Default'}`,
+      });
+
+      console.info(`[platformAdmin] activateAgency: org=${organization_id} plan=${agencyPlan.name} limit=${parsedLimit ?? 'Plan-Default'} by=${user.email}`);
+
+      return Response.json({
+        success: true,
+        action: 'activateAgency',
+        organization_id,
+        plan_name: agencyPlan.name,
+        custom_monthly_lead_limit: parsedLimit,
+        message: `Agency aktiviert. Plan: ${agencyPlan.name}. Limit: ${parsedLimit === -1 ? 'Unlimited' : (parsedLimit ?? agencyPlan.max_leads_per_month + ' (Plan-Default)')}.`,
+      });
+    }
+
+    // ── AGENCY LIMIT / NOTIZEN AKTUALISIEREN ─────────────────────────────────
+    if (action === 'updateAgencySettings') {
+      const {
+        custom_monthly_lead_limit,
+        agency_contract_notes,
+        agency_valid_from,
+        agency_valid_until,
+        plan_id: newPlanId,
+        billing_status: newBillingStatus,
+      } = payload;
+
+      const updateData = {};
+
+      if (custom_monthly_lead_limit !== undefined) {
+        if (custom_monthly_lead_limit === null || custom_monthly_lead_limit === '') {
+          updateData.custom_monthly_lead_limit = null; // zurücksetzen → Plan-Default
+        } else {
+          const parsedLimit = Number(custom_monthly_lead_limit);
+          if (isNaN(parsedLimit) || parsedLimit === 0) {
+            return Response.json({ error: 'custom_monthly_lead_limit muss eine Zahl ≠ 0 oder null sein' }, { status: 400 });
+          }
+          updateData.custom_monthly_lead_limit = parsedLimit;
+        }
+      }
+
+      if (agency_contract_notes !== undefined) updateData.agency_contract_notes = agency_contract_notes;
+      if (agency_valid_from !== undefined) updateData.agency_valid_from = agency_valid_from || null;
+      if (agency_valid_until !== undefined) updateData.agency_valid_until = agency_valid_until || null;
+      if (newPlanId !== undefined) updateData.plan_id = newPlanId;
+      if (newBillingStatus !== undefined) updateData.billing_status = newBillingStatus;
+
+      if (Object.keys(updateData).length === 0) {
+        return Response.json({ error: 'Keine Felder zum Aktualisieren' }, { status: 400 });
+      }
+
+      await base44.asServiceRole.entities.Organization.update(organization_id, updateData);
+
+      // Audit Log
+      await base44.asServiceRole.entities.PlatformAuditLog.create({
+        actor_email: user.email,
+        actor_role: user.role,
+        action: 'update_agency_settings',
+        target_type: 'agency',
+        target_id: organization_id,
+        organization_id: organization_id,
+        metadata: JSON.stringify(updateData),
+        reason: `Admin ${user.email} aktualisiert Agency-Settings für ${org.name}`,
+      });
+
+      console.info(`[platformAdmin] updateAgencySettings: org=${organization_id} fields=${Object.keys(updateData).join(',')} by=${user.email}`);
+
+      return Response.json({
+        success: true,
+        action: 'updateAgencySettings',
+        organization_id,
+        updated_fields: Object.keys(updateData),
+        message: `Agency-Settings aktualisiert: ${Object.keys(updateData).join(', ')}`,
+      });
+    }
+
     if (action === 'updateTrialStage') {
       if (!['free_preview', 'verified_trial', 'paid'].includes(trial_stage)) {
         return Response.json({ error: 'Invalid trial_stage' }, { status: 400 });

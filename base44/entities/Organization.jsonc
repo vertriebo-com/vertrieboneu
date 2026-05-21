@@ -185,6 +185,41 @@
     "service_area_radius_km": {
       "type": "number",
       "title": "Suchradius (km)"
+    },
+    "agency_enabled": {
+      "type": "boolean",
+      "title": "Agency-Zugang aktiv (nur Admin)",
+      "description": "Nur PlatformAdmin darf dieses Feld setzen. Schaltet Agency-Features frei.",
+      "default": false
+    },
+    "custom_monthly_lead_limit": {
+      "type": "number",
+      "title": "Individuelles Lead-Limit/Monat (nur Admin)",
+      "description": "-1 = Unlimited (nur bewusst durch Admin). Wenn gesetzt, \u00fcberschreibt den Plan-Wert. Null/nicht gesetzt = Plan-Wert gilt."
+    },
+    "agency_contract_notes": {
+      "type": "string",
+      "title": "Agentur-Kontrakt-Notizen (intern)",
+      "description": "Interne Konditionsnotizen: Preis, Limits, Laufzeit, Sondervereinbarungen. Nur f\u00fcr Admins sichtbar."
+    },
+    "agency_valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Agentur-Zugang g\u00fcltig ab"
+    },
+    "agency_valid_until": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Agentur-Zugang g\u00fcltig bis"
+    },
+    "agency_activated_by": {
+      "type": "string",
+      "title": "Agency aktiviert von (E-Mail)"
+    },
+    "agency_activated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Agency aktiviert am"
     }
   },
   "required": [

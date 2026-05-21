@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import ResearchRunDiagnostics from '@/components/platform-admin/ResearchRunDiagnostics';
+import AgencyPanel from '@/components/platform-admin/AgencyPanel';
 import LeadScoringDiagnostics from '@/components/platform-admin/LeadScoringDiagnostics';
 import LeadEngineDryTest from '@/components/platform-admin/LeadEngineDryTest';
 import UsageBillingDiagnostics from '@/components/platform-admin/UsageBillingDiagnostics';
@@ -762,24 +763,29 @@ export default function PlatformAdmin() {
                   </div>
                 </div>
 
-                {/* Agency-Info (falls Agency) */}
-                {selectedOrg.organization_type === 'agency' && (
+                {/* Agency-Verwaltung — für alle Orgs sichtbar (Admin kann jede Org zur Agency machen) */}
+                <AgencyPanel
+                  org={selectedOrg}
+                  plans={plans}
+                  onRefetch={() => { refetch(); setSelectedOrg(null); }}
+                />
+
+                {/* Agency-Kunden (falls bereits Agency mit Kunden) */}
+                {selectedOrg.organization_type === 'agency' && getAgencyStats(selectedOrg.id).clientCount > 0 && (
                   <div>
-                    <h3 className="text-xs font-bold uppercase text-slate-600 mb-3">Agentur-Informationen</h3>
-                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                      <p className="text-xs text-slate-600 font-medium mb-3">Zugehörige Kundenorganisationen: {getAgencyStats(selectedOrg.id).clientCount}</p>
-                      {getAgencyStats(selectedOrg.id).clients.length > 0 ? (
-                        <div className="space-y-2">
-                          {getAgencyStats(selectedOrg.id).clients.map(client => (
-                            <div key={client.id} className="text-xs bg-white rounded px-2 py-1 border border-purple-100">
-                              <p className="font-semibold text-slate-900">{client.name}</p>
-                              <p className="text-slate-500">{client.owner_email}</p>
-                            </div>
-                          ))}
+                    <h3 className="text-xs font-bold uppercase text-slate-600 mb-3">Agentur-Kunden ({getAgencyStats(selectedOrg.id).clientCount})</h3>
+                    <div className="space-y-2">
+                      {getAgencyStats(selectedOrg.id).clients.map(client => (
+                        <div key={client.id} className="text-xs bg-white rounded px-2 py-1.5 border border-slate-200 flex justify-between items-center">
+                          <div>
+                            <p className="font-semibold text-slate-900">{client.name}</p>
+                            <p className="text-slate-500">{client.owner_email}</p>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                            {client.leads_count || 0} Leads
+                          </span>
                         </div>
-                      ) : (
-                        <p className="text-xs text-slate-500">Keine Kunden zugewiesen</p>
-                      )}
+                      ))}
                     </div>
                   </div>
                 )}

@@ -45,11 +45,11 @@ const PLANS = [
   slug: "agency",
   planId: "69fb1b37d7433caf98c34ffb",
   price: null,
-  description: "Für Agenturen & größere Teams",
+  description: "Für Agenturen & Vertriebsteams. Individuell vereinbarte Konditionen – kein Self-Service-Checkout.",
   popular: false,
   isAgency: true,
-  features: ["Mehrere Kundenorganisationen", "Unbegrenzte Firmenkontakte", "Persönliches Onboarding", "Eigene Kundenverwaltung", "Priority Support"],
-  cta: "Demo anfragen"
+  features: ["Leads nach individuellem Limit", "Persönliches Onboarding & Setup", "Eigene Kundenverwaltung", "Dedizierter Ansprechpartner", "Priority Support"],
+  cta: "Kontakt aufnehmen →"
 }];
 
 
@@ -794,7 +794,10 @@ export default function Landing() {
                   <div style={{ fontSize: 13, color: plan.popular ? "rgba(147,197,253,0.8)" : "rgba(148,163,184,1)", marginBottom: 20, lineHeight: 1.5 }}>{plan.description}</div>
                   <div style={{ marginBottom: 24 }}>
                     {plan.isAgency ?
-                  <span style={{ fontSize: 20, fontWeight: 800, color: "white" }}>Individuelle Preisgestaltung</span> :
+                  <div>
+                    <span style={{ fontSize: 28, fontWeight: 900, color: "white" }}>Auf Anfrage</span>
+                    <p style={{ fontSize: 12, color: "rgba(148,163,184,0.7)", marginTop: 4 }}>Preis & Limits individuell</p>
+                  </div> :
 
                   <><span style={{ fontSize: 40, fontWeight: 900, color: "white" }}>€{plan.price}</span><span style={{ fontSize: 13, color: plan.popular ? "rgba(147,197,253,0.7)" : "rgba(148,163,184,1)", marginLeft: 4 }}>/Monat</span></>
                   }

@@ -134,7 +134,15 @@ Deno.serve(async (req) => {
     }
 
     // ── LIMIT-AUFLÖSUNG (PRODUKTREGEL) ─────────────────────────────────────
-    // unlimited gilt AUSSCHLIESSLICH wenn: Plan existiert UND max_leads_per_month === -1
+    // PRIORITÄT: custom_monthly_lead_limit (Admin-Override) > Plan-Wert
+    // custom_monthly_lead_limit: nur PlatformAdmin kann setzen (enforced in platformAdmin.js)
+    // -1 = Unlimited (bewusst durch Admin, nicht durch Plan-Default)
+    // null/nicht gesetzt = Plan-Wert gilt
+    const hasCustomLimit = org.custom_monthly_lead_limit != null;
+
+    // unlimited gilt AUSSCHLIESSLICH wenn:
+    // (a) custom_monthly_lead_limit === -1 (Admin-Override), ODER
+    // (b) Plan existiert UND max_leads_per_month === -1
     // NIEMALS wenn plan === null, plan_id fehlt, oder Plan ungültig ist.
     //
     // Fallback-Hierarchie (identisch zu startResearchRun):
@@ -149,8 +157,13 @@ Deno.serve(async (req) => {
     const isPaidCustomer = ['paid'].includes(trialStage) || ['active', 'trialing'].includes(org.billing_status || '');
 
     let monthlyLimit;
-    let planStatus = 'ok'; // "ok" | "billing_plan_missing" | "billing_plan_invalid" | "trial_limit" | "no_plan_preview"
-    if (plan) {
+    let planStatus = 'ok'; // "ok" | "billing_plan_missing" | "billing_plan_invalid" | "trial_limit" | "no_plan_preview" | "custom_limit"
+    if (hasCustomLimit) {
+      // Admin-Override: custom_monthly_lead_limit hat höchste Priorität
+      monthlyLimit = org.custom_monthly_lead_limit;
+      planStatus = 'custom_limit';
+      console.info(`[getUsageSummary] custom_monthly_lead_limit=${monthlyLimit} (Admin-Override) org=${orgId}`);
+    } else if (plan) {
       // Plan geladen — max_leads_per_month auslesen
       // null wird NICHT als unlimited behandelt: defensiv auf 50 setzen (Admin-Fehler sichtbar machen)
       monthlyLimit = (plan.max_leads_per_month != null) ? plan.max_leads_per_month : 50;
@@ -177,7 +190,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const isUnlimited = plan !== null && monthlyLimit === -1;
+    // Unlimited: custom -1 ODER Plan mit -1 (beide explizit durch Admin)
+    const isUnlimited = monthlyLimit === -1;
     const monthlyRemaining = isUnlimited ? null : Math.max(0, monthlyLimit - monthlyUsed);
     // IDENTISCH zu startResearchRun Zeile 255: >= (nicht >)
     // Bei used===limit: startResearchRun blockt (>=), getUsageSummary muss is_over_limit=true anzeigen.

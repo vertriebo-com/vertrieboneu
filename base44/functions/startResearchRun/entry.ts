@@ -180,7 +180,15 @@ Deno.serve(async (req) => {
     let monthlyContactLimit = -1; // -1 = wird unten weiter aufgelöst
 
     if (!isPlatformAdmin && trialStage !== 'free_preview') {
-      if (!org.plan_id) {
+      // ── CUSTOM LIMIT (Agency / individuell durch Admin gesetzt) ────────────
+      // custom_monthly_lead_limit überschreibt den Plan-Wert vollständig.
+      // -1 = Unlimited (nur wenn bewusst durch Admin gesetzt).
+      // null/nicht gesetzt = Plan-Wert gilt.
+      // Sicherheit: nur PlatformAdmin kann dieses Feld setzen (enforced in platformAdmin.js).
+      if (org.custom_monthly_lead_limit != null) {
+        monthlyContactLimit = org.custom_monthly_lead_limit;
+        console.info(`[startResearchRun] custom_monthly_lead_limit=${monthlyContactLimit} (Admin-Override)`);
+      } else if (!org.plan_id) {
         // Kein Plan gesetzt → prüfen ob das erlaubt ist
         if (trialStage === 'paid') {
           // Paid-Kunde ohne Plan: Konfigurationsfehler → blockieren
@@ -207,7 +215,7 @@ Deno.serve(async (req) => {
           }, { status: 402 });
         }
         // PRODUKTREGEL: unlimited gilt NUR wenn Plan existiert UND max_leads_per_month === -1.
-        // null/undefined bei max_leads_per_month ist Admin-Fehler → defensiv auf 50 (sichtbarer Fehler, kein silent unlimited).
+        // null → defensiv auf 50 (Admin-Konfigurationsfehler sichtbar machen).
         // -1 → echter Unlimited-Plan (Agency etc.)
         const rawLimit = plans[0].max_leads_per_month;
         monthlyContactLimit = (rawLimit != null) ? rawLimit : 50;
