@@ -82,7 +82,7 @@ const PAGE_CONFIG = {
   },
   "/settings": {
     title: "Einstellungen",
-    subtitle: "Unternehmen, Kommunikation, Team und Abonnement verwalten",
+    subtitle: "Unternehmen, Kommunikation und Abonnement verwalten",
     icon: Settings,
     showSearch: false,
   },

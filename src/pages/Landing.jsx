@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Check, Zap, ArrowRight, ChevronDown, Star, MapPin, Target, Phone, Mail, Users, TrendingUp, Shield, Brain, BarChart3, User, Search, Globe, Calendar, FileText, Layout, Lightbulb, CircleHelp } from "lucide-react";
+import { Check, Zap, ArrowRight, ChevronDown, Star, MapPin, Target, Phone, Mail, TrendingUp, Shield, Brain, BarChart3, User, Search, Globe, Calendar, FileText, Layout, Lightbulb, CircleHelp } from "lucide-react";
 import { toast } from "sonner";
 import { base44 } from "@/api/base44Client";
 import VertrieboLogo from "@/components/VertrieboLogo";
@@ -25,7 +25,7 @@ const PLANS = [
   slug: "professional",
   planId: "69fb1b37d7433caf98c34ffa",
   price: "199",
-  description: "Für Teams, die regelmäßig aktiv Vertrieb machen",
+  description: "Für Betriebe, die regelmäßig aktiv Vertrieb machen",
   popular: true,
   features: ["1.500 Firmenkontakte/Monat", "750 Recherche-Läufe/Monat", "300 KI-Aktionen/Monat", "Eigene E-Mail-Vorlagen", "Erweiterte Reports", "2.000 E-Mails/Monat"],
   cta: "Professional buchen"
@@ -67,7 +67,7 @@ const FEATURES = [
 { icon: Star, title: "Priorisierte Tagesliste", desc: "Tagesprioritäten statt Chaos. Heute fällige Rückrufe, priorisierte Neuleads und offene Angebote – Ihr Team sieht auf einen Blick, wer heute angerufen werden sollte.", accent: "amber" },
 { icon: Phone, title: "Komplette Kontakthistorie", desc: "Alle Gespräche, E-Mails und Notizen zu jeder Firma an einem Ort. Anrufe dokumentiert, E-Mail-Verlauf, gespeicherte Notizen – nichts geht verloren.", accent: "emerald" },
 { icon: Mail, title: "E-Mails & Follow-ups", desc: "E-Mail-Vorlagen mit Ihrem Logo und Signatur, automatische Aufgaben und Follow-up-Erinnerungen – von Erstansprache bis Nachfassen alles organisiert.", accent: "purple" },
-{ icon: Users, title: "Vertriebssteuerung für Teams", desc: "Admins sehen Fortschritt, offene Aufgaben, Aktivität und Ergebnisse. Vertriebler sehen nur ihre eigenen Leads.", accent: "indigo" },
+{ icon: BarChart3, title: "Vertriebssteuerung & Auswertung", desc: "Sehen Sie Fortschritt, offene Aufgaben, Aktivität und Ergebnisse Ihres Vertriebs auf einen Blick.", accent: "indigo" },
 { icon: Layout, title: "Alles leicht bedienbar", desc: "Keine komplizierte CRM-Einrichtung. Zielgebiet festlegen, Kontakte recherchieren, losarbeiten.", accent: "slate" },
 { icon: Brain, title: "System das mitlernt", desc: "Je mehr Sie nutzen, desto besser wird Vertriebo. Erfolgreiche Branchen werden automatisch priorisiert.", accent: "orange" },
 { icon: BarChart3, title: "Echtzeit-Erfolgsquoten", desc: "Sehen Sie sofort, wie Ihr Team performt: Quote pro Vertriebler, beste Branchen, ROI der Recherche.", accent: "rose" }];
