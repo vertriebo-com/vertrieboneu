@@ -16,30 +16,25 @@ Deno.serve(async (req) => {
       requestedOrgId = body?.org_id || null;
     } catch {}
 
-    // Organisation ermitteln + Zugriff validieren
+    // ── MVP: 1 Paket = 1 Account = 1 Organisation ─────────────────────────
+    // Keine OrganizationMember-Lookups. Zugriff nur über owner_email oder PlatformAdmin.
     const isPlatformAdmin = ["admin", "platform_owner", "platform_admin", "support_agent", "readonly_support"].includes(user.role);
-    
-    const [ownerOrgs, memberships] = await Promise.all([
-      base44.entities.Organization.filter({ owner_email: user.email }),
-      base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" }),
-    ]);
 
     let org = null;
     if (requestedOrgId) {
-      const isOwner = ownerOrgs.some(o => o.id === requestedOrgId);
-      const memberEntry = memberships.find(m => m.organization_id === requestedOrgId);
-      if (isOwner || memberEntry || isPlatformAdmin) {
-        const targetOrgs = await base44.asServiceRole.entities.Organization.filter({ id: requestedOrgId });
-        org = targetOrgs?.[0] || null;
+      const targetOrgs = await base44.asServiceRole.entities.Organization.filter({ id: requestedOrgId });
+      const targetOrg = targetOrgs?.[0] || null;
+      if (!targetOrg) {
+        return Response.json({ error: 'no_organization_found' }, { status: 404 });
+      }
+      if (targetOrg.owner_email === user.email || isPlatformAdmin) {
+        org = targetOrg;
       } else {
         return Response.json({ error: 'Forbidden' }, { status: 403 });
       }
     } else {
+      const ownerOrgs = await base44.entities.Organization.filter({ owner_email: user.email });
       org = ownerOrgs?.[0] || null;
-      if (!org && memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        org = memberOrgs?.[0] || null;
-      }
       if (!org && isPlatformAdmin) {
         const anyOrg = await base44.asServiceRole.entities.Organization.list("-created_date", 1);
         org = anyOrg?.[0] || null;
@@ -47,7 +42,7 @@ Deno.serve(async (req) => {
     }
 
     if (!org) {
-      return Response.json({ error: 'No organization found' }, { status: 404 });
+      return Response.json({ error: 'no_organization_found' }, { status: 404 });
     }
 
     const orgId = org.id;
@@ -124,9 +119,17 @@ Deno.serve(async (req) => {
     const usageLogDiff = usageLogValue - committedSlots;
 
     // ── PLAN LADEN ─────────────────────────────────────────────────────────
-    const plan = org.plan_id 
-      ? (await base44.asServiceRole.entities.Plan.filter({ id: org.plan_id }))?.[0] 
-      : null;
+    // Robuster Lookup: ungültige plan_id-Werte (z.B. "plan_starter" statt echter Entity-ID) werden abgefangen.
+    let plan = null;
+    if (org.plan_id) {
+      try {
+        const planResult = await base44.asServiceRole.entities.Plan.filter({ id: org.plan_id });
+        plan = planResult?.[0] || null;
+      } catch {
+        // plan_id ist kein gültiger Entity-ID → wie kein Plan behandeln (unlimited defaults)
+        plan = null;
+      }
+    }
 
     const monthlyLimit = plan?.max_leads_per_month ?? -1;
     const isUnlimited = monthlyLimit === -1;
