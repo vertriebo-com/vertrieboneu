@@ -46,7 +46,8 @@ export default function Leads() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const newRun = params.get("new_run");
-    setNewRunFilter(newRun);
+    // P0-FIX: "undefined" als String oder null → nicht setzen
+    setNewRunFilter(newRun && newRun !== "undefined" && newRun !== "null" ? newRun : null);
     const searchParam = params.get("search");
     setSearch(searchParam || "");
     

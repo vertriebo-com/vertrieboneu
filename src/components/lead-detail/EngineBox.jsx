@@ -164,10 +164,29 @@ export default function EngineBox({ company, contactLogs = [], tasks = [], orgId
   const handleReanalyze = async () => {
     setAnalyzing(true);
     try {
+      // P0-FIX: Org-ID sicher ermitteln wenn nicht über Props
+      let targetOrgId = orgId;
+      if (!targetOrgId) {
+        const user = await base44.auth.me();
+        if (user) {
+          const memberOrgs = await base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" });
+          if (memberOrgs?.[0]) {
+            targetOrgId = memberOrgs[0].organization_id;
+          } else {
+            const ownerOrgs = await base44.entities.Organization.filter({ owner_email: user.email });
+            targetOrgId = ownerOrgs?.[0]?.id;
+          }
+        }
+      }
+      if (!targetOrgId) {
+        toast.error("Keine Organisation gefunden");
+        setAnalyzing(false);
+        return;
+      }
       await base44.functions.invoke("analyzeLeadEngine", {
         mode: "single",
         company_id: company.id,
-        organization_id: orgId
+        organization_id: targetOrgId
       });
       if (onReanalyze) await onReanalyze();
       toast.success("Analyse aktualisiert");

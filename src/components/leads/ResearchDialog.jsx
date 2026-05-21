@@ -176,6 +176,10 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
       if (data.done || ['completed', 'partial', 'failed'].includes(data?.status)) {
         stopPolling();
         setPhase("done");
+        // P0-FIX: Direkt zur Leads-Seite mit korrekter run_id navigieren (nicht undefined!)
+        if (researchRunId) {
+          window.location.href = `/leads?new_run=${researchRunId}`;
+        }
         onSuccess?.();
       }
 

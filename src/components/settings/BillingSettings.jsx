@@ -205,8 +205,9 @@ export default function BillingSettings({ org: orgProp, user }) {
 
       // Alle aktiven Pläne mit Stripe-Preis laden (für Plan-Auswahl)
       const availablePlans = await base44.entities.Plan.filter({ is_active: true });
+      // P0-FIX: Agency-Plan aus Self-Service entfernen (nur auf Anfrage)
       const plansWithPrice = availablePlans
-        .filter(p => p.stripe_price_id)
+        .filter(p => p.stripe_price_id && p.plan_type !== 'agency')
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
       setAllPlans(plansWithPrice);
 
@@ -428,13 +429,16 @@ export default function BillingSettings({ org: orgProp, user }) {
             </Button>
             <Button
               onClick={handlePortal}
-              disabled={portalLoading || !org?.stripe_customer_id}
+              disabled={portalLoading || !org?.stripe_customer_id || !subscription}
               size="sm"
               className="gap-1.5"
             >
               {portalLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
               Abo verwalten
             </Button>
+            {!org?.stripe_customer_id && (
+              <p className="text-xs text-slate-500">Noch kein aktives Abo vorhanden</p>
+            )}
           </div>
         </div>
 
@@ -518,21 +522,21 @@ export default function BillingSettings({ org: orgProp, user }) {
           label="Recherche-Läufe"
           icon={Search}
           used={usageSummary?.research_runs_used || 0}
-          max={plan?.max_lead_generations_per_month ?? -1}
+          max={org?.trial_stage === 'free_preview' ? 3 : (plan?.max_lead_generations_per_month ?? -1)}
           color="bg-indigo-500"
         />
         <UsageBar
           label="KI-Aktionen"
           icon={Brain}
           used={usageSummary?.ai_actions_used || 0}
-          max={plan?.max_ai_scorings_per_month ?? -1}
+          max={org?.trial_stage === 'free_preview' ? 10 : (plan?.max_ai_scorings_per_month ?? -1)}
           color="bg-purple-500"
         />
         <UsageBar
           label="E-Mails dokumentiert"
           icon={Mail}
           used={usageSummary?.manual_emails_logged || 0}
-          max={-1}
+          max={org?.trial_stage === 'free_preview' ? 5 : -1}
           color="bg-green-500"
         />
       </div>
