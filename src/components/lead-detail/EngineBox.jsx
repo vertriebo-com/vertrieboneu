@@ -164,18 +164,17 @@ export default function EngineBox({ company, contactLogs = [], tasks = [], orgId
   const handleReanalyze = async () => {
     setAnalyzing(true);
     try {
-      // P0-FIX: Org-ID sicher ermitteln wenn nicht über Props
+      // P0-FIX: Org-ID Priorität: Props → company.organization_id → Owner-Org (kein Member-Fallback)
       let targetOrgId = orgId;
+      if (!targetOrgId) {
+        targetOrgId = company?.organization_id;
+      }
       if (!targetOrgId) {
         const user = await base44.auth.me();
         if (user) {
-          const memberOrgs = await base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" });
-          if (memberOrgs?.[0]) {
-            targetOrgId = memberOrgs[0].organization_id;
-          } else {
-            const ownerOrgs = await base44.entities.Organization.filter({ owner_email: user.email });
-            targetOrgId = ownerOrgs?.[0]?.id;
-          }
+          // MVP: 1 Account = 1 Organisation → nur Owner-Org prüfen
+          const ownerOrgs = await base44.entities.Organization.filter({ owner_email: user.email });
+          targetOrgId = ownerOrgs?.[0]?.id;
         }
       }
       if (!targetOrgId) {

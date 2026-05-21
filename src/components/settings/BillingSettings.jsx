@@ -545,8 +545,8 @@ export default function BillingSettings({ org: orgProp, user }) {
       )}
       </div>
 
-      {/* Plan Limits Info */}
-      {plan && (
+      {/* Plan Limits Info — bei free_preview Vorschau-Limits anzeigen */}
+      {plan && org?.trial_stage !== 'free_preview' && (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Plan-Limits im Überblick</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
@@ -564,6 +564,29 @@ export default function BillingSettings({ org: orgProp, user }) {
         </div>
         <p className="text-[11px] text-slate-400 mt-3">
           Leads = automatisch recherchierte Firmenkontakte. Manuell angelegte Kontakte verbrauchen kein Monatskontingent.
+        </p>
+      </div>
+      )}
+
+      {/* Free Preview Limits Info */}
+      {org?.trial_stage === 'free_preview' && (
+      <div className="bg-white border border-blue-200 rounded-2xl p-5 shadow-sm">
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Vorschau-Limits</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          {[
+            { label: "Vorschau-Leads", value: "10" },
+            { label: "Recherchen/Tag", value: "3" },
+            { label: "KI-Aktionen", value: "10" },
+            { label: "E-Mails", value: "5" },
+          ].map(item => (
+            <div key={item.label} className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="text-2xl font-extrabold text-blue-700">{item.value}</div>
+              <div className="text-[11px] font-semibold text-blue-600 mt-1">{item.label}</div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-blue-600 mt-3">
+          Kostenlose Vorschau: 10 Leads insgesamt, max. 3 Recherchen pro Tag. Danach Plan auswählen.
         </p>
       </div>
       )}
