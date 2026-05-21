@@ -1,324 +1,44 @@
-import { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
-import { Users, UserPlus, RefreshCw, Crown, Trash2, LayoutDashboard, Clock, CheckCircle2, Mail, Copy, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "sonner";
+/**
+ * UserManagement – MVP: zeigt nur den aktuellen Account-Inhaber.
+ * Keine Team-Einladungen, keine Mitgliederverwaltung für normale Kunden.
+ * PlatformAdmin-Verwaltung erfolgt separat über /platform/admin.
+ */
+import { User, Mail, Crown } from "lucide-react";
 import SettingsSection from "./SettingsSection";
-import SalesDashboardModal from "@/components/SalesDashboardModal";
 
-const ROLE_LABELS = {
-  organization_admin: { label: "Admin", color: "bg-blue-100 text-blue-700" },
-  sales_rep:          { label: "Vertriebler", color: "bg-green-100 text-green-700" },
-  admin:              { label: "Plattform-Admin", color: "bg-purple-100 text-purple-700" },
-  user:               { label: "Vertriebler", color: "bg-green-100 text-green-700" },
-};
-
-const STATUS_LABELS = {
-  active:   { label: "Aktiv",       color: "bg-green-100 text-green-700",   icon: CheckCircle2 },
-  invited:  { label: "Ausstehend",  color: "bg-amber-100 text-amber-700",   icon: Clock },
-  inactive: { label: "Inaktiv",     color: "bg-gray-100 text-gray-600",     icon: AlertCircle },
-};
-
-function formatRelativeDate(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  const diff = (Date.now() - d.getTime()) / 1000;
-  if (diff < 60) return "Gerade eben";
-  if (diff < 3600) return `vor ${Math.floor(diff / 60)} Min.`;
-  if (diff < 86400) return `vor ${Math.floor(diff / 3600)} Std.`;
-  if (diff < 604800) return `vor ${Math.floor(diff / 86400)} Tagen`;
-  return d.toLocaleDateString("de-DE");
-}
-
-export default function UserManagement({ users, currentUser, onRefresh }) {
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("sales_rep");
-  const [inviting, setInviting] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteUserId, setDeleteUserId] = useState(null);
-  const [deleteUserName, setDeleteUserName] = useState("");
-  const [dashboardUser, setDashboardUser] = useState(null);
-  const [orgMembers, setOrgMembers] = useState([]);
-  const [pendingInvites, setPendingInvites] = useState([]);
-  const [orgId, setOrgId] = useState(null);
-
-  useEffect(() => {
-    loadOrgData();
-  }, [currentUser]);
-
-  const loadOrgData = async () => {
-    if (!currentUser) return;
-    // Resolve org
-    const orgs = await base44.entities.Organization.filter({ owner_email: currentUser.email });
-    let foundOrg = orgs?.[0] || null;
-    if (!foundOrg) {
-      const memberships = await base44.entities.OrganizationMember.filter({ user_email: currentUser.email, status: "active" });
-      if (memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        foundOrg = memberOrgs?.[0] || null;
-      }
-    }
-    if (!foundOrg) return;
-    setOrgId(foundOrg.id);
-
-    const [members, invites] = await Promise.all([
-      base44.entities.OrganizationMember.filter({ organization_id: foundOrg.id }),
-      base44.entities.Invite.filter({ organization_id: foundOrg.id, status: "pending" }),
-    ]);
-    setOrgMembers(members);
-    setPendingInvites(invites);
-  };
-
-  const handleInvite = async () => {
-    if (!inviteEmail || !inviteEmail.includes("@")) {
-      toast.error("Bitte eine gültige E-Mail-Adresse eingeben.");
-      return;
-    }
-    if (!orgId) { toast.error("Organisation nicht gefunden."); return; }
-    setInviting(true);
-    try {
-      // Base44 Plattform-Einladung
-      await base44.users.inviteUser(inviteEmail.trim().toLowerCase(), inviteRole === "organization_admin" ? "admin" : "user");
-
-      // OrganizationMember-Eintrag erstellen (invited)
-      await base44.entities.OrganizationMember.create({
-        organization_id: orgId,
-        user_email: inviteEmail.trim().toLowerCase(),
-        role: inviteRole,
-        status: "invited",
-        invited_by: currentUser?.email,
-      });
-
-      toast.success(`Einladung an ${inviteEmail} gesendet!`);
-      setInviteEmail("");
-      loadOrgData();
-      onRefresh();
-    } catch (e) {
-      toast.error("Fehler: " + e.message);
-    }
-    setInviting(false);
-  };
-
-  const handleRoleChange = async (memberId, newRole) => {
-    await base44.entities.OrganizationMember.update(memberId, { role: newRole });
-    toast.success("Rolle aktualisiert.");
-    loadOrgData();
-  };
-
-  const handleDeleteMember = async () => {
-    await base44.entities.OrganizationMember.update(deleteUserId, { status: "inactive" });
-    toast.success(`"${deleteUserName}" deaktiviert.`);
-    setDeleteConfirmOpen(false);
-    loadOrgData();
-  };
-
-  const handleDeleteUser = async () => {
-    await base44.entities.User.delete(deleteUserId);
-    toast.success(`Benutzer "${deleteUserName}" gelöscht.`);
-    setDeleteConfirmOpen(false);
-    onRefresh();
-  };
-
-  // Merge: active members + platform users
-  const memberMap = {};
-  orgMembers.forEach(m => { memberMap[m.user_email] = m; });
-
-  // Include current user in list (owner might not have a member record)
-  const allEmails = new Set([
-    ...(currentUser ? [currentUser.email] : []),
-    ...orgMembers.map(m => m.user_email),
-  ]);
-
-  const displayMembers = [...allEmails].map(email => {
-    const platformUser = users.find(u => u.email === email);
-    const member = memberMap[email];
-    return { email, platformUser, member };
-  });
-
+export default function UserManagement({ currentUser }) {
   return (
-    <>
-      {/* Einladen */}
-      <SettingsSection icon={UserPlus} title="Teammitglied einladen" description="Der Benutzer erhält eine E-Mail mit Login-Link und wird Ihrer Organisation hinzugefügt.">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Input
-            placeholder="E-Mail-Adresse"
-            value={inviteEmail}
-            onChange={e => setInviteEmail(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleInvite()}
-            className="flex-1"
-          />
-          <Select value={inviteRole} onValueChange={setInviteRole}>
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sales_rep">Vertriebler</SelectItem>
-              <SelectItem value="organization_admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={handleInvite} disabled={inviting} className="gap-2 whitespace-nowrap h-11 px-5 text-sm font-semibold">
-            <UserPlus className="w-4 h-4" />
-            {inviting ? "Einladung..." : "Einladen"}
-          </Button>
+    <div className="space-y-4">
+      <SettingsSection
+        icon={User}
+        title="Mein Konto"
+        description="Ihr persönlicher Zugang zu Vertriebo."
+      >
+        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-lg font-bold text-blue-700 shrink-0">
+              {currentUser?.full_name?.charAt(0)?.toUpperCase() || currentUser?.email?.charAt(0)?.toUpperCase() || "?"}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-slate-900 truncate">{currentUser?.full_name || "—"}</p>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+                  <Crown className="w-2.5 h-2.5" /> Inhaber
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 truncate">{currentUser?.email}</p>
+            </div>
+          </div>
         </div>
       </SettingsSection>
 
-      {/* Aktive Mitglieder */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold text-slate-900">Team-Mitglieder ({displayMembers.length})</h3>
-          </div>
-          <button onClick={() => { loadOrgData(); onRefresh(); }} className="text-slate-400 hover:text-slate-700">
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {displayMembers.length === 0 && (
-          <div className="px-5 py-12 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-              <Users className="w-6 h-6 text-slate-400" />
-            </div>
-            <p className="text-sm font-bold text-slate-700">Noch keine Mitglieder</p>
-            <p className="text-xs font-medium text-slate-500 mt-1">Laden Sie Ihr Team über das Formular oben ein.</p>
-          </div>
-          )}
-          {displayMembers.map(({ email, platformUser, member }) => {
-            const isMe = email === currentUser?.email;
-            const role = member?.role || (platformUser?.role === "admin" ? "organization_admin" : "sales_rep");
-            const status = member?.status || "active";
-            const roleCfg = ROLE_LABELS[role] || ROLE_LABELS.sales_rep;
-            const statusCfg = STATUS_LABELS[status] || STATUS_LABELS.active;
-            const StatusIcon = statusCfg.icon;
-            const lastActive = member?.last_active_at || platformUser?.updated_date;
-
-            return (
-              <div key={email} className="px-5 py-4 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-sm font-bold text-blue-700 shrink-0">
-                    {platformUser?.full_name?.charAt(0)?.toUpperCase() || email.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="text-sm font-semibold text-slate-900 truncate">{platformUser?.full_name || "—"}</p>
-                      {isMe && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
-                          <Crown className="w-2.5 h-2.5" /> Du
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 truncate">{email}</p>
-                    {lastActive && (
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        Zuletzt aktiv: {formatRelativeDate(lastActive)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="shrink-0 flex items-center gap-2">
-                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${roleCfg.color}`}>
-                    {roleCfg.label}
-                  </span>
-                  <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${statusCfg.color}`}>
-                    <StatusIcon className="w-2.5 h-2.5" />
-                    {statusCfg.label}
-                  </span>
-                  {!isMe && platformUser && (
-                    <button
-                      onClick={() => setDashboardUser(platformUser)}
-                      className="p-1.5 rounded-md hover:bg-primary/10 text-slate-400 hover:text-primary transition-colors"
-                      title="Dashboard anzeigen"
-                    >
-                      <LayoutDashboard className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  {!isMe && member && (
-                    <>
-                      <Select value={role} onValueChange={val => handleRoleChange(member.id, val)}>
-                        <SelectTrigger className="w-36 h-7 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sales_rep">Vertriebler</SelectItem>
-                          <SelectItem value="organization_admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <button
-                        onClick={() => {
-                          setDeleteUserId(member.id);
-                          setDeleteUserName(platformUser?.full_name || email);
-                          setDeleteConfirmOpen(true);
-                        }}
-                        className="text-destructive/50 hover:text-destructive transition-colors p-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="flex items-start gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+        <Mail className="w-4 h-4 shrink-0 mt-0.5 text-slate-500" />
+        <p className="text-sm font-medium text-slate-700">
+          Im MVP hat jedes Vertriebo-Paket genau einen Nutzeraccount. Wenn ein weiterer Vertriebler
+          einen eigenen Zugang benötigt, registriert er sich separat mit eigener E-Mail und eigenem Plan.
+        </p>
       </div>
-
-      {/* Ausstehende Einladungen */}
-      {pendingInvites.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-          <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-amber-500" />
-            <h3 className="text-sm font-semibold text-slate-900">Ausstehende Einladungen ({pendingInvites.length})</h3>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {pendingInvites.map(invite => (
-              <div key={invite.id} className="px-5 py-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                    <Mail className="w-3.5 h-3.5 text-amber-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{invite.email}</p>
-                    <p className="text-[11px] text-slate-500 font-medium">
-                      Eingeladen als: {ROLE_LABELS[invite.role]?.label || invite.role}
-                      {invite.expires_at && ` · Gültig bis ${new Date(invite.expires_at).toLocaleDateString("de-DE")}`}
-                    </p>
-                  </div>
-                </div>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
-                  <Clock className="w-2.5 h-2.5" /> Ausstehend
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <SalesDashboardModal
-        user={dashboardUser}
-        open={!!dashboardUser}
-        onClose={() => setDashboardUser(null)}
-      />
-
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="w-4 h-4" /> Mitglied deaktivieren
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-slate-600 font-medium">
-            Soll <span className="font-semibold text-slate-900">„{deleteUserName}"</span> wirklich deaktiviert werden? Der Benutzer verliert den Zugang zur Organisation.
-          </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>Abbrechen</Button>
-            <Button variant="destructive" onClick={handleDeleteMember}>Ja, deaktivieren</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+    </div>
   );
 }

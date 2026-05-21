@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Loader2, Info, User, Building, Mail, FileCheck, Users, Zap } from "lucide-react";
+import { Loader2, Info, User, Building, Mail, FileCheck, Zap } from "lucide-react";
 import CompanySettings from "@/components/settings/CompanySettings";
 import EmailSettings from "@/components/settings/EmailSettings";
 import EmailTemplateSettings from "@/components/settings/EmailTemplateSettings";
@@ -23,12 +23,6 @@ const ADMIN_NAV_ITEMS = [
     label: "Vorlagen", 
     description: "E-Mail-Vorlagen für alle Anlässe",
     icon: FileCheck 
-  },
-  { 
-    id: "team", 
-    label: "Team", 
-    description: "Benutzer, Rollen und Berechtigungen",
-    icon: Users 
   },
   { 
     id: "billing", 
@@ -58,7 +52,6 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState(null);
   const [org, setOrg] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
-  const [users, setUsers] = useState([]);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -89,11 +82,6 @@ export default function SettingsPage() {
 
     setOrg(foundOrg);
     setRole(foundRole);
-
-    try {
-      const allUsers = await base44.entities.User.list();
-      setUsers(allUsers);
-    } catch (_) {}
 
     // Set default tab based on role or URL param
     const urlParams = new URLSearchParams(window.location.search);
@@ -126,7 +114,7 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-extrabold text-slate-900">Einstellungen</h1>
         <p className="text-sm font-semibold text-slate-800 mt-2">
           {isAdmin
-            ? "Verwalten Sie Ihr Unternehmen, Kommunikation, Team und Abonnement."
+            ? "Verwalten Sie Ihr Unternehmen, Kommunikation und Abonnement."
             : "Verwalten Sie Ihr persönliches Profil."}
         </p>
       </div>
@@ -174,7 +162,7 @@ export default function SettingsPage() {
 
         {activeTab === "templates" && isAdmin && <EmailTemplateSettings />}
         {activeTab === "team"      && isAdmin && (
-          <UserManagement users={users} currentUser={currentUser} onRefresh={loadData} />
+          <UserManagement currentUser={currentUser} />
         )}
         {activeTab === "billing"   && isAdmin && <BillingSettings org={org} user={currentUser} />}
 
@@ -202,8 +190,7 @@ export default function SettingsPage() {
             <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3">
               <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
               <p className="text-sm font-medium text-blue-900">
-                Unternehmensprofil, E-Mail-Vorlagen, Team-Verwaltung und Abonnement sind nur für Admins zugänglich.
-                Bitte wenden Sie sich an Ihren Administrator für Änderungen.
+                Unternehmensprofil, E-Mail-Vorlagen und Abonnement werden vom Kontoinhaber verwaltet.
               </p>
             </div>
           </div>
