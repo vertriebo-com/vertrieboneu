@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   Search, Filter, ChevronDown, Building2, Shield, AlertTriangle,
   Clock, DollarSign, Plus, MoreVertical, Eye, Lock, Unlock,
-  Zap, Wrench, CheckCircle2, AlertCircle
+  Zap, Wrench, CheckCircle2, AlertCircle, ArrowLeft
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import ResearchRunDiagnostics from '@/components/platform-admin/ResearchRunDiagnostics';
@@ -44,6 +45,7 @@ const BILLING_LABELS = {
 };
 
 export default function PlatformAdmin() {
+  // ── ALLE HOOKS MÜSSEN ANFANGS (React Rules of Hooks) ────────────────────
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedOrg, setSelectedOrg] = useState(null);
@@ -65,7 +67,13 @@ export default function PlatformAdmin() {
   const [savingSystemConfig, setSavingSystemConfig] = useState(false);
   const [showTrialStageDropdown, setShowTrialStageDropdown] = useState(false);
   const [changingTrialStage, setChangingTrialStage] = useState(false);
+  
+  // Auth-Check VOR dem Datenladen
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
 
+  // useQuery IMMER aufrufen (nicht conditional)
   const { data: responseData = {}, isLoading, refetch } = useQuery({
     queryKey: ['platform-organizations'],
     queryFn: async () => {
@@ -84,6 +92,57 @@ export default function PlatformAdmin() {
       }
     },
   });
+
+  // Auth-Check useEffect
+  useEffect(() => {
+    (async () => {
+      try {
+        const user = await base44.auth.me();
+        const isAdmin = ["admin", "platform_owner", "platform_admin"].includes(user?.role);
+        setIsPlatformAdmin(isAdmin);
+        setAuthChecked(true);
+      } catch {
+        setIsPlatformAdmin(false);
+        setAuthChecked(true);
+      } finally {
+        setAuthLoading(false);
+      }
+    })();
+  }, []);
+
+  // ── CONDITIONAL RENDERS NACH ALLEN HOOKS ───────────────────────────────
+  // Auth-Loading: Kein Content
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Nicht-Admin: 403-Seite
+  if (!authChecked || !isPlatformAdmin) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-md bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-50 mx-auto mb-4">
+            <AlertCircle className="w-6 h-6 text-red-600" />
+          </div>
+          <h1 className="text-lg font-bold text-slate-900 text-center mb-2">
+            Kein Zugriff
+          </h1>
+          <p className="text-sm text-slate-600 text-center mb-6">
+            Du hast keine Berechtigung, auf das interne Plattform-Dashboard zuzugreifen.
+          </p>
+          <Link to="/dashboard">
+            <Button className="w-full gap-2 bg-slate-800 hover:bg-slate-900 text-white">
+              <ArrowLeft className="w-4 h-4" /> Zurück zum Dashboard
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   // Load System Config aus aggregiertem Response
   useEffect(() => {
@@ -245,6 +304,12 @@ export default function PlatformAdmin() {
     return plans.find(p => p.id === planId)?.name || 'Nicht zugeordnet';
   };
 
+  const [currentUser, setCurrentUser] = useState(null);
+  
+  useEffect(() => {
+    base44.auth.me().then(u => setCurrentUser(u)).catch(() => {});
+  }, []);
+
   const getAgencyStats = (agencyId) => {
     const clientOrgs = organizations.filter(org => org.parent_agency_id === agencyId);
     return {
@@ -252,12 +317,6 @@ export default function PlatformAdmin() {
       clients: clientOrgs,
     };
   };
-
-  // Aktuellen User aus Auth laden (für Diagnose-Tab Zugriffskontrolle)
-  const [currentUser, setCurrentUser] = useState(null);
-  useEffect(() => {
-    base44.auth.me().then(u => setCurrentUser(u)).catch(() => {});
-  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">

@@ -148,6 +148,10 @@ Deno.serve(async (req) => {
 });
 
 function getPeriodMonth() {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  // KANONISCH: Kalendermonat Europe/Berlin (YYYY-MM) — identisch zu allen anderen Usage-Funktionen
+  return new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin',
+    year: 'numeric',
+    month: '2-digit',
+  }).format(new Date()).split('.').reverse().join('-');
 }
