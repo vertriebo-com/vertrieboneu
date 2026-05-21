@@ -73,7 +73,7 @@ export default function PlatformAdmin() {
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // useQuery IMMER aufrufen (nicht conditional)
+  // useQuery MIT enabled-Absicherung (Security-Fix)
   const { data: responseData = {}, isLoading, refetch } = useQuery({
     queryKey: ['platform-organizations'],
     queryFn: async () => {
@@ -91,6 +91,7 @@ export default function PlatformAdmin() {
         throw e;
       }
     },
+    enabled: authChecked && isPlatformAdmin, // SECURITY: Query nur für Admins
   });
 
   // Auth-Check useEffect
@@ -108,6 +109,21 @@ export default function PlatformAdmin() {
         setAuthLoading(false);
       }
     })();
+  }, []);
+
+  // Load System Config aus aggregiertem Response
+  useEffect(() => {
+    if (responseData.platform_config) {
+      setSystemConfig(responseData.platform_config);
+      setGooglePlacesEnabled(responseData.platform_config.google_places_api_enabled !== false);
+      setDisabledReason(responseData.platform_config.disabled_reason || '');
+    }
+  }, [responseData.platform_config]);
+
+  // Current User laden (für Diagnose-Tabs)
+  const [currentUser, setCurrentUser] = useState(null);
+  useEffect(() => {
+    base44.auth.me().then(u => setCurrentUser(u)).catch(() => {});
   }, []);
 
   // ── CONDITIONAL RENDERS NACH ALLEN HOOKS ───────────────────────────────
@@ -143,15 +159,6 @@ export default function PlatformAdmin() {
       </div>
     );
   }
-
-  // Load System Config aus aggregiertem Response
-  useEffect(() => {
-    if (responseData.platform_config) {
-      setSystemConfig(responseData.platform_config);
-      setGooglePlacesEnabled(responseData.platform_config.google_places_api_enabled !== false);
-      setDisabledReason(responseData.platform_config.disabled_reason || '');
-    }
-  }, [responseData.platform_config]);
 
   const organizations = responseData.organizations || [];
   const platformSummary = responseData.summary || {};
@@ -303,12 +310,6 @@ export default function PlatformAdmin() {
     if (!planId) return 'Kein Plan';
     return plans.find(p => p.id === planId)?.name || 'Nicht zugeordnet';
   };
-
-  const [currentUser, setCurrentUser] = useState(null);
-  
-  useEffect(() => {
-    base44.auth.me().then(u => setCurrentUser(u)).catch(() => {});
-  }, []);
 
   const getAgencyStats = (agencyId) => {
     const clientOrgs = organizations.filter(org => org.parent_agency_id === agencyId);
