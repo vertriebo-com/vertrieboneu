@@ -103,19 +103,10 @@ const OnboardingGuard = ({ children }) => {
           return;
         }
 
-        // Für normale Kunden: Organisation prüfen
+        // MVP: Single-Account – nur Owner-Org
         let org = null;
         const orgs = await base44.entities.Organization.filter({ owner_email: user.email });
         org = orgs?.[0] || null;
-
-        // Als Member suchen falls kein Owner
-        if (!org) {
-          const memberships = await base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" });
-          if (memberships?.[0]?.organization_id) {
-            const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-            org = memberOrgs?.[0] || null;
-          }
-        }
 
         if (!org) {
           // Keine Organisation → Onboarding (Plan auswählen & einrichten)

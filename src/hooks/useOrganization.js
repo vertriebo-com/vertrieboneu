@@ -57,27 +57,10 @@ export function useOrganization() {
         const isPlatformAdmin = PLATFORM_ADMIN_ROLES.includes(u.role);
 
         // ── Alle zugänglichen Orgs laden ─────────────────────────────────────
-        let ownedOrgs = [];
-        let memberOrgs = [];
-
-        ownedOrgs = await base44.entities.Organization.filter({ owner_email: u.email });
-
-        const memberships = await base44.entities.OrganizationMember.filter({
-          user_email: u.email,
-          status: "active",
-        });
-        if (memberships.length > 0) {
-          const memberOrgIds = [...new Set(memberships.map(m => m.organization_id))];
-          // Lade Member-Orgs die nicht schon in ownedOrgs sind
-          const ownedIds = new Set(ownedOrgs.map(o => o.id));
-          for (const orgId of memberOrgIds) {
-            if (ownedIds.has(orgId)) continue;
-            const orgs = await base44.entities.Organization.filter({ id: orgId });
-            if (orgs[0]) memberOrgs.push(orgs[0]);
-          }
-        }
-
-        const accessible = [...ownedOrgs, ...memberOrgs];
+        // MVP: Single-Account – normale User sehen nur ihre eigene (Owner-)Org.
+        // PlatformAdmins können via ?org_id jede Org laden.
+        const ownedOrgs = await base44.entities.Organization.filter({ owner_email: u.email });
+        const accessible = [...ownedOrgs];
         setAllOrgs(accessible);
 
         // ── Aktive Org bestimmen ──────────────────────────────────────────────
@@ -118,9 +101,9 @@ export function useOrganization() {
           }
         }
 
-        // Fallback: Default-Org (erste owned Org, dann erste Member-Org)
+        // Fallback: Default-Org (erste owned Org)
         if (!chosenOrg) {
-          chosenOrg = ownedOrgs[0] || memberOrgs[0] || null;
+          chosenOrg = ownedOrgs[0] || null;
           if (chosenOrg) {
             // Nur in localStorage schreiben wenn kein URL-Param aktiv war
             // (URL-Param-Fehler soll nicht die Default-Org überschreiben)

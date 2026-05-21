@@ -4,7 +4,6 @@ import { Loader2, Info, User, Building, Mail, FileCheck, Zap } from "lucide-reac
 import CompanySettings from "@/components/settings/CompanySettings";
 import EmailSettings from "@/components/settings/EmailSettings";
 import EmailTemplateSettings from "@/components/settings/EmailTemplateSettings";
-import UserManagement from "@/components/settings/UserManagement";
 import BillingSettings from "@/components/settings/BillingSettings";
 import LearnedIntelligencePanel from "@/components/settings/LearnedIntelligencePanel";
 import { Button } from "@/components/ui/button";
@@ -67,17 +66,11 @@ export default function SettingsPage() {
 
     if (user.role === "admin") foundRole = "organization_admin";
 
+    // MVP: Single-Account – Owner ist immer organization_admin
     const orgs = await base44.entities.Organization.filter({ owner_email: user.email });
     if (orgs?.[0]) {
       foundOrg = orgs[0];
       foundRole = foundRole || "organization_admin";
-    } else {
-      const memberships = await base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" });
-      if (memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        foundOrg = memberOrgs?.[0] || null;
-        foundRole = foundRole || memberships[0].role || "sales_rep";
-      }
     }
 
     setOrg(foundOrg);
@@ -90,7 +83,7 @@ export default function SettingsPage() {
     const salesRepDefault = "profile";
     const resolvedRole = foundRole || "sales_rep";
     const isAdminUser = resolvedRole === "organization_admin" || user.role === "admin";
-    const validAdminTabs = ["company", "templates", "team", "billing"];
+    const validAdminTabs = ["company", "templates", "billing"];
     const defaultTab = isAdminUser ? adminDefault : salesRepDefault;
     if (tabParam && isAdminUser && validAdminTabs.includes(tabParam)) {
       setActiveTab(tabParam);
@@ -161,9 +154,6 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "templates" && isAdmin && <EmailTemplateSettings />}
-        {activeTab === "team"      && isAdmin && (
-          <UserManagement currentUser={currentUser} />
-        )}
         {activeTab === "billing"   && isAdmin && <BillingSettings org={org} user={currentUser} />}
 
         {/* Sales Rep: Mein Profil */}

@@ -18,23 +18,12 @@ export function useLeadsFilter() {
       setUser(orgUser);
       return;
     }
-    let enriched = { ...orgUser };
-    if (org.owner_email === orgUser.email) {
-      enriched.org_role = "organization_admin";
-    }
+    // MVP: Single-Account – wer Owner ist, ist organization_admin. Punkt.
+    const enriched = {
+      ...orgUser,
+      org_role: org.owner_email === orgUser.email ? "organization_admin" : orgUser.role,
+    };
     setUser(enriched);
-
-    // Membership-Rolle laden (für Sales-Reps)
-    if (!["admin", "platform_owner", "platform_admin"].includes(orgUser.role)) {
-      base44.entities.OrganizationMember.filter({ user_email: orgUser.email, organization_id: org.id })
-        .then(memberships => {
-          const member = memberships?.[0];
-          if (member) {
-            setUser(prev => prev ? { ...prev, org_role: member.role } : prev);
-          }
-        })
-        .catch(() => {});
-    }
   }, [orgUser?.email, org?.id]);
 
   // Blacklist für aktive Org laden
