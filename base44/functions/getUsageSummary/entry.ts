@@ -121,18 +121,63 @@ Deno.serve(async (req) => {
     // ── PLAN LADEN ─────────────────────────────────────────────────────────
     // Robuster Lookup: ungültige plan_id-Werte (z.B. "plan_starter" statt echter Entity-ID) werden abgefangen.
     let plan = null;
+    let planLoadError = null; // "missing" | "invalid" | null
     if (org.plan_id) {
       try {
         const planResult = await base44.asServiceRole.entities.Plan.filter({ id: org.plan_id });
         plan = planResult?.[0] || null;
+        if (!plan) planLoadError = 'missing'; // plan_id gesetzt aber Plan nicht in DB gefunden
       } catch {
-        // plan_id ist kein gültiger Entity-ID → wie kein Plan behandeln (unlimited defaults)
+        planLoadError = 'invalid'; // plan_id ist kein gültiger Entity-ID
         plan = null;
       }
     }
 
-    const monthlyLimit = plan?.max_leads_per_month ?? -1;
-    const isUnlimited = monthlyLimit === -1;
+    // ── LIMIT-AUFLÖSUNG (PRODUKTREGEL) ─────────────────────────────────────
+    // unlimited gilt AUSSCHLIESSLICH wenn: Plan existiert UND max_leads_per_month === -1
+    // NIEMALS wenn plan === null, plan_id fehlt, oder Plan ungültig ist.
+    //
+    // Fallback-Hierarchie (identisch zu startResearchRun):
+    //   plan vorhanden + max_leads_per_month === -1 → unlimited (-1)
+    //   plan vorhanden + max_leads_per_month > 0   → festes Limit
+    //   plan vorhanden + max_leads_per_month null  → Trial/Fehler → 50 (defensiv)
+    //   plan_id fehlt + free_preview/verified_trial → Trial-Limits (getrennt vom Recherche-Block)
+    //   plan_id fehlt + paid/active                → billing_plan_missing (Anzeige-Flag)
+    //   plan_id gesetzt, Plan nicht gefunden        → billing_plan_missing
+    //   plan_id gesetzt, Plan ungültig              → billing_plan_invalid
+    const trialStage = org.trial_stage || 'free_preview';
+    const isPaidCustomer = ['paid'].includes(trialStage) || ['active', 'trialing'].includes(org.billing_status || '');
+
+    let monthlyLimit;
+    let planStatus = 'ok'; // "ok" | "billing_plan_missing" | "billing_plan_invalid" | "trial_limit" | "no_plan_preview"
+    if (plan) {
+      // Plan geladen — max_leads_per_month auslesen
+      // null wird NICHT als unlimited behandelt: defensiv auf 50 setzen (Admin-Fehler sichtbar machen)
+      monthlyLimit = (plan.max_leads_per_month != null) ? plan.max_leads_per_month : 50;
+      if (plan.max_leads_per_month == null) planStatus = 'plan_limit_null'; // Warnung: Admin sollte -1 setzen
+    } else if (planLoadError === 'missing') {
+      // plan_id gesetzt aber nicht gefunden
+      planStatus = 'billing_plan_missing';
+      monthlyLimit = isPaidCustomer ? 0 : 50; // paid → 0 (geblockt anzeigen), trial → 50
+    } else if (planLoadError === 'invalid') {
+      planStatus = 'billing_plan_invalid';
+      monthlyLimit = isPaidCustomer ? 0 : 50;
+    } else {
+      // plan_id nicht gesetzt
+      if (isPaidCustomer) {
+        planStatus = 'billing_plan_missing';
+        monthlyLimit = 0; // Zeige "Limit erreicht" an — Admin-Konfigurationsfehler
+      } else if (trialStage === 'verified_trial') {
+        planStatus = 'trial_limit';
+        monthlyLimit = 50;
+      } else {
+        // free_preview
+        planStatus = 'no_plan_preview';
+        monthlyLimit = 10; // Preview-Limit
+      }
+    }
+
+    const isUnlimited = plan !== null && monthlyLimit === -1;
     const monthlyRemaining = isUnlimited ? null : Math.max(0, monthlyLimit - monthlyUsed);
     // IDENTISCH zu startResearchRun Zeile 255: >= (nicht >)
     // Bei used===limit: startResearchRun blockt (>=), getUsageSummary muss is_over_limit=true anzeigen.
@@ -166,6 +211,7 @@ Deno.serve(async (req) => {
     const usage_summary = {
       period_month: periodMonth,
       plan_name: plan?.name || null,
+      plan_status: planStatus, // "ok" | "billing_plan_missing" | "billing_plan_invalid" | "trial_limit" | "no_plan_preview" | "plan_limit_null"
       monthly_limit: monthlyLimit,
       monthly_used: monthlyUsed,
       monthly_remaining: monthlyRemaining,

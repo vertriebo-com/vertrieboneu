@@ -414,11 +414,12 @@ Deno.serve(async (req) => {
 
       // Simuliere getUsageSummary-Logik für jeden Plan
       function simulateUsageSummaryForPlan(testPlan, simulatedUsed = 100) {
-        // IDENTISCH zu getUsageSummary (nach Fix): ?? -1 und >= für isOverLimit
-        const monthlyLimit = testPlan?.max_leads_per_month ?? -1;
-        const isUnlimited = monthlyLimit === -1;
+        // PRODUKTREGEL: unlimited NUR wenn Plan existiert UND max_leads_per_month === -1
+        // null → defensiv 50 (Admin-Fehler sichtbar machen, kein silent unlimited)
+        const rawLimit = testPlan?.max_leads_per_month;
+        const monthlyLimit = (rawLimit != null) ? rawLimit : 50;
+        const isUnlimited = testPlan !== null && monthlyLimit === -1;
         const monthlyRemaining = isUnlimited ? null : Math.max(0, monthlyLimit - simulatedUsed);
-        // >= statt > — identisch zu startResearchRun (nach Fix) UND getUsageSummary (nach Fix)
         const isOverLimit = !isUnlimited && simulatedUsed >= monthlyLimit;
 
         return {
@@ -466,21 +467,22 @@ Deno.serve(async (req) => {
       }
 
       // ── Grenzfall: Plan mit max_leads_per_month=null ────────────────────
-      // MUSS als -1 (unlimited) behandelt werden, da ?? -1 in getUsageSummary
+      // PRODUKTREGEL: null ist KEIN unlimited → defensiv auf 50 gesetzt (Admin-Konfigurationsfehler sichtbar)
+      // getUsageSummary: (plan.max_leads_per_month != null) ? value : 50 → null → 50
+      // startResearchRun: (rawLimit != null) ? rawLimit : 50 → null → 50
+      // → Beide zeigen Limit=50 für null — konsistent, sichtbarer Admin-Fehler, KEIN silent unlimited
       const nullPlanSim = simulateUsageSummaryForPlan({ name: 'null-plan-test', max_leads_per_month: null }, 0);
       const nullPlanChecks = {
-        // WICHTIG: null wird durch ?? -1 zu unlimited — das ist bekanntes Verhalten
-        // getUsageSummary: plan?.max_leads_per_month ?? -1 → null ?? -1 → -1 → unlimited
-        // startResearchRun: plans[0].max_leads_per_month ?? -1 → null ?? -1 → -1 → unlimited (nach Fix)
-        // → Beide zeigen unlimited für null — das ist KONSISTENT (aber edge case — Admin sollte -1 explizit setzen)
-        null_treated_as_unlimited: nullPlanSim.is_unlimited === true && nullPlanSim.monthly_limit === -1,
-        no_false_limit: nullPlanSim.monthly_limit !== 300, // frühere ?? 300 Regression würde das brechen
+        // null darf NICHT als unlimited behandelt werden
+        null_not_treated_as_unlimited: nullPlanSim.is_unlimited === false,
+        // null → defensiv auf 50 (kein stiller unlimited-Fehler)
+        null_gives_defensive_limit: nullPlanSim.monthly_limit === 50,
       };
       const nullPlanPass = Object.values(nullPlanChecks).every(Boolean);
       results['__null_plan_edge_case'] = {
         pass: nullPlanPass,
-        description: 'Plan mit max_leads_per_month=null → beide Funktionen behandeln als unlimited (-1)',
-        consistency_note: 'getUsageSummary UND startResearchRun nutzen jetzt ?? -1 — kein Divergenz-Risiko mehr',
+        description: 'Plan mit max_leads_per_month=null → beide Funktionen setzen defensiv auf 50 (NICHT unlimited)',
+        consistency_note: 'getUsageSummary UND startResearchRun: (value != null) ? value : 50 — kein silent unlimited',
         sim: nullPlanSim,
         checks: nullPlanChecks,
       };
