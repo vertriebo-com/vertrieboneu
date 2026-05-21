@@ -206,8 +206,10 @@ Deno.serve(async (req) => {
             message: 'Ihr gebuchter Plan konnte nicht geladen werden. Bitte kontaktieren Sie den Support.',
           }, { status: 402 });
         }
-        monthlyContactLimit = plans[0].max_leads_per_month ?? 300;
-        // -1 = echter Unlimited-Plan (explizit in Plan gesetzt)
+        // IDENTISCH zu getUsageSummary: ?? -1 (unlimited) wenn null, NICHT ?? 300
+        // Rationale: Ein Plan mit max_leads_per_month=null ist Admin-Fehler, kein Limit.
+        // Fallback 300 war ein Bug: Billing-Anzeige zeigte ∞, startResearchRun blockierte bei 300.
+        monthlyContactLimit = plans[0].max_leads_per_month ?? -1;
         console.info(`[startResearchRun] Plan geladen: ${plans[0].name} max_leads_per_month=${monthlyContactLimit}`);
       }
     } else if (isPlatformAdmin) {
