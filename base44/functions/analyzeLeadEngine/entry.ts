@@ -654,25 +654,29 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Org membership + role
-    const [orgRows, memberRows] = await Promise.all([
-      base44.asServiceRole.entities.Organization.filter({ id: organizationId }),
-      base44.asServiceRole.entities.OrganizationMember.filter({ organization_id: organizationId, user_email: user.email })
-    ]);
-    const org = orgRows[0] || null;
-    const member = memberRows[0] || null;
+    // MVP Access-Regel: 1 Account = 1 Organisation = Owner-Zugriff
+    // Kein OrganizationMember-Check für normale Kunden
     const isPlatformAdmin = ['admin', 'platform_owner', 'platform_admin'].includes(user.role);
 
+    // Org laden
+    const orgRows = await base44.asServiceRole.entities.Organization.filter({ id: organizationId });
+    const org = orgRows[0] || null;
+
     if (!org) return Response.json({ error: 'Organisation nicht gefunden' }, { status: 404 });
+
+    // Access-Check: Owner ODER PlatformAdmin
+    const isOwner = org.owner_email === user.email;
+    if (!isOwner && !isPlatformAdmin) {
+      console.warn(`[analyzeLeadEngine] Access denied: user=${user.email} owner=${org.owner_email} org=${organizationId}`);
+      return Response.json({ error: 'Kein Zugriff auf diese Organisation' }, { status: 403 });
+    }
+
+    // Suspension-Check
     if (org.platform_status === 'suspended' && !isPlatformAdmin) {
       return Response.json({ error: `Organisation gesperrt: ${org.suspended_reason || ''}` }, { status: 403 });
     }
-    if (!member && !isPlatformAdmin) return Response.json({ error: 'Kein Mitglied dieser Organisation' }, { status: 403 });
-    if (member && member.status !== 'active') return Response.json({ error: 'Mitgliedschaft inaktiv' }, { status: 403 });
 
-    const orgRole = member?.role || (isPlatformAdmin ? 'organization_admin' : null);
-    const isSalesRep = orgRole === 'sales_rep';
-    const isOrgAdmin = orgRole === 'organization_admin';
+    // MVP: Keine sales_rep-Logik mehr (nur Owner + PlatformAdmin)
     const userEmail = user.email;
 
     // Billing check
@@ -712,12 +716,7 @@ Deno.serve(async (req) => {
       }
       const company = companies[0];
 
-      // P0 sales_rep Scope: darf nur exakt zugewiesene Leads analysieren
-      // Auch unzugewiesene Leads (assigned_to leer) sind für sales_rep gesperrt
-      if (isSalesRep && company.assigned_to !== userEmail) {
-        console.warn(`[analyzeLeadEngine] sales_rep "${userEmail}" tried to analyze lead assigned to "${company.assigned_to}"`);
-        return Response.json({ error: 'Kein Zugriff: Dieser Lead ist einem anderen Vertriebler zugewiesen.' }, { status: 403 });
-      }
+      // MVP: Kein sales_rep-Check mehr (nur Owner + PlatformAdmin haben Zugriff)
 
       const [contactLogs, tasks, orgSettings] = await Promise.all([
         base44.asServiceRole.entities.ContactLog.filter({ company_id, organization_id: organizationId }),
@@ -750,9 +749,8 @@ Deno.serve(async (req) => {
       }
       const maxLimit = Math.min(limit, 25, remainingScorings);
 
-      // P0 sales_rep Scope: nur eigene Leads bei latest
+      // MVP: Kein sales_rep-Filter mehr (nur Owner + PlatformAdmin)
       const companyFilter = { organization_id: organizationId };
-      if (isSalesRep) companyFilter.assigned_to = userEmail;
 
       const companies = await base44.asServiceRole.entities.Company.filter(companyFilter);
       if (!companies || companies.length === 0) {
