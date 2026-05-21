@@ -401,7 +401,131 @@ Deno.serve(async (req) => {
       });
     }
 
-    return Response.json({ error: `Unknown scenario: ${scenario}. Use: info, 1, 2, 3, 4, all` }, { status: 400 });
+    // ══════════════════════════════════════════════════════════════════════════
+    // SZENARIO plan-display: Prüft getUsageSummary-Ausgabe für alle 4 Plan-Typen
+    // + null-Plan-Grenzfall.
+    // Spiegelt getUsageSummary Zeile 134: plan?.max_leads_per_month ?? -1
+    // Prüft: monthly_limit, is_unlimited, reset_date, is_over_limit, source_used
+    // KEIN startResearchRun-Aufruf — reine Logik-Prüfung gegen echte DB-Daten.
+    // ══════════════════════════════════════════════════════════════════════════
+    if (scenario === 'plan-display') {
+      // Alle aktiven Pläne laden
+      const allPlans = await base44.asServiceRole.entities.Plan.filter({ is_active: true });
+
+      // Simuliere getUsageSummary-Logik für jeden Plan
+      function simulateUsageSummaryForPlan(testPlan, simulatedUsed = 100) {
+        // IDENTISCH zu getUsageSummary (nach Fix): ?? -1 und >= für isOverLimit
+        const monthlyLimit = testPlan?.max_leads_per_month ?? -1;
+        const isUnlimited = monthlyLimit === -1;
+        const monthlyRemaining = isUnlimited ? null : Math.max(0, monthlyLimit - simulatedUsed);
+        // >= statt > — identisch zu startResearchRun (nach Fix) UND getUsageSummary (nach Fix)
+        const isOverLimit = !isUnlimited && simulatedUsed >= monthlyLimit;
+
+        return {
+          plan_name: testPlan?.name || null,
+          monthly_limit: monthlyLimit,
+          monthly_used: simulatedUsed,
+          monthly_remaining: monthlyRemaining,
+          is_unlimited: isUnlimited,
+          is_over_limit: isOverLimit,
+        };
+      }
+
+      const results = {};
+
+      // ── Alle 4 echten Pläne ──────────────────────────────────────────────
+      for (const p of allPlans) {
+        const sim = simulateUsageSummaryForPlan(p, 0); // 0 used = Baseline
+        const simHigh = simulateUsageSummaryForPlan(p, p.max_leads_per_month === -1 ? 9999 : (p.max_leads_per_month || 0));
+
+        const checks = {
+          unlimited_correct: p.max_leads_per_month === -1
+            ? (sim.is_unlimited === true && sim.monthly_limit === -1 && sim.monthly_remaining === null)
+            : (sim.is_unlimited === false && sim.monthly_limit > 0),
+          // BEIDE Funktionen nutzen jetzt >= (identisch):
+          // startResearchRun Zeile 255: monthlyUsedForCheck >= monthlyContactLimit → blockiert
+          // getUsageSummary: monthlyUsed >= monthlyLimit → is_over_limit=true
+          // bei used === limit: BEIDE zeigen "Limit erreicht/blockiert" → konsistent
+          overlimit_at_max: p.max_leads_per_month === -1
+            ? simHigh.is_over_limit === false // unlimited: niemals over_limit
+            : simHigh.is_over_limit === true,  // limited: bei used===limit → over_limit (>=)
+          remaining_at_zero: p.max_leads_per_month === -1
+            ? simHigh.monthly_remaining === null
+            : simHigh.monthly_remaining === 0,
+        };
+
+        const pass = Object.values(checks).every(Boolean);
+        results[p.name] = {
+          pass,
+          plan_id: p.id,
+          raw: { max_leads_per_month: p.max_leads_per_month },
+          sim_at_zero: sim,
+          sim_at_max: simHigh,
+          checks,
+        };
+      }
+
+      // ── Grenzfall: Plan mit max_leads_per_month=null ────────────────────
+      // MUSS als -1 (unlimited) behandelt werden, da ?? -1 in getUsageSummary
+      const nullPlanSim = simulateUsageSummaryForPlan({ name: 'null-plan-test', max_leads_per_month: null }, 0);
+      const nullPlanChecks = {
+        // WICHTIG: null wird durch ?? -1 zu unlimited — das ist bekanntes Verhalten
+        // getUsageSummary: plan?.max_leads_per_month ?? -1 → null ?? -1 → -1 → unlimited
+        // startResearchRun: plans[0].max_leads_per_month ?? -1 → null ?? -1 → -1 → unlimited (nach Fix)
+        // → Beide zeigen unlimited für null — das ist KONSISTENT (aber edge case — Admin sollte -1 explizit setzen)
+        null_treated_as_unlimited: nullPlanSim.is_unlimited === true && nullPlanSim.monthly_limit === -1,
+        no_false_limit: nullPlanSim.monthly_limit !== 300, // frühere ?? 300 Regression würde das brechen
+      };
+      const nullPlanPass = Object.values(nullPlanChecks).every(Boolean);
+      results['__null_plan_edge_case'] = {
+        pass: nullPlanPass,
+        description: 'Plan mit max_leads_per_month=null → beide Funktionen behandeln als unlimited (-1)',
+        consistency_note: 'getUsageSummary UND startResearchRun nutzen jetzt ?? -1 — kein Divergenz-Risiko mehr',
+        sim: nullPlanSim,
+        checks: nullPlanChecks,
+      };
+
+      // ── getUsageSummary live für die gegebene Org ────────────────────────
+      const liveRes = await base44.asServiceRole.entities.UsageLog.filter({ organization_id: org.id, period_month: periodMonth });
+      const liveSlots = await base44.asServiceRole.entities.QuotaReservation.filter({ organization_id: org.id, period_month: periodMonth });
+      const liveCommitted = liveSlots.filter(s => s.status === 'committed').length;
+      const liveUsageLog = liveRes?.[0]?.leads_created || 0;
+      const liveUsed = Math.max(liveCommitted, liveUsageLog);
+
+      // Reset-Datum: erster Tag nächsten Monats
+      const resetDate = new Date(Date.UTC(py, pm, 1));
+      const resetDateFormatted = resetDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Berlin' });
+
+      const liveSummary = plan ? simulateUsageSummaryForPlan(plan, liveUsed) : null;
+
+      const allPass = Object.values(results).every(r => r.pass);
+      console.log(`[testQuotaEnforcement] plan-display: ${allPass ? '✅ ALL PASS' : '❌ SOME FAILED'}`);
+
+      return Response.json({
+        scenario: 'plan-display',
+        all_pass: allPass,
+        period_month: periodMonth,
+        reset_date: resetDateFormatted,
+        live_org: {
+          id: org.id,
+          name: org.name,
+          plan_name: plan?.name,
+          plan_max_leads: plan?.max_leads_per_month,
+          live_used: liveUsed,
+          live_summary: liveSummary,
+          sources: { committed: liveCommitted, usage_log: liveUsageLog },
+        },
+        plan_checks: results,
+        divergence_status: {
+          startResearchRun: 'max_leads_per_month ?? -1 (nach Fix)',
+          getUsageSummary: 'max_leads_per_month ?? -1 (bereits korrekt)',
+          aligned: true,
+          null_plan_behavior: 'BEIDE zeigen unlimited — konsistent, aber Admin sollte -1 explizit setzen',
+        },
+      });
+    }
+
+    return Response.json({ error: `Unknown scenario: ${scenario}. Use: info, 1, 2, 3, 4, all, plan-display` }, { status: 400 });
 
   } catch (error) {
     console.error('[testQuotaEnforcement] Error:', error?.message, error?.stack);

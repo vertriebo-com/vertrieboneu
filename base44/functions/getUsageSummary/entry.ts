@@ -134,7 +134,10 @@ Deno.serve(async (req) => {
     const monthlyLimit = plan?.max_leads_per_month ?? -1;
     const isUnlimited = monthlyLimit === -1;
     const monthlyRemaining = isUnlimited ? null : Math.max(0, monthlyLimit - monthlyUsed);
-    const isOverLimit = !isUnlimited && monthlyUsed > monthlyLimit;
+    // IDENTISCH zu startResearchRun Zeile 255: >= (nicht >)
+    // Bei used===limit: startResearchRun blockt (>=), getUsageSummary muss is_over_limit=true anzeigen.
+    // Sonst: UI zeigt "Limit nicht erreicht", aber Recherche wird blockiert → Nutzerverwirrung.
+    const isOverLimit = !isUnlimited && monthlyUsed >= monthlyLimit;
 
     // ── CRM-BESTAND (aktuell gespeicherte Companies, ohne Blacklist) ───────
     // allCompaniesRaw wird wiederverwendet — kein zweiter DB-Call
