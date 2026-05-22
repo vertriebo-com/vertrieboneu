@@ -219,40 +219,44 @@ async function handleSubscriptionUpdated(base44, stripeSub) {
     return { status: 'ignored', reason: 'org_not_found' };
   }
 
-  await upsertSubscription(base44, { organization_id: org.id, stripeSub, plan_id: planId || org.plan_id });
+  // plan_id aus Metadata (Starter, Professional, Gold) oder bestehende org.plan_id
+  const resolvedPlanId = planId || org.plan_id;
+  await upsertSubscription(base44, { organization_id: org.id, stripeSub, plan_id: resolvedPlanId });
   const billingStatus = mapBillingStatus(stripeSub.status);
-  
-  // trial_stage: nur vorwärts ändern, nie zurück.
-  // paid > verified_trial > free_preview (Reihenfolge = Priorität)
+
+  // ── trial_stage: nur VORWÄRTS, nie zurück ─────────────────────────────────
+  // free_preview(0) → verified_trial(1) → paid(2)
+  //
+  // Starter mit Trial:       trialing → verified_trial → (nach Trial-Ende) active → paid
+  // Professional (direkt):   active → paid (sofort, kein Trial)
+  // Gold (direkt):           active → paid (sofort, kein Trial)
+  // Upgrade Starter→Pro/Gold: active → paid (korrekt hochgestuft)
   const STAGE_RANK = { free_preview: 0, verified_trial: 1, paid: 2 };
-  const currentRank = STAGE_RANK[org.trial_stage] ?? 0;
-
+  const currentStageRank = STAGE_RANK[org.trial_stage] ?? 0;
   let newTrialStage = org.trial_stage;
-  if (stripeSub.status === 'active') {
-    // active → immer auf paid hochstufen (nie downgraden)
-    if (currentRank < 2) newTrialStage = 'paid';
-  } else if (stripeSub.status === 'trialing') {
-    // trialing → nur auf verified_trial, aber NICHT wenn schon paid
-    if (currentRank < 1) newTrialStage = 'verified_trial';
+  if (stripeSub.status === 'active' && currentStageRank < 2) {
+    newTrialStage = 'paid';
+  } else if (stripeSub.status === 'trialing' && currentStageRank < 1) {
+    newTrialStage = 'verified_trial';
   }
-  // canceled/past_due → trial_stage nie ändern
+  // past_due, canceled, unpaid → trial_stage unverändert lassen
 
-  // billing_status: trialing darf nie 'active' überschreiben (Race Condition Schutz)
-  // active darf nie 'active' downgraden
-  const BILLING_RANK = { preview: 0, incomplete: 1, trialing: 2, active: 3 };
-  const currentBillingRank = BILLING_RANK[org.billing_status] ?? 0;
-  const newBillingRank = BILLING_RANK[billingStatus] ?? 0;
-  // Nur updaten wenn neuer Status "schlechter" als active ODER es eine echte Statusänderung ist
-  // Nie von 'active' auf 'trialing' downgraden
-  const shouldUpdateBillingStatus = !(org.billing_status === 'active' && billingStatus === 'trialing');
+  // ── billing_status: nie von 'active' auf 'trialing' downgraden ─────────────
+  // Race Condition: subscription.created kommt manchmal vor checkout.completed.
+  // checkout.completed setzt 'active' → subscription.created darf das nicht auf 'trialing' drehen.
+  const neverDowngrade = org.billing_status === 'active' && billingStatus === 'trialing';
 
   await base44.asServiceRole.entities.Organization.update(org.id, {
-    ...(shouldUpdateBillingStatus ? { billing_status: billingStatus } : {}),
+    ...(!neverDowngrade ? { billing_status: billingStatus } : {}),
     trial_stage: newTrialStage,
-    ...(stripeSub.status === 'trialing' && !org.trial_verified_at ? { trial_verified_at: new Date().toISOString(), trial_verified_by: org.owner_email } : {}),
+    ...(resolvedPlanId ? { plan_id: resolvedPlanId } : {}),
+    ...(stripeSub.status === 'trialing' && !org.trial_verified_at ? {
+      trial_verified_at: new Date().toISOString(),
+      trial_verified_by: org.owner_email
+    } : {}),
   });
 
-  console.info(`[stripeWebhook] subscription.updated org=${org.id} status=${stripeSub.status} trial_stage=${trialStage} cancel_at_period_end=${stripeSub.cancel_at_period_end}`);
+  console.info(`[stripeWebhook] subscription.updated org=${org.id} plan=${resolvedPlanId} stripe_status=${stripeSub.status} billing_status=${neverDowngrade ? org.billing_status + '(kept)' : billingStatus} trial_stage=${newTrialStage}`);
   return { status: 'success' };
 }
 
