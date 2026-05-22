@@ -28,7 +28,7 @@ const PLANS = [
   description: "Für Betriebe, die regelmäßig aktiv Vertrieb machen",
   popular: true,
   features: ["1.500 Firmenkontakte/Monat", "750 Recherche-Läufe/Monat", "300 KI-Aktionen/Monat", "Eigene E-Mail-Vorlagen", "Erweiterte Reports", "2.000 E-Mails/Monat"],
-  cta: "Professional buchen"
+  cta: "14 Tage kostenlos testen"
 },
 {
   name: "Gold",

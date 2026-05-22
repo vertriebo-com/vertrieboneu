@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import moment from "moment";
 import "moment/locale/de";
+moment.locale("de");
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import DailyActionList from "@/components/dashboard/DailyActionList";
 import DashboardPrimaryAction from "@/components/dashboard/DashboardPrimaryAction";

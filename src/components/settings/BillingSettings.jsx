@@ -11,6 +11,7 @@ import {
 const BILLING_STATUS_CONFIG = {
   active:             { label: "Aktiv",              color: "bg-green-100 text-green-700 border-green-200",   icon: CheckCircle2 },
   trialing:           { label: "Trial",              color: "bg-blue-100 text-blue-700 border-blue-200",     icon: Clock },
+  preview:            { label: "Kostenlose Vorschau", color: "bg-blue-100 text-blue-700 border-blue-200",    icon: Clock },
   past_due:           { label: "Zahlung überfällig", color: "bg-red-100 text-red-700 border-red-200",        icon: AlertTriangle },
   unpaid:             { label: "Unbezahlt",          color: "bg-red-100 text-red-700 border-red-200",        icon: AlertTriangle },
   canceled:           { label: "Gekündigt",          color: "bg-gray-100 text-gray-600 border-gray-200",     icon: AlertTriangle },
@@ -138,14 +139,15 @@ function MonthlyLeadQuotaCard({ usageSummary, plan, subscription }) {
   );
 }
 
-function UsageBar({ label, icon: Icon, used, max, color = "bg-blue-500" }) {
+function UsageBar({ label, icon: Icon, used, max, color = "bg-blue-500", overLimitMessage }) {
   const pct = max === -1 ? 0 : Math.min(100, Math.round((used / max) * 100));
   const isUnlimited = max === -1;
   const isWarning = !isUnlimited && pct >= 80;
   const isDanger = !isUnlimited && pct >= 95;
+  const isOverLimit = !isUnlimited && used >= max;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2.5">
+    <div className={`border rounded-xl p-4 space-y-2.5 ${isOverLimit ? "bg-red-50 border-red-200" : "bg-white border-slate-200"}`}>
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
           <Icon className="w-4 h-4 text-slate-600" /> {label}
@@ -162,8 +164,14 @@ function UsageBar({ label, icon: Icon, used, max, color = "bg-blue-500" }) {
           />
         </div>
       )}
-      {!isUnlimited && (
+      {!isUnlimited && !overLimitMessage && (
         <p className="text-[11px] font-medium text-slate-500">{Math.max(0, max - used)} verbleibend</p>
+      )}
+      {overLimitMessage && (
+        <div className="flex items-start gap-1.5 mt-1">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0 mt-0.5" />
+          <p className="text-[11px] font-semibold text-red-700">{overLimitMessage}</p>
+        </div>
       )}
     </div>
   );
@@ -336,7 +344,7 @@ export default function BillingSettings({ org: orgProp, user }) {
 
       {/* Plan-Auswahl für Free Preview */}
       {org?.trial_stage === 'free_preview' && allPlans.length > 0 && (
-        <div className="bg-white border-2 border-blue-200 rounded-2xl p-6 shadow-sm">
+        <div id="plan-selection" className="bg-white border-2 border-blue-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-start gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
               <Sparkles className="w-5 h-5 text-blue-600" />
@@ -361,7 +369,7 @@ export default function BillingSettings({ org: orgProp, user }) {
                       {p.price_monthly ? `${(p.price_monthly / 100).toFixed(0)} € / Monat` : "–"}
                     </p>
                   </div>
-                  {p.has_advanced_reports && (
+                  {p.name === 'Professional' && (
                     <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Beliebt</span>
                   )}
                 </div>
@@ -402,22 +410,30 @@ export default function BillingSettings({ org: orgProp, user }) {
 
       {/* Plan & Status Card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow space-y-4">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Aktueller Plan</h3>
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+              {billingStatus === 'preview' ? 'Aktueller Zugang' : 'Aktueller Plan'}
+            </h3>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-extrabold text-slate-950">{plan?.name || "–"}</span>
-              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${statusCfg.color}`}>
-                <StatusIcon className="w-3 h-3" /> {statusCfg.label}
+              <span className="text-2xl font-extrabold text-slate-950">
+                {billingStatus === 'preview' ? 'Kostenlose Vorschau' : (plan?.name || "–")}
               </span>
+              {billingStatus !== 'preview' && (
+                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border ${statusCfg.color}`}>
+                  <StatusIcon className="w-3 h-3" /> {statusCfg.label}
+                </span>
+              )}
             </div>
-            {plan?.price_monthly && (
+            {billingStatus === 'preview' ? (
+              <p className="text-sm text-slate-600 font-medium mt-0.5">Kein aktives Abo vorhanden</p>
+            ) : plan?.price_monthly ? (
               <p className="text-sm text-slate-600 font-medium mt-0.5">
                 {(plan.price_monthly / 100).toFixed(0)} € / Monat
               </p>
-            )}
+            ) : null}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Button
               variant="outline"
               size="sm"
@@ -427,17 +443,25 @@ export default function BillingSettings({ org: orgProp, user }) {
             >
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
             </Button>
-            <Button
-              onClick={handlePortal}
-              disabled={portalLoading || !org?.stripe_customer_id || !subscription}
-              size="sm"
-              className="gap-1.5"
-            >
-              {portalLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
-              Abo verwalten
-            </Button>
-            {!org?.stripe_customer_id && (
-              <p className="text-xs text-slate-500">Noch kein aktives Abo vorhanden</p>
+            {billingStatus === 'preview' ? (
+              <Button
+                onClick={() => document.getElementById('plan-selection')?.scrollIntoView({ behavior: 'smooth' })}
+                size="sm"
+                className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+                Plan auswählen
+              </Button>
+            ) : (
+              <Button
+                onClick={handlePortal}
+                disabled={portalLoading || !org?.stripe_customer_id || !subscription}
+                size="sm"
+                className="gap-1.5"
+              >
+                {portalLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                Abo verwalten
+              </Button>
             )}
           </div>
         </div>
@@ -531,6 +555,11 @@ export default function BillingSettings({ org: orgProp, user }) {
           used={usageSummary?.ai_actions_used || 0}
           max={org?.trial_stage === 'free_preview' ? 10 : (plan?.max_ai_scorings_per_month ?? -1)}
           color="bg-purple-500"
+          overLimitMessage={
+            org?.trial_stage === 'free_preview' && (usageSummary?.ai_actions_used || 0) >= 10
+              ? "Vorschau-Limit für KI-Aktionen erreicht. Wählen Sie einen Plan, um weitere KI-Analysen zu nutzen."
+              : undefined
+          }
         />
         <UsageBar
           label="E-Mails dokumentiert"
