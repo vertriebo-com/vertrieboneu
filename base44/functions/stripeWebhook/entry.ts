@@ -222,24 +222,33 @@ async function handleSubscriptionUpdated(base44, stripeSub) {
   await upsertSubscription(base44, { organization_id: org.id, stripeSub, plan_id: planId || org.plan_id });
   const billingStatus = mapBillingStatus(stripeSub.status);
   
-  // Bestimme trial_stage basierend auf Stripe-Status
-  let trialStage = org.trial_stage || 'free_preview';
-  if (stripeSub.status === 'trialing') {
-    trialStage = 'verified_trial';
-  } else if (stripeSub.status === 'active') {
-    trialStage = 'paid';
-  }
-  // 'canceled' → trial_stage nicht zurücksetzen (Anti-Missbrauch)
+  // trial_stage: nur vorwärts ändern, nie zurück.
+  // paid > verified_trial > free_preview (Reihenfolge = Priorität)
+  const STAGE_RANK = { free_preview: 0, verified_trial: 1, paid: 2 };
+  const currentRank = STAGE_RANK[org.trial_stage] ?? 0;
 
-  // WICHTIG: billing_status für trialing-Subs = 'trialing', aber wenn die Org bereits
-  // durch checkout.completed auf 'active'+'paid' gesetzt wurde (paid-Checkout ohne Trial),
-  // darf subscription.updated das NICHT auf 'trialing' zurücksetzen.
-  // Regel: Wenn org bereits trial_stage='paid' hat und billingStatus='trialing' → nicht downgraden.
-  const shouldUpdateBillingStatus = !(org.trial_stage === 'paid' && billingStatus === 'trialing');
+  let newTrialStage = org.trial_stage;
+  if (stripeSub.status === 'active') {
+    // active → immer auf paid hochstufen (nie downgraden)
+    if (currentRank < 2) newTrialStage = 'paid';
+  } else if (stripeSub.status === 'trialing') {
+    // trialing → nur auf verified_trial, aber NICHT wenn schon paid
+    if (currentRank < 1) newTrialStage = 'verified_trial';
+  }
+  // canceled/past_due → trial_stage nie ändern
+
+  // billing_status: trialing darf nie 'active' überschreiben (Race Condition Schutz)
+  // active darf nie 'active' downgraden
+  const BILLING_RANK = { preview: 0, incomplete: 1, trialing: 2, active: 3 };
+  const currentBillingRank = BILLING_RANK[org.billing_status] ?? 0;
+  const newBillingRank = BILLING_RANK[billingStatus] ?? 0;
+  // Nur updaten wenn neuer Status "schlechter" als active ODER es eine echte Statusänderung ist
+  // Nie von 'active' auf 'trialing' downgraden
+  const shouldUpdateBillingStatus = !(org.billing_status === 'active' && billingStatus === 'trialing');
 
   await base44.asServiceRole.entities.Organization.update(org.id, {
     ...(shouldUpdateBillingStatus ? { billing_status: billingStatus } : {}),
-    trial_stage: trialStage,
+    trial_stage: newTrialStage,
     ...(stripeSub.status === 'trialing' && !org.trial_verified_at ? { trial_verified_at: new Date().toISOString(), trial_verified_by: org.owner_email } : {}),
   });
 
