@@ -29,7 +29,6 @@ export default function Leads() {
   const [sortBy, setSortBy] = useState("priority");
   const [showAdd, setShowAdd] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState("Alle");
-  const [assignedFilter, setAssignedFilter] = useState("Alle");
   const [showArchived, setShowArchived] = useState(false);
   const [showResearch, setShowResearch] = useState(false);
   const [researching, setResearching] = useState(false);
@@ -142,13 +141,12 @@ export default function Leads() {
         if (!showArchived && ["Gewonnen", "Verloren"].includes(c.status)) return false;
         if (statusFilter && c.status !== statusFilter) return false;
         if (priorityFilter !== "Alle") {
-          const score = c.priority_score || 0;
-          if (priorityFilter === "Hoch" && score < 60) return false;
-          if (priorityFilter === "Mittel" && (score < 30 || score >= 60)) return false;
-          if (priorityFilter === "Niedrig" && score >= 30) return false;
-        }
-        if (assignedFilter !== "Alle" && c.assigned_to !== assignedFilter) return false;
-        if (newRunFilter && c.research_run_id !== newRunFilter) return false;
+           const score = c.priority_score || 0;
+           if (priorityFilter === "Hoch" && score < 60) return false;
+           if (priorityFilter === "Mittel" && (score < 30 || score >= 60)) return false;
+           if (priorityFilter === "Niedrig" && score >= 30) return false;
+         }
+         if (newRunFilter && c.research_run_id !== newRunFilter) return false;
         
         // Focus Filters
         const today = moment().format("YYYY-MM-DD");
@@ -175,7 +173,7 @@ export default function Leads() {
     );
     console.timeEnd("[Leads] filter + sort");
     return result;
-  }, [companies, filterCompanies, showArchived, statusFilter, priorityFilter, assignedFilter, newRunFilter, focusFilter, search]);
+  }, [companies, filterCompanies, showArchived, statusFilter, priorityFilter, newRunFilter, focusFilter, search]);
 
   // Pagination: Nur erste 50 initial, danach alle
   const visibleLeads = useMemo(() => {
@@ -335,14 +333,6 @@ export default function Leads() {
                 {["Neu","Kontakt","Rückruf","Termin","Angebot","Gewonnen","Verloren"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            {/* Vertriebler-Filter deaktiviert für MVP (1 Account = 1 Owner) */}
-            {/* <Select value={assignedFilter} onValueChange={setAssignedFilter}>
-              <SelectTrigger className="w-40 bg-white border border-[#E2E8F0]"><SelectValue placeholder="Vertriebler" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Alle">Alle Vertriebler</SelectItem>
-                {members.map(m => <SelectItem key={m.id} value={m.user_email}>{m.user_email}</SelectItem>)}
-              </SelectContent>
-            </Select> */}
             <div className="flex-1" />
           </div>
         </div>
