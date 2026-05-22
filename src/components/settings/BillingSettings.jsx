@@ -213,9 +213,15 @@ export default function BillingSettings({ org: orgProp, user }) {
 
       // Alle aktiven Pläne mit Stripe-Preis laden (für Plan-Auswahl)
       const availablePlans = await base44.entities.Plan.filter({ is_active: true });
-      // P0-FIX: Agency-Plan aus Self-Service entfernen (nur auf Anfrage)
+      // P0-FIX: Agency-Plan aus Self-Service entfernen (robust multi-check)
       const plansWithPrice = availablePlans
-        .filter(p => p.stripe_price_id && p.plan_type !== 'agency')
+        .filter(p => {
+          const isAgencyPlan =
+            p.plan_type === 'agency' ||
+            p.slug === 'agency' ||
+            (p.name || '').toLowerCase() === 'agency';
+          return p.stripe_price_id && !isAgencyPlan;
+        })
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
       setAllPlans(plansWithPrice);
 
@@ -387,7 +393,9 @@ export default function BillingSettings({ org: orgProp, user }) {
                   {checkoutLoading === p.id
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     : <ArrowRight className="w-3.5 h-3.5" />}
-                  {(p.name || '').toLowerCase().includes('starter') ? '14 Tage kostenlos testen' : `${p.name} buchen`}
+                  {(p.name || '').toLowerCase() === 'starter'
+                    ? '14 Tage kostenlos testen'
+                    : `${p.name} buchen`}
                 </Button>
               </div>
             ))}
