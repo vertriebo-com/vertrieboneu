@@ -64,17 +64,7 @@ export default function Leads() {
     }
   }, [location.search]);
 
-  // Auto-analyze when coming from Dashboard CTA (separate Effect)
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const analyzeParam = params.get("analyze");
-    if (analyzeParam === 'true' && companies.length > 0 && !researching) {
-      handleAnalyzeLatest();
-      // Clean URL after triggering
-      params.delete("analyze");
-      navigate("/leads?" + params.toString(), { replace: true });
-    }
-  }, [location.search, companies.length]);
+  
 
   const orgId = org?.id || null;
   const { data: companies = [], isLoading: loading, refetch } = useQuery({
@@ -113,6 +103,16 @@ export default function Leads() {
 
 
 
+
+  // ═ Auto-analyze when coming from Dashboard CTA
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("analyze") === 'true' && companies.length > 0 && !researching) {
+      handleAnalyzeLatest();
+      params.delete("analyze");
+      navigate("/leads?" + params.toString(), { replace: true });
+    }
+  }, [companies.length, location.search]);
 
   // ═ Helpers & Derived Values
   const loadData = () => refetch();

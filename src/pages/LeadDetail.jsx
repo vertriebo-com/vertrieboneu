@@ -48,6 +48,7 @@ export default function LeadDetail() {
   const [showBlacklistConfirm, setShowBlacklistConfirm] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [orgId, setOrgId] = useState(null);
+  const [orgOwnerEmail, setOrgOwnerEmail] = useState(null);
 
   useEffect(() => { loadData(); }, [id]);
 
@@ -65,6 +66,7 @@ export default function LeadDetail() {
 
       setCurrentUser(me);
       setOrgId(orgId);
+      setOrgOwnerEmail(org?.owner_email || null);
 
       const [comp, logs, allTasks] = await Promise.all([
         base44.entities.Company.filter({ id, organization_id: orgId }),
@@ -145,9 +147,9 @@ export default function LeadDetail() {
   };
 
   const isPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(currentUser?.role);
-  // MVP: Owner = currentUser hat Owner-Rechte für seine Org (orgId ist Owner-Org)
-  const isOwner = orgId !== null;
-  // Admin-Aktionen: PlatformAdmin oder Owner der aktuellen Org
+  // Sauberer Owner-Check: gespeicherte owner_email der Org mit aktuellem User vergleichen
+  const isOwner = orgOwnerEmail !== null && currentUser?.email === orgOwnerEmail;
+  // Admin-Aktionen: PlatformAdmin oder Owner der Org
   const canUseAdminActions = isPlatformAdmin || isOwner;
 
   const handleEnrich = async () => {
