@@ -223,19 +223,22 @@ async function handleSubscriptionUpdated(base44, stripeSub) {
   const billingStatus = mapBillingStatus(stripeSub.status);
   
   // Bestimme trial_stage basierend auf Stripe-Status
-  let trialStage = org.trial_stage || 'free_preview'; // Behalte aktuellen Stage, update nur wenn explizit nötig
+  let trialStage = org.trial_stage || 'free_preview';
   if (stripeSub.status === 'trialing') {
     trialStage = 'verified_trial';
   } else if (stripeSub.status === 'active') {
     trialStage = 'paid';
-  } else if (stripeSub.status === 'canceled') {
-    // Nicht zurücksetzen zu free_preview — verhindert Missbrauch
-    // Behalte verified_trial mit canceled status
-    trialStage = org.trial_stage;
   }
+  // 'canceled' → trial_stage nicht zurücksetzen (Anti-Missbrauch)
+
+  // WICHTIG: billing_status für trialing-Subs = 'trialing', aber wenn die Org bereits
+  // durch checkout.completed auf 'active'+'paid' gesetzt wurde (paid-Checkout ohne Trial),
+  // darf subscription.updated das NICHT auf 'trialing' zurücksetzen.
+  // Regel: Wenn org bereits trial_stage='paid' hat und billingStatus='trialing' → nicht downgraden.
+  const shouldUpdateBillingStatus = !(org.trial_stage === 'paid' && billingStatus === 'trialing');
 
   await base44.asServiceRole.entities.Organization.update(org.id, {
-    billing_status: billingStatus,
+    ...(shouldUpdateBillingStatus ? { billing_status: billingStatus } : {}),
     trial_stage: trialStage,
     ...(stripeSub.status === 'trialing' && !org.trial_verified_at ? { trial_verified_at: new Date().toISOString(), trial_verified_by: org.owner_email } : {}),
   });

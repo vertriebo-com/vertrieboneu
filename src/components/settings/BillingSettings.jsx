@@ -260,15 +260,22 @@ export default function BillingSettings({ org: orgProp, user }) {
           const freshOrg = orgs[0];
           if (freshOrg) {
             setOrg(freshOrg);
-            if (freshOrg.billing_status === 'active' && freshOrg.trial_stage === 'paid') {
+            // Checkout gilt als verarbeitet wenn: bezahlt ODER trial aktiv
+            const checkoutProcessed =
+              (freshOrg.billing_status === 'active' && freshOrg.trial_stage === 'paid') ||
+              (freshOrg.billing_status === 'trialing' && freshOrg.trial_stage === 'verified_trial') ||
+              freshOrg.billing_status === 'trialing';
+            if (checkoutProcessed) {
               await loadData(true);
               window.dispatchEvent(new CustomEvent("checkout-success"));
               window.history.replaceState({}, document.title, window.location.pathname + "?tab=billing");
             } else if (pollCount < maxPolls) {
-              // Noch nicht bereit, weiterpollen
+              // Webhook noch nicht verarbeitet, weiterpollen
               setTimeout(doRefresh, 1500);
             } else {
+              // Timeout: trotzdem laden + Sync-Hinweis wird durch billingStatus-Logik angezeigt
               await loadData(true);
+              window.history.replaceState({}, document.title, window.location.pathname + "?tab=billing");
             }
           }
         } catch { /* Polling-Fehler still ignorieren */ }
