@@ -106,7 +106,9 @@ export default function Dashboard() {
       });
   }, [orgData?.id, dashboardData?.user?.full_name]);
 
-  if (orgLoading || isLoading) return <DashboardSkeleton />;
+  // Skeleton solange: org lädt, query lädt, oder query enabled aber dashboardData noch null (erster Load)
+  const isFirstLoad = orgLoading || isLoading || (!activeOrg?.id) || (!!activeOrg?.id && !dashboardData && !error);
+  if (isFirstLoad) return <DashboardSkeleton />;
 
   if (error) {
     return (
