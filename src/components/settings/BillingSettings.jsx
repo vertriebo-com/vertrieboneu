@@ -358,9 +358,9 @@ export default function BillingSettings({ org: orgProp, user }) {
             <div>
               <h3 className="text-base font-bold text-slate-900">Plan auswählen & loslegen</h3>
               <p className="text-xs font-medium text-slate-600 mt-1">
-                Wählen Sie Ihren Plan. Beim Starter-Plan erhalten Sie 14 Tage kostenlos zum Testen.
+                Sie haben Ihre 10 Vorschau-Leads genutzt. Wählen Sie jetzt einen Plan, um weiter zu recherchieren.
                 <br />
-                <span className="text-slate-500">Professional und Gold starten direkt. Alle Pläne sind monatlich kündbar.</span>
+                <span className="text-slate-500">Starter: 14 Tage kostenlos. Professional und Gold starten direkt. Alle Pläne monatlich kündbar.</span>
               </p>
             </div>
           </div>
@@ -474,7 +474,8 @@ export default function BillingSettings({ org: orgProp, user }) {
           </div>
         </div>
 
-        {/* Subscription Period */}
+        {/* Subscription Period – hidden for preview */}
+        {billingStatus !== 'preview' && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200">
           <div>
             <p className="text-xs text-slate-600 font-medium mb-0.5">Aktuelle Periode</p>
@@ -493,6 +494,12 @@ export default function BillingSettings({ org: orgProp, user }) {
             <p className="text-sm font-semibold text-slate-900">{org?.trial_ends_at ? formatDate(org.trial_ends_at) : "–"}</p>
           </div>
         </div>
+        )}
+        {billingStatus === 'preview' && (
+          <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+            Abrechnungsdaten erscheinen nach Planbuchung.
+          </div>
+        )}
 
         {subscription?.cancel_at_period_end && (
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
@@ -502,22 +509,7 @@ export default function BillingSettings({ org: orgProp, user }) {
         )}
       </div>
 
-      {/* Current Access Level – Trial states */}
-      {org?.trial_stage === 'free_preview' && (
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Aktueller Zugang</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="font-semibold text-slate-700">Zugang:</span>
-            <span className="text-blue-600 font-bold">Kostenlose Vorschau</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="font-semibold text-slate-700">Vorschau-Leads:</span>
-            <span className="text-slate-900 font-bold">{org?.trial_leads_granted || 0} / 10 genutzt</span>
-          </div>
-        </div>
-      </div>
-      )}
+      {/* Current Access Level – Free Preview zusammengefasst in Plan & Status Card hidden */}
 
       {org?.trial_stage === 'verified_trial' && (
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
