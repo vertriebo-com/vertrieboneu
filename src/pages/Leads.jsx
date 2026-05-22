@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useLeadsFilter } from "../hooks/useLeadsFilter";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Filter, X, TrendingUp, Building2, Upload, Sparkles, Activity, Target } from "lucide-react";
+import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -99,8 +100,33 @@ export default function Leads() {
     if (!outcomeByCompany[o.company_id]) outcomeByCompany[o.company_id] = o.outcome_type;
   }
 
+  // ═ handleAnalyzeLatest definiert vor Effects
+  const handleAnalyzeLatest = useCallback(async () => {
+    if (!orgId || researching) return;
+    try {
+      setResearching(true);
+      toast.info("Vertriebo Engine analysiert die neuesten Leads…");
 
+      const result = await base44.functions.invoke("analyzeLeadEngine", {
+        organization_id: orgId,
+        mode: "latest",
+        limit: 10
+      });
 
+      if (result?.data?.success) {
+        const analyzed = result.data.analyzed_count || result.data.analyzed || 0;
+        toast.success(`${analyzed} Leads analysiert. Hot/Warm/Cold wurde aktualisiert.`);
+        await refetch();
+      } else {
+        toast.error(result?.data?.error || "Die Vertriebo Engine konnte nicht gestartet werden.");
+      }
+    } catch (error) {
+      console.error("[Leads] Engine analysis error:", error);
+      toast.error(error?.message || "Analyse fehlgeschlagen. Bitte erneut versuchen.");
+    } finally {
+      setResearching(false);
+    }
+  }, [orgId, researching, refetch]);
 
 
   // ═ Auto-analyze when coming from Dashboard CTA
@@ -190,33 +216,6 @@ export default function Leads() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = "leads.csv"; a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const handleAnalyzeLatest = async () => {
-    if (!orgId || researching) return;
-    try {
-      setResearching(true);
-      toast.info("Vertriebo Engine analysiert die neuesten Leads…");
-
-      const result = await base44.functions.invoke("analyzeLeadEngine", {
-        organization_id: orgId,
-        mode: "latest",
-        limit: 10
-      });
-
-      if (result?.data?.success) {
-        const analyzed = result.data.analyzed_count || result.data.analyzed || 0;
-        toast.success(`${analyzed} Leads analysiert. Hot/Warm/Cold wurde aktualisiert.`);
-        await refetch();
-      } else {
-        toast.error(result?.data?.error || "Die Vertriebo Engine konnte nicht gestartet werden.");
-      }
-    } catch (error) {
-      console.error("[Leads] Engine analysis error:", error);
-      toast.error(error?.message || "Analyse fehlgeschlagen. Bitte erneut versuchen.");
-    } finally {
-      setResearching(false);
-    }
   };
 
 
