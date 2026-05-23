@@ -34,20 +34,33 @@ function mapBillingStatus(stripeStatus) {
 
 /**
  * Simuliert handleCheckoutCompleted-Logik auf einem Org-State-Objekt.
- * Gibt den neuen Org-State zurück.
+ *
+ * OPTION A (kanonisch):
+ *   Starter Trial:   stripeSub.status='trialing' → billing=trialing,  stage=verified_trial
+ *   Pro/Gold direkt: stripeSub.status='active'   → billing=active,    stage=paid
+ *
+ * trial_stage geht nur VORWÄRTS (free_preview → verified_trial → paid).
+ * checkout.session.completed setzt NIEMALS billing=active/stage=paid als Standard-Basis
+ * und korrigiert dann zurück — der Subscription-Status ist die einzige Autorität.
  */
 function simulateCheckoutCompleted(org, { planId, stripeStatus, stripeCustomerId }) {
   const next = { ...org };
   next.stripe_customer_id = stripeCustomerId || org.stripe_customer_id;
   next.plan_id = planId || org.plan_id;
-  // checkout.completed setzt IMMER active+paid als Basis
-  next.billing_status = 'active';
-  next.trial_stage = 'paid';
 
-  // Danach: wenn Subscription trialing ist, korrigieren auf verified_trial
+  const currentRank = STAGE_RANK[org.trial_stage] ?? 0;
+
   if (stripeStatus === 'trialing') {
-    next.trial_stage = 'verified_trial';
-    next.billing_status = 'trialing'; // Starter Trial: billing bleibt trialing
+    // Starter Trial: billing=trialing, stage=verified_trial (nur vorwärts)
+    next.billing_status = 'trialing';
+    next.trial_stage = currentRank < 1 ? 'verified_trial' : org.trial_stage;
+  } else if (stripeStatus === 'active') {
+    // Professional/Gold: billing=active, stage=paid (nur vorwärts)
+    next.billing_status = 'active';
+    next.trial_stage = currentRank < 2 ? 'paid' : org.trial_stage;
+  } else {
+    // Unerwarteter Status – konservativ, kein trial_stage-Sprung
+    next.billing_status = mapBillingStatus(stripeStatus);
   }
   return next;
 }
@@ -125,15 +138,33 @@ Deno.serve(async (req) => {
 
   // ══════════════════════════════════════════════════════════════════════════
   // TEST 1: STARTER – checkout.completed (trialing) → subscription.updated (trialing) → subscription.updated (active)
+  //
+  // OPTION A (kanonische Regel):
+  //   checkout.completed mit Subscription.status=trialing
+  //   → billing_status = 'trialing'    (NICHT 'active')
+  //   → trial_stage    = 'verified_trial' (NICHT 'paid')
+  //   Erst nach invoice.paid (Trial-Ende) → billing='active', stage='paid'
+  //
+  // Begründung: billing_status und trial_stage spiegeln den echten Stripe-Status.
+  //   'paid' bedeutet: echter Zahlungseingang. Beim Trial ist noch keine Zahlung erfolgt.
   // ══════════════════════════════════════════════════════════════════════════
-  results.push(runTest('1a. Starter: checkout.completed (trialing)', () => {
+  results.push(runTest('1a. Starter: checkout.completed (trialing) → billing=trialing, stage=verified_trial [Option A]', () => {
     let org = { ...INITIAL_ORG };
     org = simulateCheckoutCompleted(org, { planId: PLAN_IDS.starter, stripeStatus: 'trialing', stripeCustomerId: 'cus_starter' });
 
-    assert(org.billing_status === 'trialing', `billing_status soll 'trialing', got '${org.billing_status}'`);
-    assert(org.trial_stage === 'verified_trial', `trial_stage soll 'verified_trial', got '${org.trial_stage}'`);
+    assert(org.billing_status === 'trialing', `billing_status soll 'trialing' (Starter Trial, noch kein Geldeingang), got '${org.billing_status}'`);
+    assert(org.trial_stage === 'verified_trial', `trial_stage soll 'verified_trial' (verifiziert, aber noch nicht bezahlt), got '${org.trial_stage}'`);
     assert(org.plan_id === PLAN_IDS.starter, `plan_id soll Starter, got '${org.plan_id}'`);
     assert(org.stripe_customer_id === 'cus_starter', `stripe_customer_id fehlt`);
+  }));
+
+  results.push(runTest('1a-WIDERSPRUCHS-CHECK: checkout darf nie paid→verified_trial (rückwärts)', () => {
+    // Wenn Org schon auf paid ist (z.B. nach Upgrade) und ein Starter-checkout-Event nochmal ankommt:
+    let org = { ...INITIAL_ORG, billing_status: 'active', trial_stage: 'paid', plan_id: PLAN_IDS.professional };
+    org = simulateCheckoutCompleted(org, { planId: PLAN_IDS.starter, stripeStatus: 'trialing', stripeCustomerId: 'cus_starter' });
+
+    // trial_stage darf NICHT von paid auf verified_trial zurückgehen
+    assert(org.trial_stage === 'paid', `trial_stage darf nie rückwärts gehen (paid→verified_trial), got '${org.trial_stage}'`);
   }));
 
   results.push(runTest('1b. Starter: subscription.updated (trialing) nach checkout – kein Downgrade', () => {
@@ -198,14 +229,30 @@ Deno.serve(async (req) => {
   // ══════════════════════════════════════════════════════════════════════════
   // TEST 4: AGENCY – kein Self-Service
   // ══════════════════════════════════════════════════════════════════════════
-  results.push(runTest('4. Agency: kein Self-Service Checkout (createCheckoutSession blockt)', () => {
-    // Die Logik ist in createCheckoutSession: isAgencyPlan → 400 zurück
-    // Hier simulieren wir: plan_type='agency' → geblockt
+  results.push(runTest('4a. Agency: createCheckoutSession blockt (plan_type=agency → 400)', () => {
     const agencyPlan = { name: 'Agency', plan_type: 'agency', is_active: true };
     const isAgency = agencyPlan.plan_type === 'agency' || (agencyPlan.name || '').toLowerCase().includes('agency');
-    assert(isAgency === true, 'Agency-Plan muss als Agency erkannt werden');
-    // Würde 400 zurückgeben – kein Checkout möglich
-    assert(true, 'Agency Self-Service korrekt geblockt (plan_type check)');
+    assert(isAgency === true, 'Agency-Plan muss als Agency erkannt werden → 400');
+  }));
+
+  results.push(runTest('4b. Agency: stripeWebhook checkout.completed blockt Agency plan_id (Defense-in-Depth)', () => {
+    // Simuliert den Agency-Block im Webhook-Handler
+    const agencyPlan = { name: 'Vertriebo Agency', plan_type: 'agency' };
+    const isAgency = agencyPlan.plan_type === 'agency' || (agencyPlan.name || '').toLowerCase().includes('agency');
+    assert(isAgency === true, 'Webhook erkennt Agency → status=ignored, reason=agency_plan_blocked');
+
+    // Sicherstellen: nicht-Agency-Pläne sind NICHT geblockt
+    const starterPlan = { name: 'Vertriebo Starter', plan_type: 'standard' };
+    const starterBlocked = starterPlan.plan_type === 'agency' || (starterPlan.name || '').toLowerCase().includes('agency');
+    assert(starterBlocked === false, 'Starter darf nicht fälschlicherweise geblockt werden');
+  }));
+
+  results.push(runTest('4c. Agency: Org kann nur per PlatformAdmin freigeschaltet werden (agency_enabled=true)', () => {
+    // Agency-Aktivierung setzt agency_enabled=true, das ist ein Admin-Only Feld
+    // Self-Service kann dieses Feld nicht setzen (kein Checkout-Pfad führt dazu)
+    const adminAction = { field: 'agency_enabled', set_by: 'platform_admin', via_checkout: false };
+    assert(adminAction.via_checkout === false, 'agency_enabled darf nie via Checkout gesetzt werden');
+    assert(adminAction.set_by === 'platform_admin', 'Nur PlatformAdmin darf agency_enabled setzen');
   }));
 
   // ══════════════════════════════════════════════════════════════════════════

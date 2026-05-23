@@ -139,6 +139,23 @@ async function handleCheckoutCompleted(base44, session) {
   // org_not_found = echter Fehler → throw, damit 500 und Stripe retried
   if (!org) throw new Error(`org_not_found: Organization "${organizationId}" nicht in DB`);
 
+  // ── HARD-BLOCK: Agency darf kein Self-Service Checkout haben ─────────────
+  // Schutz ist auch im Frontend und createCheckoutSession, aber Defense-in-Depth:
+  if (planId) {
+    try {
+      const plans = await base44.asServiceRole.entities.Plan.filter({ id: planId });
+      const p = plans[0];
+      if (p) {
+        const isAgency = p.plan_type === 'agency' || (p.name || '').toLowerCase().includes('agency');
+        if (isAgency) {
+          console.error(`[stripeWebhook] BLOCKED: Agency plan self-service checkout für org ${organizationId} plan ${planId}`);
+          // Als ignored loggen (nicht als Fehler – wir wollen keinen Retry von Stripe)
+          return { status: 'ignored', reason: 'agency_plan_blocked' };
+        }
+      }
+    } catch (e) { console.warn('[stripeWebhook] Plan check failed (non-critical):', e.message); }
+  }
+
   // Stripe Customer ID sichern
   if (session.customer && org.stripe_customer_id !== session.customer) {
     await base44.asServiceRole.entities.Organization.update(organizationId, {
@@ -146,7 +163,7 @@ async function handleCheckoutCompleted(base44, session) {
     });
   }
 
-  // Plan aus DB validieren (Price-ID kommt NICHT von Stripe)
+  // Plan aus DB validieren
   let resolvedPlanId = planId;
   if (planId) {
     try {
@@ -158,31 +175,72 @@ async function handleCheckoutCompleted(base44, session) {
     } catch (_) { resolvedPlanId = null; }
   }
 
-  // Beim Checkout SOFORT auf 'active' + 'paid' setzen (unabhängig vom Subscription-Status)
-  // Die subscription.updated Events verfeinern das später falls nötig (z.B. für trialing)
-  await base44.asServiceRole.entities.Organization.update(organizationId, {
-    billing_status: 'active',
-    trial_stage: 'paid',
-    plan_id: resolvedPlanId || org.plan_id,
-    stripe_customer_id: session.customer || org.stripe_customer_id,
-  });
+  // ── OPTION A: Starter-Trial-Regel ────────────────────────────────────────
+  //
+  // billing_status und trial_stage werden AUSSCHLIESSLICH vom echten
+  // Subscription-Status abgeleitet — nie vom bloßen checkout.session.completed.
+  //
+  // Starter  (trial):  stripeSub.status='trialing' → billing=trialing, stage=verified_trial
+  // Pro/Gold (direkt): stripeSub.status='active'   → billing=active,   stage=paid
+  //
+  // trial_stage darf nur VORWÄRTS: free_preview → verified_trial → paid
+  // invoice.paid setzt schließlich stage=paid für Starter (nach Trial-Ende)
+  //
+  // Regel: checkout.session.completed darf trial_stage NIE von verified_trial zurück auf paid
+  //        setzen oder umgekehrt – der Subscription-Status ist die einzige Autorität.
 
-  // Optional: Subscription speichern, falls vorhanden
   if (session.subscription) {
     try {
       const stripeSub = await stripe.subscriptions.retrieve(session.subscription);
       await upsertSubscription(base44, { organization_id: organizationId, stripeSub, plan_id: resolvedPlanId });
-      
-      // Falls es ein trialing Abo ist — überschreibe mit verified_trial
+
+      const STAGE_RANK = { free_preview: 0, verified_trial: 1, paid: 2 };
+      const currentRank = STAGE_RANK[org.trial_stage] ?? 0;
+
+      let newBillingStatus, newTrialStage;
+
       if (stripeSub.status === 'trialing') {
-        await base44.asServiceRole.entities.Organization.update(organizationId, {
-          trial_stage: 'verified_trial',
+        // Starter Trial: billing=trialing, stage=verified_trial (nur vorwärts)
+        newBillingStatus = 'trialing';
+        newTrialStage = currentRank < 1 ? 'verified_trial' : org.trial_stage;
+      } else if (stripeSub.status === 'active') {
+        // Professional/Gold: billing=active, stage=paid (nur vorwärts)
+        newBillingStatus = 'active';
+        newTrialStage = currentRank < 2 ? 'paid' : org.trial_stage;
+      } else {
+        // Unerwarteter Status (incomplete etc.) – konservativ setzen
+        newBillingStatus = mapBillingStatus(stripeSub.status);
+        newTrialStage = org.trial_stage;
+      }
+
+      await base44.asServiceRole.entities.Organization.update(organizationId, {
+        billing_status: newBillingStatus,
+        trial_stage: newTrialStage,
+        plan_id: resolvedPlanId || org.plan_id,
+        stripe_customer_id: session.customer || org.stripe_customer_id,
+        ...(stripeSub.status === 'trialing' && !org.trial_verified_at ? {
           trial_verified_at: new Date().toISOString(),
           trial_verified_by: org.owner_email,
           ...(stripeSub.trial_end ? { trial_ends_at: new Date(stripeSub.trial_end * 1000).toISOString() } : {}),
-        });
-      }
-    } catch (e) { console.warn('[stripeWebhook] Subscription fetch failed (non-critical):', e.message); }
+        } : {}),
+      });
+
+      console.info(`[stripeWebhook] checkout.completed org=${organizationId} plan=${resolvedPlanId} stripe_status=${stripeSub.status} → billing=${newBillingStatus} stage=${newTrialStage}`);
+    } catch (e) {
+      // Subscription fetch schlug fehl – Fallback: nur customer_id + plan_id sichern, Status nicht ändern
+      console.warn('[stripeWebhook] Subscription fetch failed – nur customer_id gesichert:', e.message);
+      await base44.asServiceRole.entities.Organization.update(organizationId, {
+        plan_id: resolvedPlanId || org.plan_id,
+        stripe_customer_id: session.customer || org.stripe_customer_id,
+      });
+    }
+  } else {
+    // Kein subscription object im session (Edge-Case) – nur IDs sichern
+    await base44.asServiceRole.entities.Organization.update(organizationId, {
+      plan_id: resolvedPlanId || org.plan_id,
+      stripe_customer_id: session.customer || org.stripe_customer_id,
+    });
+    console.warn(`[stripeWebhook] checkout.completed ohne subscription object für org ${organizationId}`);
   }
 
   if (userEmail) {
