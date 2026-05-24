@@ -613,9 +613,13 @@ Deno.serve(async (req) => {
   const MAX_RUN_SECONDS = 180;
   const LOCK_DURATION_MS = 25000;
 
-  // research_run_id außerhalb des try-Blocks: wird im catch-Error-Handler benötigt
-  // Wird nur gesetzt wenn der Request gültig ist und der User-Check bestanden hat.
+  // ── OUTER-SCOPE VARIABLEN FÜR CATCH-BLOCK (kritisch für Error-Handling) ────
+  // Diese Variablen werden vor dem try deklariert damit sie im catch sicher verfügbar sind.
+  // GitHub Lint: Vermeidet ReferenceError bei block-scoped const/let im try.
   let research_run_id = null;
+  let organization_id = null;
+  let workerKey = 'unknown';
+  let runSnapshot = null;
 
   try {
     const base44 = createClientFromRequest(req);
@@ -634,9 +638,13 @@ Deno.serve(async (req) => {
     const run = runs[0];
     if (!run) return Response.json({ error: 'Nicht gefunden', success: false }, { status: 404 });
 
+    // ── OUTER-SCOPE SNAPSHOTS SETZEN (für catch-Block) ───────────────────────
+    research_run_id = run.id;
+    organization_id = run.organization_id;
+    runSnapshot = run;
+
     // ── Tenant-sicherer Ownership-Check ──────────────────────────────────────
     // SICHERHEIT: organization_id IMMER aus dem validierten ResearchRun, nie aus dem Request-Body
-    const organization_id = run.organization_id;
     const isPlatformAdmin = ["admin","platform_owner","platform_admin"].includes(user.role);
 
     if (!isPlatformAdmin) {
@@ -753,6 +761,8 @@ Deno.serve(async (req) => {
     // ── OPTIMISTIC LOCK: Schreibe Lock + unique workerKey, dann nochmal lesen ──
     // Zwei parallele Workers schreiben beide ihren workerKey. Der zweite überschreibt
     // den ersten. Nach 300ms lesen beide nochmal — nur einer sieht seinen eigenen Key.
+    // workerKey wird hier gesetzt (nach Lock-Write) für catch-Block
+    workerKey = `${user.email}:${Date.now()}`;
     const lockExpires = new Date(Date.now() + LOCK_DURATION_MS).toISOString();
     await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
       processing_lock_until: lockExpires,
@@ -1351,18 +1361,20 @@ Deno.serve(async (req) => {
     
     // ── AUDIT: Run-Error (nicht-blockierend, aber await + Catch) ─────────────
     // Non-blocking: Fehler werden gefangen, aber Aufruf wird erwartet
+    // WICHTIG: Nur auf outer-scope Variablen zugreifen (research_run_id, organization_id, workerKey, runSnapshot)
+    // Nicht auf block-scoped const run zugreifen → ReferenceError-Gefahr!
     if (research_run_id && organization_id) {
       try {
         await auditResearchEvent(
           research_run_id,
           organization_id,
           'run_error',
-          workerKey || 'unknown',
+          workerKey, // outer-scope, immer verfügbar
           {
             error_message: error?.message,
             error_stack: error?.stack,
-            batch_index: run.batch_index || 0,
-            leads_saved: run.leads_saved || 0,
+            batch_index: runSnapshot?.batch_index || 0,
+            leads_saved: runSnapshot?.leads_saved || 0,
           }
         );
         console.info(`[processResearchRun] ✅ Audit run_error geschrieben`);
