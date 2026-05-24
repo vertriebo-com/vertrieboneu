@@ -952,33 +952,6 @@ Deno.serve(async (req) => {
     const batchIndex = freshBatchIndex;
     const QUERIES_PER_BATCH = trialStage === 'free_preview' ? 2 : 3;
     const PLACE_DETAILS_PER_BATCH = 15;
-    const totalBatches = Math.ceil(allQueries.length / QUERIES_PER_BATCH);
-
-    // PUNKT 3: batch_index >= total_batches → completed
-    if (batchIndex >= totalBatches) {
-      await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
-        status: 'completed', progress_percent: 100,
-        current_step: currentLeadsSaved > 0 ? `${currentLeadsSaved} Firmenkontakte gefunden` : 'Keine neuen Kontakte gefunden',
-        finished_at: new Date().toISOString(), processing_lock_until: null, processing_by: null,
-        ...(currentLeadsSaved === 0 ? { zero_result_cause: 'all_queries_exhausted' } : {}),
-      });
-      console.info(`[processResearchRun] GUARD: batchIndex(${batchIndex}) >= totalBatches(${totalBatches}), completing`);
-      return Response.json({ success: true, done: true, status: 'completed', leads_saved: currentLeadsSaved, progress_percent: 100 });
-    }
-
-    const batchStart = batchIndex * QUERIES_PER_BATCH;
-    const batchQueries = allQueries.slice(batchStart, batchStart + QUERIES_PER_BATCH);
-
-    if (batchQueries.length === 0) {
-      await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
-        status: 'completed', progress_percent: 100,
-        current_step: currentLeadsSaved > 0 ? `${currentLeadsSaved} Firmenkontakte gefunden` : 'Keine neuen Kontakte gefunden',
-        finished_at: new Date().toISOString(),
-        processing_lock_until: null, processing_by: null,
-        ...(currentLeadsSaved === 0 ? { zero_result_cause: 'all_queries_exhausted' } : {}),
-      });
-      return Response.json({ success: true, done: true, status: 'completed', leads_saved: currentLeadsSaved, progress_percent: 100 });
-    }
 
     // ── Search Points: Grid + LocationIndex-Orte kombiniert ─────────────────
     // Wenn coveredLocations aus LocationIndex vorhanden → Location-Punkte einmischen.
@@ -1006,12 +979,42 @@ Deno.serve(async (req) => {
       : [];
 
     // Kombination: erst LocationIndex-Punkte (Priorität), dann Grid als Ergänzung
-    // Limit: max 50 Punkte gesamt (Performance)
+    // Kein hartes Limit mehr: alle selected coveredLocations müssen erreichbar sein
     const allAvailablePoints = locationIndexPoints.length > 0
-      ? [...locationIndexPoints, ...gridPoints].slice(0, 50)
+      ? [...locationIndexPoints, ...gridPoints]
       : gridPoints;
 
+    // ── totalBatches: max(queryBatches, pointBatches) sichert vollständige Abdeckung ─
+    // FIX: Vorher nur queryBatches → bei Professional/Gold wurden nicht alle Orte erreicht.
+    // Jetzt: genug Batches damit jeder Punkt mindestens einmal als Suchzentrum dient.
+    const POINTS_PER_BATCH = trialStage === 'free_preview' ? 1 : 3;
+    const queryBatches = Math.ceil(allQueries.length / QUERIES_PER_BATCH);
+    const pointBatches = Math.ceil(allAvailablePoints.length / POINTS_PER_BATCH);
+    const totalBatches = Math.max(queryBatches, pointBatches);
+
     console.info(`[processResearchRun] Points: locationIndex=${locationIndexPoints.length} grid=${gridPoints.length} combined=${allAvailablePoints.length} coverageMode=${coverageMode}`);
+    console.info(`[processResearchRun] Batches: queryBatches=${queryBatches} pointBatches=${pointBatches} totalBatches=${totalBatches} (max garantiert alle Orte)`);
+
+    // GUARD: batch_index >= totalBatches → completed
+    if (batchIndex >= totalBatches) {
+      await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
+        status: 'completed', progress_percent: 100,
+        current_step: currentLeadsSaved > 0 ? `${currentLeadsSaved} Firmenkontakte gefunden` : 'Keine neuen Kontakte gefunden',
+        finished_at: new Date().toISOString(), processing_lock_until: null, processing_by: null,
+        ...(currentLeadsSaved === 0 ? { zero_result_cause: 'all_queries_exhausted' } : {}),
+      });
+      console.info(`[processResearchRun] GUARD: batchIndex(${batchIndex}) >= totalBatches(${totalBatches}), completing`);
+      return Response.json({ success: true, done: true, status: 'completed', leads_saved: currentLeadsSaved, progress_percent: 100 });
+    }
+
+    // ── Queries: Wrap-around Rotation ────────────────────────────────────────
+    // Wenn pointBatches > queryBatches rotieren Queries durch → keine leeren batchQueries mehr.
+    // Jede Query wird über alle nötigen Batches wiederholt für neue Orte.
+    const queryOffset = (batchIndex * QUERIES_PER_BATCH) % allQueries.length;
+    const batchQueries = [];
+    for (let i = 0; i < QUERIES_PER_BATCH; i++) {
+      batchQueries.push(allQueries[(queryOffset + i) % allQueries.length]);
+    }
 
     if (allAvailablePoints.length === 0) {
       await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
@@ -1021,9 +1024,6 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Keine Suchkoordinaten.', done: true, status: 'failed' });
     }
 
-    // POINTS_PER_BATCH: Wie viele Punkte pro Batch verwendet werden
-    // Preview: nur 1 Punkt (Zentrum), bezahlt: bis zu 3 Punkte pro Batch
-    const POINTS_PER_BATCH = trialStage === 'free_preview' ? 1 : 3;
     const pointOffset = (batchIndex * POINTS_PER_BATCH) % allAvailablePoints.length;
     const pointsToSearch = [];
     for (let i = 0; i < POINTS_PER_BATCH; i++) {
@@ -1054,8 +1054,30 @@ Deno.serve(async (req) => {
         if (newLeadsSavedThisBatch + currentLeadsSaved >= batchTarget) break outer;
         if (Date.now() - startedAt > MAX_BATCH_MS) { console.warn('[processResearchRun] Batch time budget reached'); break outer; }
 
-        const places = await searchPlaces(query, { lat: point.lat, lng: point.lng }, pointRadiusMeters, GOOGLE_PLACES_API_KEY);
-        rawHitsThisBatch += places.length;
+        // ── Punkt 5: Ortsbezogene Query für LocationIndex-Punkte ──────────────
+        // Bei benannten Orten (city-level) wird eine Stadtname-Variante eingemischt:
+        // "Hausverwaltung" + locationBias → zusätzlich "Hausverwaltung Neuwied" ohne Bias
+        // Das verbessert die Trefferrate bei präzisen Ortssuchen erheblich.
+        let allPlacesForQuery = [];
+        const geoQuery = query;
+        allPlacesForQuery = await searchPlaces(geoQuery, { lat: point.lat, lng: point.lng }, pointRadiusMeters, GOOGLE_PLACES_API_KEY);
+        rawHitsThisBatch += allPlacesForQuery.length;
+
+        // City-Keyword-Variante: nur für LocationIndex-Punkte mit bekanntem Ort
+        if (point.locationCity && allPlacesForQuery.length < 5) {
+          const cityQuery = `${query} ${point.locationCity}`;
+          const cityPlaces = await searchPlaces(cityQuery, { lat: point.lat, lng: point.lng }, Math.min(pointRadiusMeters * 1.5, 25000), GOOGLE_PLACES_API_KEY);
+          rawHitsThisBatch += cityPlaces.length;
+          // Zusammenführen, Duplikate per place_id vermeiden
+          const existingIds = new Set(allPlacesForQuery.map(p => p.place_id));
+          for (const cp of cityPlaces) {
+            if (!existingIds.has(cp.place_id)) { allPlacesForQuery.push(cp); existingIds.add(cp.place_id); }
+          }
+          if (cityPlaces.length > 0) {
+            console.info(`[processResearchRun] City-Query "${cityQuery}" → +${cityPlaces.length} zusätzliche Treffer`);
+          }
+        }
+        const places = allPlacesForQuery;
 
         for (const place of places) {
           if (newLeadsSavedThisBatch + currentLeadsSaved >= batchTarget) break outer;
@@ -1260,6 +1282,16 @@ Deno.serve(async (req) => {
       ? (totalLeadsSaved > 0 ? `${totalLeadsSaved} neue Firmenkontakte gefunden` : 'Keine neuen Kontakte gefunden')
       : `Suche läuft… ${totalLeadsSaved} Kontakte bisher gefunden`;
 
+    // ── Punkt 4: Erweiterte Coverage-Diagnostik ────────────────────────────
+    const cumulativeLocationsSearched = (freshRun.locations_searched_count || 0) + locationsSearchedSet.size;
+    const selectedLocationsCount = freshRun.selected_locations_count || coveredLocations.length || 0;
+    const locationsRemainingCount = Math.max(0, selectedLocationsCount - cumulativeLocationsSearched);
+    const coverageComplete = selectedLocationsCount > 0
+      ? cumulativeLocationsSearched >= selectedLocationsCount
+      : true; // grid_only mode: kein Location-Index → immer "complete"
+
+    console.info(`[processResearchRun] Coverage: searched=${cumulativeLocationsSearched}/${selectedLocationsCount} remaining=${locationsRemainingCount} complete=${coverageComplete}`);
+
     await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
       status: newStatus, leads_saved: totalLeadsSaved,
       duplicates_skipped: (run.duplicates_skipped || 0) + dupSkippedThisBatch,
@@ -1271,8 +1303,8 @@ Deno.serve(async (req) => {
       current_step: newStep,
       seen_place_ids: JSON.stringify([...seenPlaceIds].slice(-500)),
       charged_lead_generation: totalLeadsSaved > 0,
-      // LocationIndex Coverage-Diagnostik
-      locations_searched_count: (freshRun.locations_searched_count || 0) + locationsSearchedSet.size,
+      // Punkt 4: Vollständige Coverage-Diagnostik
+      locations_searched_count: cumulativeLocationsSearched,
       search_points_used_count: (freshRun.search_points_used_count || 0) + pointsToSearch.length,
       // VITAL: Lock muss AKTIV bleiben solange Run nicht completed ist
       // Sonst ruft Banner nochmal auf bevor Status-Update committed ist
