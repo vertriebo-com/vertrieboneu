@@ -272,7 +272,7 @@ export default function KeywordProfilePanel({ organizationId }) {
               <Input
                 value={newKeyword}
                 onChange={(e) => setNewKeyword(e.target.value)}
-                placeholder="z.B. Büroreinigung, WEG-Verwaltung..."
+                placeholder="z.B. Zielgruppe, Suchbegriff oder Kundentyp..."
                 autoFocus
                 className="text-sm"
               />
