@@ -111,12 +111,25 @@ Deno.serve(async (req) => {
     const existingKeywords = new Set(existingProfiles.map(p => p.keyword.toLowerCase()));
 
     // ── 6. Vorschläge generieren ─────────────────────────────────────────────
+    // WICHTIG: Nicht vorschlagen was bereits in Onboarding/Settings gewählt wurde!
     
-    // 6a) Aus target_customer_types (Taxonomie)
+    // Bereits in Onboarding/Settings gewählte Begriffe sammeln (Single Source of Truth)
+    const onboardingTargets = (settings.target_customer_types || '').split(/,|, /).map(x => x.trim()).filter(Boolean);
+    const onboardingServices = (settings.own_services || settings.services || '').split(/,|, /).map(x => x.trim()).filter(Boolean);
+    const onboardingExcluded = (settings.excluded_customer_types || '').split(/,|, /).map(x => x.trim()).filter(Boolean);
+    
+    const alreadyChosenLower = new Set([
+      ...onboardingTargets.map(t => t.toLowerCase()),
+      ...onboardingServices.map(s => s.toLowerCase()),
+      ...onboardingExcluded.map(e => e.toLowerCase()),
+    ]);
+
+    // 6a) Aus target_customer_types (Taxonomie) - NUR wenn NICHT bereits im Onboarding gewählt
     if (taxonomyProfile.target_customer_types) {
       for (const target of taxonomyProfile.target_customer_types.slice(0, 8)) {
         const kwLower = target.toLowerCase();
         if (existingKeywords.has(kwLower)) continue;
+        if (alreadyChosenLower.has(kwLower)) continue; // NICHT doppelt vorschlagen!
         
         suggestions.push({
           keyword: target,
@@ -129,7 +142,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6b) Aus search_keyword_variants (Taxonomie)
+    // 6b) Aus search_keyword_variants (Taxonomie) - NUR wenn NICHT bereits gewählt
     if (taxonomyProfile.search_keyword_variants) {
       const variants = taxonomyProfile.search_keyword_variants;
       for (const [category, keywords] of Object.entries(variants)) {
@@ -137,6 +150,7 @@ Deno.serve(async (req) => {
         for (const kw of keywords.slice(0, 3)) {
           const kwLower = kw.toLowerCase();
           if (existingKeywords.has(kwLower)) continue;
+          if (alreadyChosenLower.has(kwLower)) continue; // NICHT doppelt vorschlagen!
           
           suggestions.push({
             keyword: kw,
@@ -150,11 +164,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6c) Aus own_services (Taxonomie)
+    // 6c) Aus own_services (Taxonomie) - NUR wenn NICHT bereits im Onboarding gewählt
     if (taxonomyProfile.own_services) {
       for (const service of taxonomyProfile.own_services.slice(0, 5)) {
         const kwLower = service.toLowerCase();
         if (existingKeywords.has(kwLower)) continue;
+        if (alreadyChosenLower.has(kwLower)) continue; // NICHT doppelt vorschlagen!
         
         suggestions.push({
           keyword: service,
@@ -167,23 +182,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6d) Aus Onboarding-Einstellungen (falls vorhanden)
-    const onboardingTargets = (settings.target_customer_types || '').split(/,|, /).map(x => x.trim()).filter(Boolean);
-    for (const target of onboardingTargets) {
-      const kwLower = target.toLowerCase();
-      if (existingKeywords.has(kwLower)) continue;
-      
-      suggestions.push({
-        keyword: target,
-        source: 'onboarding',
-        reason: 'Im Onboarding ausgewählt',
-        priority_score: 75,
-        status: 'suggested',
-        metadata: { category: 'onboarding' }
-      });
-    }
-
-    // 6e) Aus OrgLearnedSignals (bereits gelernte, aber noch nicht als Profile)
+    // 6d) Aus OrgLearnedSignals (bereits gelernte, aber noch nicht als Profile) - NUR wenn NICHT bereits gewählt
     if (learnedSignals && learnedSignals.boosted_keywords) {
       try {
         const boostedKws = JSON.parse(learnedSignals.boosted_keywords);
@@ -191,6 +190,7 @@ Deno.serve(async (req) => {
           const kw = typeof kwObj === 'string' ? kwObj : (kwObj.keyword || '');
           const kwLower = kw.toLowerCase();
           if (existingKeywords.has(kwLower) || !kw) continue;
+          if (alreadyChosenLower.has(kwLower)) continue; // NICHT doppelt vorschlagen!
           
           const stats = typeof kwObj === 'object' ? kwObj : { score: 1, total_count: 1 };
           
@@ -217,7 +217,25 @@ Deno.serve(async (req) => {
       const kwLower = s.keyword.toLowerCase();
       if (seenKeywords.has(kwLower)) continue;
       seenKeywords.add(kwLower);
-      uniqueSuggestions.push(s);
+      
+      // status_hint für UI: Bereits gewählte Begriffe markieren
+      let statusHint = 'suggested';
+      if (onboardingTargets.some(t => t.toLowerCase() === kwLower)) {
+        statusHint = 'already_active_target_customer';
+      } else if (onboardingServices.some(s => s.toLowerCase() === kwLower)) {
+        statusHint = 'already_active_service';
+      } else if (onboardingExcluded.some(e => e.toLowerCase() === kwLower)) {
+        statusHint = 'blocked';
+      }
+      
+      uniqueSuggestions.push({
+        ...s,
+        status_hint: statusHint,
+        keyword_type: s.metadata?.category === 'target_customer' ? 'target_customer' :
+                      s.metadata?.category === 'own_service' ? 'service' :
+                      s.metadata?.category === 'keyword_variant' ? 'search_variant' :
+                      s.metadata?.category === 'learned' ? 'learned_query' : 'manual'
+      });
     }
 
     uniqueSuggestions.sort((a, b) => b.priority_score - a.priority_score);
@@ -231,9 +249,13 @@ Deno.serve(async (req) => {
       suggestions: uniqueSuggestions.slice(0, 20), // Max 20 Vorschläge
       total_suggestions: uniqueSuggestions.length,
       existing_keywords_count: existingKeywords.size,
+      onboarding_data: {
+        target_customer_types: onboardingTargets,
+        own_services: onboardingServices,
+        excluded_customer_types: onboardingExcluded,
+      },
       source_breakdown: {
         taxonomy: uniqueSuggestions.filter(s => s.source === 'taxonomy').length,
-        onboarding: uniqueSuggestions.filter(s => s.source === 'onboarding').length,
         outcome_feedback: uniqueSuggestions.filter(s => s.source === 'outcome_feedback').length,
       }
     });

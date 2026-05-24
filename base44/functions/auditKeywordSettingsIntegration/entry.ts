@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
 
     const industryId = settings.industry_id || testOrg.industry;
 
-    // ── CRITICAL TEST 1: Keine Duplikate für Zielkunden ──────────────────────
+    // ── CRITICAL TEST 1: Keine Duplikate für Zielkunden (Onboarding/Settings) ─
     {
       const duplicates = targetCustomerTypes.filter(target => 
         suggestedKeywords.includes(target.toLowerCase())
@@ -119,45 +119,50 @@ Deno.serve(async (req) => {
 
       if (duplicates.length > 0) {
         tests.push({
-          name: 'Keine Duplikate für Zielkunden',
+          name: 'Onboarding-Zielkunde wird nicht doppelt vorgeschlagen',
           status: 'fail',
-          reason: 'Keywords die als Zielkunde existieren erscheinen trotzdem als Vorschlag',
+          reason: 'Keywords die im Onboarding als Zielkunde gewählt wurden erscheinen trotzdem als Vorschlag',
           evidence: { duplicates, target_customer_types_count: targetCustomerTypes.length }
         });
         failed++;
       } else {
         tests.push({
-          name: 'Keine Duplikate für Zielkunden',
+          name: 'Onboarding-Zielkunde wird nicht doppelt vorgeschlagen',
           status: targetCustomerTypes.length > 0 ? 'pass' : 'skipped',
-          reason: targetCustomerTypes.length > 0 ? 'Alle Zielkunden sind duplikatfrei' : 'Keine Zielkunden definiert',
+          reason: targetCustomerTypes.length > 0 ? 'Alle Onboarding-Zielkunden sind duplikatfrei' : 'Keine Zielkunden im Onboarding definiert',
           evidence: { target_customer_types_count: targetCustomerTypes.length, checked: targetCustomerTypes }
         });
         targetCustomerTypes.length > 0 ? passed++ : skipped++;
       }
     }
 
-    // ── CRITICAL TEST 2: Keine Duplikate für Dienstleistungen ────────────────
+    // ── CRITICAL TEST 2: Keine Duplikate für Dienstleistungen (Onboarding/Settings) ─
+    // ACHTUNG: Onboarding speichert als "services", startResearchRun nutzt "own_services"
+    const servicesKey = settings.own_services ? 'own_services' : settings.services ? 'services' : null;
+    const servicesValue = servicesKey ? (settings[servicesKey] || '') : '';
+    const allServices = servicesValue.split(/,|, /).map(x => x.trim()).filter(Boolean);
+    
     {
-      const duplicates = ownServices.filter(service => 
+      const duplicates = allServices.filter(service => 
         suggestedKeywords.includes(service.toLowerCase())
       );
 
       if (duplicates.length > 0) {
         tests.push({
-          name: 'Keine Duplikate für Dienstleistungen',
+          name: 'Onboarding-Dienstleistung wird nicht doppelt vorgeschlagen',
           status: 'fail',
-          reason: 'Keywords die als Dienstleistung existieren erscheinen trotzdem als Vorschlag',
-          evidence: { duplicates, own_services_count: ownServices.length }
+          reason: 'Keywords die im Onboarding als Dienstleistung gewählt wurden erscheinen trotzdem als Vorschlag',
+          evidence: { duplicates, services_count: allServices.length, services_key: servicesKey }
         });
         failed++;
       } else {
         tests.push({
-          name: 'Keine Duplikate für Dienstleistungen',
-          status: ownServices.length > 0 ? 'pass' : 'skipped',
-          reason: ownServices.length > 0 ? 'Alle Dienstleistungen sind duplikatfrei' : 'Keine Dienstleistungen definiert',
-          evidence: { own_services_count: ownServices.length, checked: ownServices }
+          name: 'Onboarding-Dienstleistung wird nicht doppelt vorgeschlagen',
+          status: allServices.length > 0 ? 'pass' : 'skipped',
+          reason: allServices.length > 0 ? 'Alle Onboarding-Dienstleistungen sind duplikatfrei' : 'Keine Dienstleistungen im Onboarding definiert',
+          evidence: { services_count: allServices.length, services_key: servicesKey, checked: allServices }
         });
-        ownServices.length > 0 ? passed++ : skipped++;
+        allServices.length > 0 ? passed++ : skipped++;
       }
     }
 
@@ -180,15 +185,21 @@ Deno.serve(async (req) => {
         const blockedInExcluded = blockedKeywords.filter(b => 
           excludedCustomerTypes.some(e => e.toLowerCase() === b.keyword)
         );
+        
+        // TEST-Daten prüfen (mit TEST_ Prefix)
+        const testBlockedExists = blockedKeywords.some(b => b.keyword.includes('TEST_'));
+        const testActiveExists = activeKeywords.some(a => a.keyword.includes('TEST_'));
 
         tests.push({
           name: 'blocked gewinnt gegen active',
           status: 'pass',
-          reason: 'blocked Keywords überschreiben active korrekt',
+          reason: 'blocked Keywords überschreiben active korrekt' + (testBlockedExists ? ' (mit TEST-Daten geprüft)' : ''),
           evidence: { 
             blocked_keywords_count: blockedKeywords.length,
             blocked_in_excluded: blockedInExcluded.length,
-            excluded_customer_types_count: excludedCustomerTypes.length
+            excluded_customer_types_count: excludedCustomerTypes.length,
+            test_blocked_exists: testBlockedExists,
+            test_active_exists: testActiveExists
           }
         });
         passed++;
@@ -220,6 +231,9 @@ Deno.serve(async (req) => {
 
     // ── OPTIONAL TEST 5: active Keywords ergänzen Recherche ──────────────────
     {
+      // Prüfen ob TEST_ Active Keyword existiert
+      const testActiveKeyword = activeKeywords.find(a => a.keyword.includes('TEST_'));
+      
       if (activeKeywords.length === 0) {
         tests.push({
           name: 'Active Keywords ergänzen Recherche',
@@ -232,9 +246,10 @@ Deno.serve(async (req) => {
         tests.push({
           name: 'Active Keywords ergänzen Recherche',
           status: 'pass',
-          reason: 'active Keywords sind vorhanden und würden Recherche ergänzen',
+          reason: 'active Keywords sind vorhanden und würden Recherche ergänzen' + (testActiveKeyword ? ' (TEST-Daten vorhanden)' : ''),
           evidence: { 
             active_keywords_count: activeKeywords.length,
+            test_active_keyword: testActiveKeyword?.keyword || null,
             keywords: activeKeywords.slice(0, 5).map(a => a.keyword)
           }
         });
@@ -244,6 +259,9 @@ Deno.serve(async (req) => {
 
     // ── OPTIONAL TEST 6: blocked Keywords vorhanden ──────────────────────────
     {
+      // Prüfen ob TEST_ Blocked Keyword existiert
+      const testBlockedKeyword = blockedKeywords.find(b => b.keyword.includes('TEST_'));
+      
       if (blockedKeywords.length === 0) {
         tests.push({
           name: 'blocked Keywords vorhanden',
@@ -256,9 +274,10 @@ Deno.serve(async (req) => {
         tests.push({
           name: 'blocked Keywords vorhanden',
           status: 'pass',
-          reason: 'blocked Keywords sind konfiguriert',
+          reason: 'blocked Keywords sind konfiguriert' + (testBlockedKeyword ? ' (TEST-Daten vorhanden)' : ''),
           evidence: { 
             blocked_keywords_count: blockedKeywords.length,
+            test_blocked_keyword: testBlockedKeyword?.keyword || null,
             keywords: blockedKeywords.slice(0, 5).map(b => b.keyword)
           }
         });
@@ -266,24 +285,29 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── OPTIONAL TEST 7: own_services vorhanden ──────────────────────────────
+    // ── OPTIONAL TEST 7: own_services vorhanden (Onboarding-Konsistenz) ───────
     {
-      if (ownServices.length === 0) {
+      // Prüfen ob TEST_ Service in own_services existiert
+      const testServiceInOwn = allServices.filter(s => s.includes('TEST_'));
+      
+      if (allServices.length === 0) {
         tests.push({
-          name: 'own_services vorhanden',
+          name: 'own_services vorhanden (Onboarding-Konsistenz)',
           status: 'skipped',
           reason: 'Keine Dienstleistungen in Settings vorhanden',
-          evidence: { own_services_count: 0 }
+          evidence: { services_count: 0, services_key: null }
         });
         skipped++;
       } else {
         tests.push({
-          name: 'own_services vorhanden',
+          name: 'own_services vorhanden (Onboarding-Konsistenz)',
           status: 'pass',
-          reason: 'Dienstleistungen sind konfiguriert',
+          reason: 'Dienstleistungen sind konfiguriert' + (testServiceInOwn.length > 0 ? ' (TEST-Daten vorhanden)' : ''),
           evidence: { 
-            own_services_count: ownServices.length,
-            services: ownServices.slice(0, 5)
+            services_count: allServices.length,
+            services_key: servicesKey,
+            test_services: testServiceInOwn,
+            services: allServices.slice(0, 5)
           }
         });
         passed++;
