@@ -215,6 +215,90 @@ async function processFeedbackForOrg(base44, organization_id) {
 
   console.info(`[processLeadOutcomeFeedback] org=${organization_id} categories=${categoryScores.length} keywords=${boostedKeywords.length} won=${outcomes.filter(o=>o.outcome_type==='won').length} excluded=${badCategories.length}`);
 
+  // ── OrganizationKeywordProfile aktualisieren (Phase 2) ─────────────────────
+  try {
+    // Bestehende Profile laden
+    const existingProfiles = await base44.asServiceRole.entities.OrganizationKeywordProfile.filter({ organization_id });
+    const profileMap = {};
+    existingProfiles.forEach(p => { profileMap[p.keyword.toLowerCase()] = p; });
+
+    const now = new Date().toISOString();
+    const updates = [];
+
+    // Keywords aus Feedback verarbeiten
+    for (const [keyword, stats] of Object.entries(keywordStats)) {
+      const kwLower = keyword.toLowerCase();
+      const score = (stats.won_count * 3) + (stats.relevant_count * 1) - (stats.not_relevant_count * 2);
+      
+      // Status-Regeln
+      let status = 'suggested';
+      let isBoosted = false;
+      let isReduced = false;
+      
+      if (score >= 5 && stats.total_count >= 2) {
+        status = 'boosted';
+        isBoosted = true;
+      } else if (score <= -3 && stats.total_count >= 3) {
+        status = 'reduced';
+        isReduced = true;
+      } else if (score > 0 && stats.total_count >= 1) {
+        status = 'active';
+      }
+
+      // Source bestimmen
+      let source = 'outcome_feedback';
+      let isUserAdded = false;
+      if (profileMap[kwLower]) {
+        source = profileMap[kwLower].source;
+        isUserAdded = profileMap[kwLower].is_user_added || false;
+      }
+
+      const profileData = {
+        organization_id,
+        industry_id: settings.industry_id || org.industry || '',
+        keyword,
+        source,
+        status,
+        score,
+        won_count: stats.won_count,
+        relevant_count: stats.relevant_count,
+        not_relevant_count: stats.not_relevant_count,
+        total_count: stats.total_count,
+        last_feedback_at: now,
+        is_boosted: isBoosted,
+        is_reduced: isReduced,
+        is_user_added: isUserAdded,
+      };
+
+      if (profileMap[kwLower]) {
+        // Update bestehend
+        updates.push(
+          base44.asServiceRole.entities.OrganizationKeywordProfile.update(
+            profileMap[kwLower].id,
+            profileData
+          )
+        );
+      } else {
+        // Create neu
+        updates.push(
+          base44.asServiceRole.entities.OrganizationKeywordProfile.create({
+            ...profileData,
+            used_in_research_count: 0,
+            last_used_at: null,
+          })
+        );
+      }
+    }
+
+    // Alle Updates parallel ausführen
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      console.info(`[processLeadOutcomeFeedback] KeywordProfile aktualisiert: ${updates.length} Keywords`);
+    }
+  } catch (profileErr) {
+    console.warn(`[processLeadOutcomeFeedback] KeywordProfile-Fehler (non-blocking): ${profileErr.message}`);
+  }
+
   return {
     success: true,
     updated: true,
@@ -223,7 +307,8 @@ async function processFeedbackForOrg(base44, organization_id) {
     boosted_keywords: boostedKeywords.length,
     boosted_keywords_preview: boostedKeywords.slice(0, 5).map(k => `${k.keyword} (score=${k.score})`),
     winning_signals: winningSignals.length,
-    total_outcomes: outcomes.length
+    total_outcomes: outcomes.length,
+    keyword_profiles_updated: Object.keys(keywordStats).length
   };
 }
 

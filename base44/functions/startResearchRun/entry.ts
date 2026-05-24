@@ -497,6 +497,34 @@ Deno.serve(async (req) => {
       console.info(`[startResearchRun] Fallback: targetCustomerTypes aus Taxonomie (${targetCustomerTypes.length})`);
     }
 
+    // ── OrganizationKeywordProfile laden (Phase 2) ───────────────────────────
+    let keywordProfiles = [];
+    let activeKeywords = [];
+    let boostedKeywordsFromProfile = [];
+    let blockedKeywords = [];
+    
+    try {
+      const profiles = await base44.asServiceRole.entities.OrganizationKeywordProfile.filter({ organization_id });
+      keywordProfiles = profiles;
+      
+      // Nach Status filtern
+      activeKeywords = profiles
+        .filter(p => p.status === 'active' || p.status === 'boosted')
+        .map(p => p.keyword);
+      
+      boostedKeywordsFromProfile = profiles
+        .filter(p => p.status === 'boosted' || p.is_boosted === true)
+        .map(p => p.keyword);
+      
+      blockedKeywords = profiles
+        .filter(p => p.status === 'blocked' || p.is_reduced === true)
+        .map(p => p.keyword);
+      
+      console.info(`[startResearchRun] KeywordProfile: ${profiles.length} gesamt, ${activeKeywords.length} active, ${boostedKeywordsFromProfile.length} boosted, ${blockedKeywords.length} blocked/reduced`);
+    } catch (kpErr) {
+      console.warn(`[startResearchRun] KeywordProfile Ladefehler (non-blocking): ${kpErr.message}`);
+    }
+
     // ── Learning Loop anwenden (wenn genug Outcomes vorhanden) ───────────────
     let boostedKeywordsForPlan = [];
     if (learningApplied) {
@@ -519,25 +547,51 @@ Deno.serve(async (req) => {
 
       // 2. boosted_keywords als zusätzliche Suchbegriffe aufnehmen
       //    light → max 2, strong → max 5
-      if (learnedBoostedKeywords.length > 0) {
+      //    JETZT: KeywordProfile hat Priorität, dann OrgLearnedSignals als Fallback
+      const profileBoostedSet = new Set(boostedKeywordsFromProfile.map(k => k.toLowerCase()));
+      
+      if (boostedKeywordsFromProfile.length > 0) {
+        // KeywordProfile boosted Keywords nutzen
+        const maxKW = learningWeightLevel === 'strong' ? 5 : 2;
+        const existingLower = new Set(targetCustomerTypes.map(t => t.toLowerCase()));
+        boostedKeywordsForPlan = boostedKeywordsFromProfile
+          .filter(kw => !existingLower.has(kw.toLowerCase()))
+          .slice(0, maxKW);
+        
+        const newTargets = boostedKeywordsForPlan.filter(kw => !existingLower.has(kw.toLowerCase()));
+        if (newTargets.length > 0) {
+          targetCustomerTypes = [...targetCustomerTypes, ...newTargets];
+        }
+        console.info(`[startResearchRun] KeywordProfile: boostedKeywords aus Profilen (${learningWeightLevel}): ${boostedKeywordsForPlan.join(', ')}`);
+      } else if (learnedBoostedKeywords.length > 0) {
+        // Fallback: OrgLearnedSignals (Abwärtskompatibilität)
         const maxKW = learningWeightLevel === 'strong' ? 5 : 2;
         const existingLower = new Set(targetCustomerTypes.map(t => t.toLowerCase()));
         boostedKeywordsForPlan = learnedBoostedKeywords
           .map(k => k.keyword || k)
           .filter(Boolean)
-          .filter(kw => !existingLower.has(kw.toLowerCase())) // Keine Duplikate zu bestehenden Zielkunden
+          .filter(kw => !existingLower.has(kw.toLowerCase()))
           .slice(0, maxKW);
-        // Boosted Keywords als zusätzliche targetCustomerTypes einfügen (am Ende, nach bestehenden)
-        // So generiert processResearchRun automatisch Queries dafür
+        
         const newTargets = boostedKeywordsForPlan.filter(kw => !existingLower.has(kw.toLowerCase()));
         if (newTargets.length > 0) {
           targetCustomerTypes = [...targetCustomerTypes, ...newTargets];
         }
-        console.info(`[startResearchRun] Learning: boostedKeywords als Suchbegriffe aufgenommen (${learningWeightLevel}): ${boostedKeywordsForPlan.join(', ')}`);
+        console.info(`[startResearchRun] Learning: boostedKeywords aus Signals (${learningWeightLevel}): ${boostedKeywordsForPlan.join(', ')}`);
       }
 
       // 3. excluded_categories zu excludedCustomerTypes hinzufügen
-      //    Nur wenn total >= 3 und not_relevant > 60% (bereits durch processLeadOutcomeFeedback gefiltert)
+      //    JETZT: blockedKeywords aus KeywordProfile + learned excluded
+      if (blockedKeywords.length > 0) {
+        const blockedFromProfile = blockedKeywords.filter(kw => 
+          !excludedCustomerTypes.map(e => e.toLowerCase()).includes(kw.toLowerCase())
+        );
+        if (blockedFromProfile.length > 0) {
+          excludedCustomerTypes = [...excludedCustomerTypes, ...blockedFromProfile];
+          console.info(`[startResearchRun] KeywordProfile: ${blockedFromProfile.length} Keywords ausgeschlossen (blocked/reduced)`);
+        }
+      }
+      
       if (learnedExcludedCategories.length > 0) {
         const excludedFromLearning = learnedExcludedCategories
           .map(c => c.category || c)
@@ -695,7 +749,7 @@ Deno.serve(async (req) => {
       console.warn(`[startResearchRun] LocationIndex inline Fehler (non-blocking): ${coverageErr?.message} → fallback grid_only`);
     }
 
-    // ── Suchplan zusammenbauen (Taxonomie-Profil + LocationIndex + Learning eingebettet) ─
+    // ── Suchplan zusammenbauen (Taxonomie-Profil + LocationIndex + Learning + KeywordProfile) ─
     const searchPlanData = {
       industry,
       industryId,
@@ -730,6 +784,19 @@ Deno.serve(async (req) => {
       learned_excluded_categories: learnedExcludedCategories,
       boosted_queries_added: boostedKeywordsForPlan,
       boosted_keywords_used_count: boostedKeywordsForPlan.length,
+      // ── KeywordProfile (Phase 2) ───────────────────────────────────────────
+      keyword_profile_version: new Date().toISOString().split('T')[0],
+      org_keywords_active: activeKeywords.length,
+      org_keywords_boosted: boostedKeywordsFromProfile.length,
+      org_keywords_blocked: blockedKeywords.length,
+      suggested_keywords_available: keywordProfiles.filter(p => p.status === 'suggested').length,
+      keyword_profile_summary: {
+        total_profiles: keywordProfiles.length,
+        active: activeKeywords.length,
+        boosted: boostedKeywordsFromProfile.length,
+        suggested: keywordProfiles.filter(p => p.status === 'suggested').length,
+        blocked: blockedKeywords.length,
+      }
     };
 
     // ── ResearchRun erstellen ────────────────────────────────────────────────

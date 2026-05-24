@@ -1,0 +1,101 @@
+{
+  "name": "OrganizationKeywordProfile",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "title": "Organisation ID"
+    },
+    "industry_id": {
+      "type": "string",
+      "title": "Branchen-ID"
+    },
+    "keyword": {
+      "type": "string",
+      "title": "Suchbegriff"
+    },
+    "source": {
+      "type": "string",
+      "title": "Quelle",
+      "enum": [
+        "taxonomy",
+        "onboarding",
+        "outcome_feedback",
+        "manual_user_added",
+        "ai_suggestion"
+      ],
+      "default": "taxonomy"
+    },
+    "status": {
+      "type": "string",
+      "title": "Status",
+      "enum": [
+        "suggested",
+        "active",
+        "boosted",
+        "reduced",
+        "blocked"
+      ],
+      "default": "suggested"
+    },
+    "score": {
+      "type": "number",
+      "title": "Score",
+      "default": 0
+    },
+    "won_count": {
+      "type": "number",
+      "title": "Gewonnen",
+      "default": 0
+    },
+    "relevant_count": {
+      "type": "number",
+      "title": "Relevant",
+      "default": 0
+    },
+    "not_relevant_count": {
+      "type": "number",
+      "title": "Nicht relevant",
+      "default": 0
+    },
+    "total_count": {
+      "type": "number",
+      "title": "Gesamt",
+      "default": 0
+    },
+    "used_in_research_count": {
+      "type": "number",
+      "title": "In Recherche genutzt",
+      "default": 0
+    },
+    "last_used_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Zuletzt genutzt"
+    },
+    "last_feedback_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Zuletzt Feedback erhalten"
+    },
+    "is_boosted": {
+      "type": "boolean",
+      "title": "Ist boosted",
+      "default": false
+    },
+    "is_reduced": {
+      "type": "boolean",
+      "title": "Ist reduziert",
+      "default": false
+    },
+    "is_user_added": {
+      "type": "boolean",
+      "title": "Manuell hinzugef\u00fcgt",
+      "default": false
+    }
+  },
+  "required": [
+    "organization_id",
+    "keyword"
+  ]
+}
