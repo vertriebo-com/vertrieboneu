@@ -416,6 +416,13 @@ Deno.serve(async (req) => {
         org_id: orgId,
         period_month: periodMonthU,
       },
+      // Weitere Usage-Metriken — REGEL: null/undefined ≠ -1 (unlimited)
+      research_runs_used: usageLogsU?.[0]?.lead_generations_used || 0,
+      ai_actions_used: usageLogsU?.[0]?.ai_actions_used || 0,
+      manual_emails_logged: usageLogsU?.[0]?.manual_emails_logged || 0,
+      max_research_runs: plan != null ? (plan.max_lead_generations_per_month ?? null) : null,
+      max_ai_actions: plan != null ? (plan.max_ai_scorings_per_month ?? null) : null,
+      max_emails_per_month: plan != null ? (plan.max_emails_per_month ?? null) : null,
     };
 
     return Response.json({

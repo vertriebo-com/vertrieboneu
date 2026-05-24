@@ -254,8 +254,11 @@ Deno.serve(async (req) => {
       research_runs_used: usageLog?.lead_generations_used || 0,
       ai_actions_used: usageLog?.ai_actions_used || 0,
       manual_emails_logged: usageLog?.manual_emails_logged || 0,
-      max_research_runs: plan?.max_lead_generations_per_month ?? -1,
-      max_ai_actions: plan?.max_ai_scorings_per_month ?? -1,
+      // REGEL: null/undefined wird NICHT als -1 (unlimited) behandelt.
+      // Nur explizit -1 im Plan-Feld darf unlimited anzeigen.
+      max_research_runs: plan != null ? (plan.max_lead_generations_per_month ?? null) : null,
+      max_ai_actions: plan != null ? (plan.max_ai_scorings_per_month ?? null) : null,
+      max_emails_per_month: plan != null ? (plan.max_emails_per_month ?? null) : null,
     };
 
     return Response.json({

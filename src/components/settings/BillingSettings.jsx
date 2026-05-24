@@ -140,11 +140,14 @@ function MonthlyLeadQuotaCard({ usageSummary, plan, subscription }) {
 }
 
 function UsageBar({ label, icon: Icon, used, max, color = "bg-blue-500", overLimitMessage }) {
-  const pct = max === -1 ? 0 : Math.min(100, Math.round((used / max) * 100));
+  // REGEL: null/undefined = kein Limit bekannt (kein Plan geladen) → nicht als unlimited behandeln
+  // Nur explizit -1 = unlimited
   const isUnlimited = max === -1;
-  const isWarning = !isUnlimited && pct >= 80;
-  const isDanger = !isUnlimited && pct >= 95;
-  const isOverLimit = !isUnlimited && used >= max;
+  const isUnknown = max === null || max === undefined;
+  const pct = (isUnlimited || isUnknown || !max) ? 0 : Math.min(100, Math.round((used / max) * 100));
+  const isWarning = !isUnlimited && !isUnknown && pct >= 80;
+  const isDanger = !isUnlimited && !isUnknown && pct >= 95;
+  const isOverLimit = !isUnlimited && !isUnknown && used >= max;
 
   return (
     <div className={`border rounded-xl p-4 space-y-2.5 ${isOverLimit ? "bg-red-50 border-red-200" : "bg-white border-slate-200"}`}>
@@ -153,10 +156,14 @@ function UsageBar({ label, icon: Icon, used, max, color = "bg-blue-500", overLim
           <Icon className="w-4 h-4 text-slate-600" /> {label}
         </span>
         <span className={`text-sm font-bold ${isDanger ? "text-red-600" : isWarning ? "text-amber-600" : "text-slate-950"}`}>
-          {isUnlimited ? <span className="text-emerald-600">∞ Unbegrenzt</span> : `${used} / ${max}`}
+          {isUnlimited
+            ? <span className="text-emerald-600">∞ Unbegrenzt</span>
+            : isUnknown
+            ? <span className="text-slate-400">{used} / –</span>
+            : `${used} / ${max}`}
         </span>
       </div>
-      {!isUnlimited && (
+      {!isUnlimited && !isUnknown && (
         <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${isDanger ? "bg-red-500" : isWarning ? "bg-amber-500" : color}`}
@@ -164,7 +171,7 @@ function UsageBar({ label, icon: Icon, used, max, color = "bg-blue-500", overLim
           />
         </div>
       )}
-      {!isUnlimited && !overLimitMessage && (
+      {!isUnlimited && !isUnknown && !overLimitMessage && (
         <p className="text-[11px] font-medium text-slate-500">{Math.max(0, max - used)} verbleibend</p>
       )}
       {overLimitMessage && (
@@ -553,14 +560,14 @@ export default function BillingSettings({ org: orgProp, user }) {
           label="Recherche-Läufe"
           icon={Search}
           used={usageSummary?.research_runs_used || 0}
-          max={org?.trial_stage === 'free_preview' ? 3 : (plan?.max_lead_generations_per_month ?? -1)}
+          max={org?.trial_stage === 'free_preview' ? 3 : (usageSummary?.max_research_runs ?? (typeof plan?.max_lead_generations_per_month === 'number' ? plan.max_lead_generations_per_month : null))}
           color="bg-indigo-500"
         />
         <UsageBar
           label="KI-Aktionen"
           icon={Brain}
           used={usageSummary?.ai_actions_used || 0}
-          max={org?.trial_stage === 'free_preview' ? 10 : (plan?.max_ai_scorings_per_month ?? -1)}
+          max={org?.trial_stage === 'free_preview' ? 10 : (usageSummary?.max_ai_actions ?? (typeof plan?.max_ai_scorings_per_month === 'number' ? plan.max_ai_scorings_per_month : null))}
           color="bg-purple-500"
           overLimitMessage={
             org?.trial_stage === 'free_preview' && (usageSummary?.ai_actions_used || 0) >= 10
@@ -572,7 +579,7 @@ export default function BillingSettings({ org: orgProp, user }) {
           label="E-Mails dokumentiert"
           icon={Mail}
           used={usageSummary?.manual_emails_logged || 0}
-          max={org?.trial_stage === 'free_preview' ? 5 : (typeof plan?.max_emails_per_month === 'number' ? plan.max_emails_per_month : -1)}
+          max={org?.trial_stage === 'free_preview' ? 5 : (usageSummary?.max_emails_per_month ?? (typeof plan?.max_emails_per_month === 'number' ? plan.max_emails_per_month : null))}
           color="bg-green-500"
         />
       </div>
