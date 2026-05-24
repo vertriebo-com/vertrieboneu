@@ -126,7 +126,7 @@ export default function Layout() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-900 truncate">{user.full_name || "Benutzer"}</p>
                   <p className="text-[10px] font-medium text-slate-600 capitalize">
-                    {orgRole === "organization_admin" ? "Admin" : orgRole === "sales_rep" ? "Vertriebler" : user.role || "Vertriebler"}
+                    {orgRole === "organization_admin" ? "Kontoinhaber" : orgRole === "sales_rep" ? "Vertriebler" : user.role || "Vertriebler"}
                   </p>
                 </div>
                 <button onClick={handleLogout} className="text-slate-400 hover:text-slate-600 transition-colors p-1.5 hover:bg-slate-200/50 rounded-lg">

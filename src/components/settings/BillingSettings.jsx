@@ -572,7 +572,7 @@ export default function BillingSettings({ org: orgProp, user }) {
           label="E-Mails dokumentiert"
           icon={Mail}
           used={usageSummary?.manual_emails_logged || 0}
-          max={org?.trial_stage === 'free_preview' ? 5 : -1}
+          max={org?.trial_stage === 'free_preview' ? 5 : (typeof plan?.max_emails_per_month === 'number' ? plan.max_emails_per_month : -1)}
           color="bg-green-500"
         />
       </div>
