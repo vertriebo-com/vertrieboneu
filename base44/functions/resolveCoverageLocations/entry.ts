@@ -39,11 +39,15 @@ function resolveMaxLocations(trialStage, plan) {
   if (!plan) return 10; // fallback Starter-ähnlich
 
   const maxLeads = plan.max_leads_per_month;
-  if (maxLeads === -1) return 9999; // unlimited
+  if (maxLeads === -1) return 9999; // unlimited (Agency)
   if (plan.plan_type === 'agency') return 9999;
-  if (maxLeads >= 1000) return 50;   // Gold
-  if (maxLeads >= 500)  return 25;   // Professional
-  if (maxLeads >= 300)  return 10;   // Starter
+  // Schwellwerte anhand echter Plan-Werte:
+  // Gold = 5000 leads → 50 Orte
+  // Professional = 1500 leads → 25 Orte
+  // Starter = 300 leads → 10 Orte
+  if (maxLeads >= 2000) return 50;  // Gold (5000)
+  if (maxLeads >= 500)  return 25;  // Professional (1500)
+  if (maxLeads >= 100)  return 10;  // Starter (300)
   return 10;
 }
 

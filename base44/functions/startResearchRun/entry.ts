@@ -523,42 +523,84 @@ Deno.serve(async (req) => {
       } catch {}
     }
 
-    // ── LocationIndex: Coverage für diesen Suchbereich auflösen ─────────────
-    // resolveCoverageLocations gibt aktive, deduplizierte Orte im Radius zurück.
-    // Diese werden in search_plan_json eingebettet und in processResearchRun genutzt.
+    // ── LocationIndex: Coverage für diesen Suchbereich auflösen (INLINE) ──────
+    // Direkt per asServiceRole statt functions.invoke — verhindert Auth-Fehler wenn
+    // User-Token nicht durchgereicht wird (z.B. Service-Role-Kontext).
+    // Identische Schwellwert-Logik wie resolveCoverageLocations (SSOT unten).
     let coveredLocations = [];
     let coveredLocationsTotal = 0;
     let selectedLocationsCount = 0;
-    let coverageMode = 'grid_only'; // Fallback wenn LocationIndex nicht verfügbar
+    let coverageMode = 'grid_only';
 
     try {
-      const coverageRes = await base44.functions.invoke('resolveCoverageLocations', {
-        center_lat: cityCoords.lat,
-        center_lng: cityCoords.lng,
-        radius_km: radiusKm,
-        organization_id,
-      });
-      const coverageData = coverageRes?.data;
-      if (coverageData?.success && coverageData.locations?.length > 0) {
-        const selected = coverageData.locations.filter(l => l.selected_for_search);
-        coveredLocations = selected.map(l => ({
-          city: l.city,
-          postal_code: l.postal_code,
-          lat: l.lat,
-          lng: l.lng,
-          state_code: l.state_code,
-          distance_km: l.distance_km,
-          priority_score: l.priority_score,
-        }));
-        coveredLocationsTotal = coverageData.summary?.total_in_radius || 0;
-        selectedLocationsCount = coveredLocations.length;
-        coverageMode = selectedLocationsCount > 0 ? 'location_index_plus_grid' : 'grid_only';
-        console.info(`[startResearchRun] LocationIndex: ${coveredLocationsTotal} Orte im Radius, ${selectedLocationsCount} ausgewählt (Plan-Limit), Mode=${coverageMode}`);
-      } else {
-        console.warn('[startResearchRun] LocationIndex leer oder Fehler → fallback grid_only');
+      // Plan-Limit für Locations (identisch zu resolveCoverageLocations)
+      function resolveMaxLocations(ts, planObj) {
+        if (!ts || ts === 'free_preview') return 3;
+        if (ts === 'verified_trial') return 5;
+        if (!planObj) return 10;
+        const ml = planObj.max_leads_per_month;
+        if (ml === -1) return 9999;
+        if (planObj.plan_type === 'agency') return 9999;
+        if (ml >= 2000) return 50;  // Gold (5000 leads)
+        if (ml >= 500)  return 25;  // Professional (1500 leads)
+        if (ml >= 100)  return 10;  // Starter (300 leads)
+        return 10;
       }
+
+      // Plan für Org laden (nur wenn noch nicht geladen)
+      let planForCoverage = null;
+      if (org.plan_id) {
+        const planRecs = await base44.asServiceRole.entities.Plan.filter({ id: org.plan_id });
+        planForCoverage = planRecs[0] || null;
+      }
+      const maxLocs = org.custom_monthly_lead_limit === -1
+        ? 9999
+        : resolveMaxLocations(trialStage, planForCoverage);
+
+      // LocationIndex paginiert laden
+      const PAGE_SIZE_LOC = 2000;
+      const seenLocIds = new Set();
+      const allLocEntries = [];
+      for (let pg = 0; pg < 20; pg++) {
+        const batch = await base44.asServiceRole.entities.LocationIndex.list('-quality_score', PAGE_SIZE_LOC, pg * PAGE_SIZE_LOC);
+        for (const r of batch) { if (!seenLocIds.has(r.id)) { seenLocIds.add(r.id); allLocEntries.push(r); } }
+        if (batch.length < PAGE_SIZE_LOC) break;
+      }
+
+      // Aktive Einträge filtern + Composite-Dedupe
+      const compositeSeenLoc = new Set();
+      const dedupedLoc = [];
+      for (const r of allLocEntries) {
+        if (!(r.is_active === true || r.is_active === 'true') || r.location_type === 'special_postal_recipient') continue;
+        if (!r.lat || !r.lng || r.lat === 0 || r.lng === 0) continue;
+        const ck = `${r.country_code||'DE'}|${r.postal_code||''}|${r.normalized_name||(r.city||'').toLowerCase()}|${r.state_code||''}`;
+        if (compositeSeenLoc.has(ck)) continue;
+        compositeSeenLoc.add(ck);
+        dedupedLoc.push(r);
+      }
+
+      // Im Radius filtern + sortieren
+      const inRadiusLoc = dedupedLoc
+        .map(r => ({ ...r, dist: haversineKm(cityCoords.lat, cityCoords.lng, r.lat, r.lng) }))
+        .filter(r => r.dist <= radiusKm)
+        .sort((a, b) => (b.quality_score || 80) - (a.quality_score || 80) || a.dist - b.dist);
+
+      coveredLocationsTotal = inRadiusLoc.length;
+      const selectedLoc = inRadiusLoc.slice(0, maxLocs);
+      coveredLocations = selectedLoc.map(l => ({
+        city: l.city,
+        postal_code: l.postal_code,
+        lat: l.lat,
+        lng: l.lng,
+        state_code: l.state_code,
+        distance_km: Math.round(l.dist * 10) / 10,
+        priority_score: l.quality_score || 80,
+      }));
+      selectedLocationsCount = coveredLocations.length;
+      coverageMode = selectedLocationsCount > 0 ? 'location_index_plus_grid' : 'grid_only';
+      console.info(`[startResearchRun] LocationIndex (inline): total=${coveredLocationsTotal} selected=${selectedLocationsCount} maxLocs=${maxLocs} mode=${coverageMode}`);
     } catch (coverageErr) {
-      console.warn(`[startResearchRun] resolveCoverageLocations Fehler (non-blocking): ${coverageErr?.message} → fallback grid_only`);
+      console.warn(`[startResearchRun] LocationIndex inline Fehler (non-blocking): ${coverageErr?.message} → fallback grid_only`);
     }
 
     // ── Suchplan zusammenbauen (Taxonomie-Profil + LocationIndex eingebettet) ─

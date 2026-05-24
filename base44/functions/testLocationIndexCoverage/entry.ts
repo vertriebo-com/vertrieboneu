@@ -55,10 +55,10 @@ Deno.serve(async (req) => {
       const maxLeads = planObj.max_leads_per_month;
       if (maxLeads === -1) return 9999;
       if (planObj.plan_type === 'agency') return 9999;
-      // Korrekte Schwellwerte (identisch zu resolveCoverageLocations):
-      if (maxLeads >= 1000) return 50;  // Gold (1000+) → 50 Orte
-      if (maxLeads >= 500)  return 25;  // Professional (500+) → 25 Orte
-      if (maxLeads >= 300)  return 10;  // Starter (300+) → 10 Orte
+      // Schwellwerte identisch zu resolveCoverageLocations:
+      if (maxLeads >= 2000) return 50;  // Gold (5000 leads) → 50 Orte
+      if (maxLeads >= 500)  return 25;  // Professional (1500 leads) → 25 Orte
+      if (maxLeads >= 100)  return 10;  // Starter (300 leads) → 10 Orte
       return 10;
     }
 
