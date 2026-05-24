@@ -11,7 +11,7 @@ import {
   ShieldCheck, TrendingUp, TrendingDown, Search, Loader2 
 } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export default function KeywordProfilePanel({ organizationId }) {
   const [showAddKeyword, setShowAddKeyword] = useState(false);
@@ -262,35 +262,46 @@ export default function KeywordProfilePanel({ organizationId }) {
       <Dialog open={showAddKeyword} onOpenChange={setShowAddKeyword}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="w-4 h-4 text-violet-600" /> Keyword hinzufügen
-            </DialogTitle>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <Plus className="w-5 h-5 text-violet-600" />
+              </div>
+              <div className="flex-1">
+                <DialogTitle className="text-base font-bold text-slate-900">
+                  Keyword hinzufügen
+                </DialogTitle>
+                <DialogDescription className="text-sm text-slate-600 mt-0.5">
+                  Fügen Sie einen Suchbegriff hinzu der aktiv für Ihre Recherchen genutzt wird.
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4 pt-2">
             <div>
-              <Label className="text-xs font-semibold mb-1.5 block">Suchbegriff</Label>
+              <Label className="text-xs font-bold text-slate-800 mb-1.5 block">Suchbegriff</Label>
               <Input
                 value={newKeyword}
                 onChange={(e) => setNewKeyword(e.target.value)}
                 placeholder="z.B. Zielgruppe, Suchbegriff oder Kundentyp..."
                 autoFocus
-                className="text-sm"
+                className="text-sm bg-white border-slate-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
               />
-              <p className="text-[10px] text-slate-500 mt-1">
-                Dieser Begriff wird aktiv für Ihre Recherchen genutzt.
+              <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                Dieser Begriff wird aktiv für Ihre Recherchen genutzt und verbessert die Ergebnisqualität.
               </p>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
               <button
                 onClick={() => setShowAddKeyword(false)}
-                className="text-sm px-3 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50"
+                disabled={addKeywordMutation.isPending}
+                className="text-sm px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
               >
                 Abbrechen
               </button>
               <button
                 onClick={handleAddKeyword}
                 disabled={!newKeyword.trim() || addKeywordMutation.isPending}
-                className="text-sm px-4 py-1.5 rounded-md bg-violet-600 text-white font-semibold disabled:opacity-50"
+                className="text-sm px-5 py-2 rounded-lg bg-violet-600 text-white font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {addKeywordMutation.isPending ? "Füge hinzu..." : "Hinzufügen"}
               </button>
