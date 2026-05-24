@@ -112,6 +112,17 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
     setErrorMsg("");
     setErrorInfo(null);
 
+    // Org-ID prüfen
+    if (!orgId) {
+      setErrorInfo({
+        type: 'error',
+        title: 'Keine Organisation gefunden',
+        message: 'Bitte stellen Sie sicher dass Sie einer Organisation angehören.',
+      });
+      setPhase("error");
+      return;
+    }
+
     try {
       const res = await base44.functions.invoke("startResearchRun", {
         organization_id: orgId,
@@ -143,6 +154,7 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
 
     } catch (err) {
       // Axios wirft bei 4xx/5xx – response.data enthält den strukturierten Backend-Body
+      console.error("[ResearchDialog] Start error:", err?.message, err?.response?.data);
       const info = getFriendlyResearchError(err, err?.response?.data);
       setErrorInfo(info);
       setPhase("error");
