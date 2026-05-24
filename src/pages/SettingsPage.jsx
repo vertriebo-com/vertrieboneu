@@ -6,6 +6,7 @@ import EmailSettings from "@/components/settings/EmailSettings";
 import EmailTemplateSettings from "@/components/settings/EmailTemplateSettings";
 import BillingSettings from "@/components/settings/BillingSettings";
 import LearnedIntelligencePanel from "@/components/settings/LearnedIntelligencePanel";
+import KeywordProfilePanel from "@/components/settings/KeywordProfilePanel";
 import { Button } from "@/components/ui/button";
 
 // ─── Navigation Items ─────────────────────────────────────────────────────────────
@@ -16,7 +17,12 @@ const ADMIN_NAV_ITEMS = [
     description: "Firmendaten, Suchgebiet und Zielkunden",
     icon: Building 
   },
-
+  { 
+    id: "keywords", 
+    label: "Suchbegriffe", 
+    description: "Keyword-Profil für bessere Recherche",
+    icon: Zap 
+  },
   { 
     id: "templates", 
     label: "Vorlagen", 
@@ -83,7 +89,7 @@ export default function SettingsPage() {
     const salesRepDefault = "profile";
     const resolvedRole = foundRole || "sales_rep";
     const isAdminUser = resolvedRole === "organization_admin" || user.role === "admin";
-    const validAdminTabs = ["company", "templates", "billing"];
+    const validAdminTabs = ["company", "keywords", "templates", "billing"];
     const defaultTab = isAdminUser ? adminDefault : salesRepDefault;
     if (tabParam && isAdminUser && validAdminTabs.includes(tabParam)) {
       setActiveTab(tabParam);
@@ -146,15 +152,21 @@ export default function SettingsPage() {
       {/* Content Area */}
       <div className="space-y-4 sm:space-y-6 pb-20">
         {/* Admin Content */}
-        {activeTab === "company"   && isAdmin && (
+        {activeTab === "company" && isAdmin && (
           <>
             <LearnedIntelligencePanel organizationId={org?.id} />
             <CompanySettings org={org} />
           </>
         )}
 
+        {activeTab === "keywords" && isAdmin && (
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <KeywordProfilePanel organizationId={org?.id} />
+          </div>
+        )}
+
         {activeTab === "templates" && isAdmin && <EmailTemplateSettings />}
-        {activeTab === "billing"   && isAdmin && <BillingSettings org={org} user={currentUser} />}
+        {activeTab === "billing" && isAdmin && <BillingSettings org={org} user={currentUser} />}
 
         {/* Sales Rep: Mein Profil */}
         {activeTab === "profile" && (

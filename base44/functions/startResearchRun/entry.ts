@@ -502,6 +502,7 @@ Deno.serve(async (req) => {
     let activeKeywords = [];
     let boostedKeywordsFromProfile = [];
     let blockedKeywords = [];
+    let suggestedKeywords = [];
     
     try {
       const profiles = await base44.asServiceRole.entities.OrganizationKeywordProfile.filter({ organization_id });
@@ -509,7 +510,7 @@ Deno.serve(async (req) => {
       
       // Nach Status filtern
       activeKeywords = profiles
-        .filter(p => p.status === 'active' || p.status === 'boosted')
+        .filter(p => p.status === 'active')
         .map(p => p.keyword);
       
       boostedKeywordsFromProfile = profiles
@@ -520,7 +521,11 @@ Deno.serve(async (req) => {
         .filter(p => p.status === 'blocked' || p.is_reduced === true)
         .map(p => p.keyword);
       
-      console.info(`[startResearchRun] KeywordProfile: ${profiles.length} gesamt, ${activeKeywords.length} active, ${boostedKeywordsFromProfile.length} boosted, ${blockedKeywords.length} blocked/reduced`);
+      suggestedKeywords = profiles
+        .filter(p => p.status === 'suggested')
+        .map(p => p.keyword);
+      
+      console.info(`[startResearchRun] KeywordProfile: ${profiles.length} gesamt, ${activeKeywords.length} active, ${boostedKeywordsFromProfile.length} boosted, ${blockedKeywords.length} blocked/reduced, ${suggestedKeywords.length} suggested`);
     } catch (kpErr) {
       console.warn(`[startResearchRun] KeywordProfile Ladefehler (non-blocking): ${kpErr.message}`);
     }
@@ -786,16 +791,19 @@ Deno.serve(async (req) => {
       boosted_keywords_used_count: boostedKeywordsForPlan.length,
       // ── KeywordProfile (Phase 2) ───────────────────────────────────────────
       keyword_profile_version: new Date().toISOString().split('T')[0],
+      org_keywords_used: [...activeKeywords, ...boostedKeywordsFromProfile].length,
       org_keywords_active: activeKeywords.length,
       org_keywords_boosted: boostedKeywordsFromProfile.length,
       org_keywords_blocked: blockedKeywords.length,
-      suggested_keywords_available: keywordProfiles.filter(p => p.status === 'suggested').length,
+      suggested_keywords_available: suggestedKeywords.length,
+      blocked_keywords_excluded: blockedKeywords.length,
       keyword_profile_summary: {
         total_profiles: keywordProfiles.length,
         active: activeKeywords.length,
         boosted: boostedKeywordsFromProfile.length,
-        suggested: keywordProfiles.filter(p => p.status === 'suggested').length,
+        suggested: suggestedKeywords.length,
         blocked: blockedKeywords.length,
+        used_in_research: [...activeKeywords, ...boostedKeywordsFromProfile].length,
       }
     };
 

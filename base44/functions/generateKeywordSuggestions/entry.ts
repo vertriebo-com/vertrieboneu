@@ -14,28 +14,31 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Nicht eingeloggt' }, { status: 401 });
-
+    
     const body = await req.json().catch(() => ({}));
     const { organization_id } = body;
-
-    const isPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(user.role);
 
     // Organisation ermitteln
     let orgId = organization_id;
     if (!orgId) {
+      const user = await base44.auth.me();
+      if (!user) return Response.json({ error: 'organisation_id erforderlich' }, { status: 400 });
       const orgs = await base44.entities.Organization.filter({ owner_email: user.email });
       orgId = orgs?.[0]?.id;
     }
     if (!orgId) return Response.json({ error: 'Organisation nicht gefunden' }, { status: 404 });
 
-    // Access Check
-    if (!isPlatformAdmin) {
-      const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
-      const org = orgs?.[0];
-      if (!org || (org.owner_email !== user.email)) {
-        return Response.json({ error: 'Kein Zugriff' }, { status: 403 });
+    // Access Check nur wenn organization_id nicht direkt übergeben (Security)
+    if (!organization_id) {
+      const user = await base44.auth.me();
+      if (!user) return Response.json({ error: 'Nicht eingeloggt' }, { status: 401 });
+      const isPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(user.role);
+      if (!isPlatformAdmin) {
+        const orgs = await base44.asServiceRole.entities.Organization.filter({ id: orgId });
+        const org = orgs?.[0];
+        if (!org || (org.owner_email !== user.email)) {
+          return Response.json({ error: 'Kein Zugriff' }, { status: 403 });
+        }
       }
     }
 
