@@ -5,14 +5,18 @@
  *      Statt "Keine Aufgaben" soll der Nutzer konkrete Handlungen sehen.
  *
  * LOGIC: Zeigt priorisierte Aktionsliste aus getDashboardData.actionableLeads:
- *   1. Überfällige Tasks → rot
- *   2. Heute fällige Tasks → blau
- *   3. Heiße Leads ohne Task → orange (🔥)
- *   4. Warme Leads mit KI-Empfehlung → amber
- *   5. Neue kontaktierbare Leads → grün
+ *   Priority 0 – task_overdue:       Überfällige Aufgaben (allgemein) → rot
+ *   Priority 0 – callback_overdue:   Überfälliger Rückruf → rot + Telefon-Icon
+ *   Priority 1 – task_today:         Heute fällige Aufgaben (allgemein) → blau
+ *   Priority 1 – callback_due_today: Heute fälliger Rückruf → blau + Telefon-Icon
+ *   Priority 2 – hot_lead:           Heißer Lead ohne offene Task → orange 🔥
+ *   Priority 2.5 – offer_followup:   Offenes Angebot ohne offene Task → indigo
+ *   Priority 3 – warm_lead_action:   Warmer Lead mit KI-Empfehlung → amber
+ *   Priority 3 – callback_pending:   Rückruf-Status ohne Task → violet
+ *   Priority 4 – new_contactable:    Neuer Lead (Score ≥65, kontaktierbar) → grün
  *
- * DATA: actionableLeads aus getDashboardData (serverseitig priorisiert)
- * UX: Klick → direkt zur Firma oder Aufgabenansicht
+ * DATA: actionableLeads aus getDashboardData (serverseitig priorisiert, max 6)
+ * UX: Klick → direkt zur Firma (/leads/:id) oder Aufgabenansicht (/tasks)
  */
 import { Link } from "react-router-dom";
 import { AlertCircle, Phone, ArrowRight, CheckCircle2, Zap, Flame, Star, FileText } from "lucide-react";
