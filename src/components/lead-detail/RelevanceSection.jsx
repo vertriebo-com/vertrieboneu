@@ -24,47 +24,44 @@ export default function RelevanceSection({ company, learnedSignals }) {
   let isReducedCategory = false;
 
   if (learningActive && learnedSignals) {
-    // Priority Categories prüfen
-    const priorityCats = (() => {
-      try { return JSON.parse(learnedSignals.priority_categories || "[]"); }
-      catch { return []; }
-    })();
-    const topCats = priorityCats.filter(c => c.score > 50 && (c.won > 0 || c.relevant > 0));
+    const parseArr = (json) => { try { return JSON.parse(json || "[]"); } catch { return []; } };
+
+    // Priority Categories prüfen (object[] oder string[])
+    const priorityCats = parseArr(learnedSignals.priority_categories);
+    const topCats = priorityCats.filter(c => {
+      if (typeof c === "string") return true; // Legacy: score unbekannt → immer anzeigen
+      return c.score > 50 && (c.won > 0 || c.relevant > 0);
+    });
     const tcLower = (company.matched_target_customer_type || '').toLowerCase();
     matchesPriorityCategory = topCats.some(c => {
-      const catLower = (c.category || c).toLowerCase();
-      return tcLower && (catLower === tcLower || catLower.includes(tcLower) || tcLower.includes(catLower));
+      const catLower = (typeof c === "string" ? c : (c.category || '')).toLowerCase();
+      return tcLower && catLower && (catLower === tcLower || catLower.includes(tcLower) || tcLower.includes(catLower));
     });
 
-    // Boosted Keywords prüfen (gegen source_query und matched_search_category)
-    const boostedKws = (() => {
-      try { return JSON.parse(learnedSignals.boosted_keywords || "[]"); }
-      catch { return []; }
-    })();
+    // Boosted Keywords prüfen (object[] oder legacy string[])
+    const boostedKws = parseArr(learnedSignals.boosted_keywords);
     const sourceQuery = (company.source_query || '').toLowerCase();
     const matchedCat = (company.matched_search_category || '').toLowerCase();
 
     for (const kw of boostedKws) {
-      const kwLower = (kw.keyword || '').toLowerCase();
+      const kwStr = typeof kw === "string" ? kw : (kw.keyword || '');
+      const kwLower = kwStr.toLowerCase();
       if (!kwLower) continue;
       if (
         (sourceQuery && (sourceQuery.includes(kwLower) || kwLower.includes(sourceQuery))) ||
         (matchedCat && (matchedCat.includes(kwLower) || kwLower.includes(matchedCat)))
       ) {
-        matchedKeyword = kw.keyword;
-        matchedKeywordStats = kw;
+        matchedKeyword = kwStr;
+        matchedKeywordStats = typeof kw === "string" ? { keyword: kw, won_count: 0, relevant_count: 1 } : kw;
         break;
       }
     }
 
-    // Excluded Categories prüfen
-    const excludedCats = (() => {
-      try { return JSON.parse(learnedSignals.excluded_categories || "[]"); }
-      catch { return []; }
-    })();
+    // Excluded Categories prüfen (object[] oder string[])
+    const excludedCats = parseArr(learnedSignals.excluded_categories);
     const brancheLower = (company.branche || '').toLowerCase();
     isReducedCategory = excludedCats.some(c => {
-      const catLower = (c.category || c).toLowerCase();
+      const catLower = (typeof c === "string" ? c : (c.category || '')).toLowerCase();
       return brancheLower && catLower && (catLower === brancheLower || brancheLower.includes(catLower));
     });
   }

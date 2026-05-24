@@ -11,27 +11,34 @@ export default function LearningLoopBox({ learnedSignals }) {
   const total = learnedSignals.total_outcomes_analyzed || 0;
   const weight = total >= 15 ? "strong" : total >= 5 ? "light" : "none";
 
-  // ── Daten parsen ──
-  const priorityCats = (() => {
-    try {
-      const arr = JSON.parse(learnedSignals.priority_categories || "[]");
-      return arr.filter(c => c.score > 50 && (c.won > 0 || c.relevant > 0)).slice(0, 3);
-    } catch { return []; }
-  })();
+  // ── Daten parsen (unterstützt object[] und legacy string[]) ──
+  const parseLearningArray = (json) => {
+    try { return JSON.parse(json || "[]"); } catch { return []; }
+  };
 
-  const boostedKws = (() => {
-    try {
-      const arr = JSON.parse(learnedSignals.boosted_keywords || "[]");
-      return arr.filter(k => k.score > 0 && k.total_count >= 2).slice(0, 5);
-    } catch { return []; }
-  })();
+  // Normalisiert string oder object → { category: string }
+  const normalizeCat = (item) =>
+    typeof item === "string" ? { category: item } : item;
 
-  const excludedCats = (() => {
-    try {
-      const arr = JSON.parse(learnedSignals.excluded_categories || "[]");
-      return arr.slice(0, 3);
-    } catch { return []; }
-  })();
+  // Normalisiert string oder object → { keyword, score, total_count, won_count, relevant_count, not_relevant_count }
+  const normalizeKw = (item) =>
+    typeof item === "string"
+      ? { keyword: item, score: 1, total_count: 1, won_count: 0, relevant_count: 1, not_relevant_count: 0 }
+      : item;
+
+  const priorityCats = parseLearningArray(learnedSignals.priority_categories)
+    .map(normalizeCat)
+    .filter(c => (c.score == null || c.score > 50) && (c.won > 0 || c.relevant > 0 || c.score == null))
+    .slice(0, 3);
+
+  const boostedKws = parseLearningArray(learnedSignals.boosted_keywords)
+    .map(normalizeKw)
+    .filter(k => k.keyword && (k.score == null || k.score > 0) && (k.total_count == null || k.total_count >= 1))
+    .slice(0, 5);
+
+  const excludedCats = parseLearningArray(learnedSignals.excluded_categories)
+    .map(normalizeCat)
+    .slice(0, 3);
 
   const hasAnyData = priorityCats.length > 0 || boostedKws.length > 0 || excludedCats.length > 0;
 

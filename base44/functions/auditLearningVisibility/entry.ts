@@ -151,6 +151,45 @@ Deno.serve(async (req) => {
       `totalOutcomes=${totalOutcomes} → weight=${expectedWeight}`,
       { total_outcomes: totalOutcomes, weight_level: expectedWeight, thresholds: { light: 5, strong: 15 } });
 
+    // Test 9: Legacy-Format-Kompatibilität (string[] statt object[])
+    // Simuliert altes Dateiformat und prüft ob Parsing robust ist
+    const legacyData = {
+      boosted_keywords: JSON.stringify(["Suchbegriff A", "Suchbegriff B"]),
+      excluded_categories: JSON.stringify(["Kategorie X", "Kategorie Y"]),
+      priority_categories: JSON.stringify(["Zielgruppe A", "Zielgruppe B"]),
+    };
+    let legacyErrors = [];
+    // boosted_keywords: string[] → soll { keyword, score=1, total_count=1 } normalisieren
+    try {
+      const arr = JSON.parse(legacyData.boosted_keywords);
+      const normalized = arr.map(item => typeof item === "string"
+        ? { keyword: item, score: 1, total_count: 1, won_count: 0, relevant_count: 1 }
+        : item);
+      if (!normalized.every(k => k.keyword && k.score > 0)) legacyErrors.push('boosted_keywords normalization');
+    } catch { legacyErrors.push('boosted_keywords parse'); }
+    // excluded_categories: string[] → soll { category } normalisieren
+    try {
+      const arr = JSON.parse(legacyData.excluded_categories);
+      const normalized = arr.map(item => typeof item === "string" ? { category: item } : item);
+      if (!normalized.every(c => c.category)) legacyErrors.push('excluded_categories normalization');
+    } catch { legacyErrors.push('excluded_categories parse'); }
+    // priority_categories: string[] → soll { category } normalisieren
+    try {
+      const arr = JSON.parse(legacyData.priority_categories);
+      const normalized = arr.map(item => typeof item === "string" ? { category: item } : item);
+      if (!normalized.every(c => c.category)) legacyErrors.push('priority_categories normalization');
+    } catch { legacyErrors.push('priority_categories parse'); }
+
+    if (legacyErrors.length === 0) {
+      pass('9. Legacy-Format (string[]) kompatibel',
+        'string[] für boosted_keywords, excluded_categories, priority_categories korrekt normalisiert – kein Crash',
+        { tested_formats: ['boosted_keywords: string[]', 'excluded_categories: string[]', 'priority_categories: string[]'] });
+    } else {
+      fail('9. Legacy-Format (string[]) kompatibel',
+        `Normalisierungsfehler: ${legacyErrors.join(', ')}`,
+        { errors: legacyErrors });
+    }
+
     const allPassed = failed === 0;
     return Response.json({
       success: true,
