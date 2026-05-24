@@ -227,6 +227,18 @@
       "default": 0,
       "description": "Anzahl Orte aus LocationIndex die aktiv als Suchzentrum genutzt wurden"
     },
+    "locations_remaining_count": {
+      "type": "number",
+      "title": "Verbleibende Orte",
+      "default": 0,
+      "description": "selected_locations_count - locations_searched_count (sinkt pro Batch)"
+    },
+    "coverage_complete": {
+      "type": "boolean",
+      "title": "Ortsabdeckung vollst\u00e4ndig",
+      "default": false,
+      "description": "true wenn locations_searched_count >= selected_locations_count oder target_count erreicht"
+    },
     "search_points_used_count": {
       "type": "number",
       "title": "Verwendete Suchpunkte gesamt",

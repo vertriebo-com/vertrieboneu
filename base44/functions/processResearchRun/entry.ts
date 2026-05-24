@@ -1305,6 +1305,8 @@ Deno.serve(async (req) => {
       charged_lead_generation: totalLeadsSaved > 0,
       // Punkt 4: Vollständige Coverage-Diagnostik
       locations_searched_count: cumulativeLocationsSearched,
+      locations_remaining_count: locationsRemainingCount,
+      coverage_complete: coverageComplete,
       search_points_used_count: (freshRun.search_points_used_count || 0) + pointsToSearch.length,
       // VITAL: Lock muss AKTIV bleiben solange Run nicht completed ist
       // Sonst ruft Banner nochmal auf bevor Status-Update committed ist
