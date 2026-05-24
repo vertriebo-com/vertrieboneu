@@ -51,12 +51,35 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.asin(Math.sqrt(a));
 }
 
+// ── RADIUS-ADAPTIVE GRID ──────────────────────────────────────────────────────
+// Erzeugt ein Hex-Grid das den Suchradius lückenlos abdeckt.
+// stepKm = Abstand zwischen Gitterpunkten (adaptiv je nach Radius).
+// Nur Punkte die tatsächlich im Radius liegen werden zurückgegeben.
+//
+// Radius-Matrix (stepKm → Punkte):
+//  ≤ 5km  → stepKm=4   → ~1-7 Punkte (enger Grid für dichten Raum)
+//  ≤ 10km → stepKm=6   → ~7 Punkte
+//  ≤ 25km → stepKm=10  → ~7-19 Punkte
+//  ≤ 50km → stepKm=15  → ~19 Punkte
+//  > 50km → stepKm=20  → ~19-37 Punkte
 function generateSearchGrid(centerLat, centerLng, radiusKm, trialStage) {
-  const points = [{ lat: centerLat, lng: centerLng, label: 'center' }];
-  if (trialStage === 'free_preview') return points;
-  const stepKm = 15;
-  const rings = radiusKm <= 20 ? 1 : radiusKm <= 40 ? 1 : 2;
-  for (let ring = 1; ring <= rings; ring++) {
+  const center = { lat: centerLat, lng: centerLng, label: 'center' };
+  if (trialStage === 'free_preview') return [center];
+
+  // Adaptiver Step je nach Radius
+  let stepKm;
+  if (radiusKm <= 5)       stepKm = 4;
+  else if (radiusKm <= 10) stepKm = 6;
+  else if (radiusKm <= 25) stepKm = 10;
+  else if (radiusKm <= 50) stepKm = 15;
+  else                     stepKm = 20;
+
+  const points = [center];
+
+  // Maximale Anzahl Ringe die in den Radius passen
+  const maxRings = Math.floor(radiusKm / stepKm);
+
+  for (let ring = 1; ring <= maxRings; ring++) {
     const ringRadiusKm = ring * stepKm;
     const pointsInRing = 6 * ring;
     for (let i = 0; i < pointsInRing; i++) {
@@ -64,11 +87,14 @@ function generateSearchGrid(centerLat, centerLng, radiusKm, trialStage) {
       const dLat = (ringRadiusKm / 111) * Math.cos(angle);
       const dLng = (ringRadiusKm / (111 * Math.cos(centerLat * Math.PI / 180))) * Math.sin(angle);
       const pLat = centerLat + dLat, pLng = centerLng + dLng;
-      if (haversineKm(centerLat, centerLng, pLat, pLng) <= radiusKm * 1.05) {
+      // Nur Punkte die tatsächlich innerhalb des Radius liegen
+      if (haversineKm(centerLat, centerLng, pLat, pLng) <= radiusKm) {
         points.push({ lat: pLat, lng: pLng, label: `grid_${ring}_${i}` });
       }
     }
   }
+
+  console.info(`[generateSearchGrid] radiusKm=${radiusKm} stepKm=${stepKm} maxRings=${maxRings} points=${points.length}`);
   return points;
 }
 

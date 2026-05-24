@@ -977,11 +977,24 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, done: true, status: 'completed', leads_saved: currentLeadsSaved, progress_percent: 100 });
     }
 
-    // ── Search Points ────────────────────────────────────────────────────────
-    const basePoint = cityCoords ? { lat: cityCoords.lat, lng: cityCoords.lng, label:'center', centerLat: cityCoords.lat, centerLng: cityCoords.lng, centerCity: city } : null;
-    const pointsToSearch = (allPoints.length > 0 ? allPoints : basePoint ? [basePoint] : []).slice(0, 3);
+    // ── Search Points: Batch-rotierende Punkt-Auswahl ────────────────────────
+    // KERNFIX: Nicht immer slice(0, 3) – stattdessen rotieren über alle Punkte.
+    //
+    // Strategie: Jeder Batch verarbeitet QUERIES_PER_BATCH Queries × POINTS_PER_BATCH Punkte.
+    // Die Punkte werden über batch_index rotiert, sodass über mehrere Batches alle
+    // Grid-Punkte abgedeckt werden.
+    //
+    // pointOffset = batchIndex * POINTS_PER_BATCH (wraps around wenn alle Punkte durch)
+    //
+    // Beispiel: 7 Punkte, POINTS_PER_BATCH=3
+    //   Batch 0: Punkte [0,1,2]
+    //   Batch 1: Punkte [3,4,5]
+    //   Batch 2: Punkte [6,0,1] (wrap-around)
 
-    if (pointsToSearch.length === 0) {
+    const basePoint = cityCoords ? { lat: cityCoords.lat, lng: cityCoords.lng, label:'center', centerLat: cityCoords.lat, centerLng: cityCoords.lng, centerCity: city } : null;
+    const allAvailablePoints = allPoints.length > 0 ? allPoints : basePoint ? [basePoint] : [];
+
+    if (allAvailablePoints.length === 0) {
       await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
         status: 'failed', error_message: 'Keine Suchkoordinaten.', finished_at: new Date().toISOString(),
         zero_result_cause: 'no_geo_coords', processing_lock_until: null, processing_by: null,
@@ -989,7 +1002,23 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Keine Suchkoordinaten.', done: true, status: 'failed' });
     }
 
-    const pointRadiusMeters = Math.min(15000, Math.max(8000, radiusMeters / Math.max(pointsToSearch.length, 1)));
+    // POINTS_PER_BATCH: Wie viele Punkte pro Batch verwendet werden
+    // Preview: nur 1 Punkt (Zentrum), bezahlt: bis zu 3 Punkte pro Batch
+    const POINTS_PER_BATCH = trialStage === 'free_preview' ? 1 : 3;
+    const pointOffset = (batchIndex * POINTS_PER_BATCH) % allAvailablePoints.length;
+    const pointsToSearch = [];
+    for (let i = 0; i < POINTS_PER_BATCH; i++) {
+      pointsToSearch.push(allAvailablePoints[(pointOffset + i) % allAvailablePoints.length]);
+    }
+
+    // Suchradius pro Punkt: kleinerer Radius für dichtere Grid-Punkte, größer für wenige Punkte
+    // Ziel: Überlappung zwischen benachbarten Grid-Punkten minimal halten
+    const pointRadiusMeters = Math.min(
+      radiusKm <= 10 ? 8000 : radiusKm <= 25 ? 12000 : 20000,
+      Math.max(5000, (radiusMeters * 0.6) / Math.max(allAvailablePoints.length, 1) * POINTS_PER_BATCH)
+    );
+
+    console.info(`[processResearchRun] Search points: total=${allAvailablePoints.length} offset=${pointOffset} using=${pointsToSearch.length} pointRadiusMeters=${Math.round(pointRadiusMeters)} batchIndex=${batchIndex}`);
     let newLeadsSavedThisBatch = 0, rawHitsThisBatch = 0, dupSkippedThisBatch = 0, noMatchThisBatch = 0, outsideRadiusThisBatch = 0, placeDetailsUsed = 0;
 
     outer:
