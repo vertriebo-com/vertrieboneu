@@ -1,0 +1,111 @@
+{
+  "name": "LocationIndex",
+  "type": "object",
+  "properties": {
+    "country_code": {
+      "type": "string",
+      "title": "L\u00e4ndercode",
+      "description": "ISO 3166-1 alpha-2 (z.B. DE)"
+    },
+    "postal_code": {
+      "type": "string",
+      "title": "Postleitzahl"
+    },
+    "city": {
+      "type": "string",
+      "title": "Ort"
+    },
+    "state": {
+      "type": "string",
+      "title": "Bundesland"
+    },
+    "state_code": {
+      "type": "string",
+      "title": "Bundesland-K\u00fcrzel (z.B. RP)"
+    },
+    "district": {
+      "type": "string",
+      "title": "Kreis / Landkreis"
+    },
+    "district_code": {
+      "type": "string",
+      "title": "Kreis-Code"
+    },
+    "municipality": {
+      "type": "string",
+      "title": "Gemeinde"
+    },
+    "municipality_code": {
+      "type": "string",
+      "title": "Gemeinde-Code"
+    },
+    "lat": {
+      "type": "number",
+      "title": "Breitengrad"
+    },
+    "lng": {
+      "type": "number",
+      "title": "L\u00e4ngengrad"
+    },
+    "accuracy": {
+      "type": "number",
+      "title": "Geo-Genauigkeit (GeoNames 1\u20136)"
+    },
+    "location_type": {
+      "type": "string",
+      "title": "Ortstyp",
+      "enum": [
+        "postal_code_city",
+        "city_only",
+        "district_only",
+        "special_postal_recipient"
+      ],
+      "default": "postal_code_city",
+      "description": "special_postal_recipient = Firmen-/Gro\u00dfempf\u00e4nger-PLZ, niemals als Suchort verwenden"
+    },
+    "source": {
+      "type": "string",
+      "title": "Datenquelle",
+      "default": "geonames_postal"
+    },
+    "source_file": {
+      "type": "string",
+      "title": "Quelldatei",
+      "default": "DE.zip"
+    },
+    "source_row": {
+      "type": "number",
+      "title": "Zeilennummer in Quelldatei"
+    },
+    "source_id": {
+      "type": "string",
+      "title": "Quell-ID (GeoNames admin_code)"
+    },
+    "normalized_name": {
+      "type": "string",
+      "title": "Normalisierter Ortsname (Kleinbuchstaben, bereinigt)"
+    },
+    "quality_score": {
+      "type": "number",
+      "title": "Qualit\u00e4tsscore (0\u2013100)",
+      "default": 80
+    },
+    "is_active": {
+      "type": "boolean",
+      "title": "Aktiv (f\u00fcr Suche nutzbar)",
+      "default": true,
+      "description": "false = inaktiv/special recipient, niemals f\u00fcr resolveCoverageLocations verwenden"
+    },
+    "filter_reasons": {
+      "type": "string",
+      "title": "Filter-Gr\u00fcnde (JSON-Array)",
+      "description": "Warum wurde dieser Eintrag als inaktiv/sonderfall markiert"
+    }
+  },
+  "required": [
+    "postal_code",
+    "city",
+    "lat",
+    "lng"
+  ]
+}
