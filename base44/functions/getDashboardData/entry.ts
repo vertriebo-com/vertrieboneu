@@ -148,23 +148,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Überfällige/Heute-Tasks → als Aktionen
+    // Task-Typ-Hilfsfunktion: Ist Task ein Rückruf?
+    const isCallbackTask = (t) => {
+      const typ = (t.typ || '').toLowerCase();
+      const titel = (t.titel || '').toLowerCase();
+      return typ.includes('rückruf') || titel.includes('rückruf') || typ === 'rückruf';
+    };
+
+    // Überfällige Tasks → als Aktionen (Rückrufe separat taggen)
     const overdueActionItems = overdueTasks.slice(0, 3).map(t => ({
-      type: 'task_overdue',
+      type: isCallbackTask(t) ? 'callback_overdue' : 'task_overdue',
       company_id: t.company_id || null,
       company_name: t.company_name || t.titel,
-      action: t.typ || 'Aufgabe',
+      action: isCallbackTask(t) ? 'Rückruf durchführen' : (t.typ || 'Aufgabe'),
       reason: `Überfällig seit ${t.faellig_am ? new Date(t.faellig_am).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }) : '?'}`,
       priority: 0,
       task_id: t.id,
     }));
 
     const todayActionItems = todayTasks.slice(0, 3).map(t => ({
-      type: 'task_today',
+      type: isCallbackTask(t) ? 'callback_due_today' : 'task_today',
       company_id: t.company_id || null,
       company_name: t.company_name || t.titel,
-      action: t.typ || 'Aufgabe',
-      reason: 'Heute fällig',
+      action: isCallbackTask(t) ? 'Rückruf durchführen' : (t.typ || 'Aufgabe'),
+      reason: isCallbackTask(t) ? 'Rückruf heute fällig' : 'Heute fällig',
       priority: 1,
       task_id: t.id,
     }));
@@ -232,6 +239,30 @@ Deno.serve(async (req) => {
           priority: 3,
           lead_temperature: leadTemp,
           has_contact: hasContact,
+        });
+        continue;
+      }
+
+      // Offenes Angebot ohne offene Task → Nachfassen
+      if (company.status === 'Angebot' && !companiesWithTasks.has(company.id)) {
+        // Alter des Angebots bestimmen (je älter, desto dringlicher)
+        const offerDate = company.last_contact_date || company.updated_date || null;
+        const offerAgeDays = offerDate
+          ? Math.floor((now - new Date(offerDate)) / (1000 * 60 * 60 * 24))
+          : null;
+        const offerReason = offerAgeDays !== null
+          ? (offerAgeDays > 7 ? `Angebot seit ${offerAgeDays} Tagen offen` : 'Offenes Angebot')
+          : 'Offenes Angebot';
+        companyActionItems.push({
+          type: 'offer_followup',
+          company_id: company.id,
+          company_name: company.name,
+          action: 'Angebot nachfassen',
+          reason: offerReason,
+          priority: 2.5, // Nach heißen Leads, vor warmen
+          lead_temperature: leadTemp,
+          has_contact: hasContact,
+          offer_age_days: offerAgeDays,
         });
         continue;
       }

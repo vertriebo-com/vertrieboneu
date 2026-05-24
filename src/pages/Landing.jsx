@@ -64,7 +64,7 @@ const FAQS = [
 const FEATURES = [
 { icon: Search, title: "Automatische Firmenkontakt-Recherche", desc: "Legen Sie Zielgebiet, Branche und Kundentyp fest – Vertriebo findet passende Firmenkontakte für Ihren Vertrieb.", accent: "blue" },
 { icon: Globe, title: "Lückenlose Gebiets-Abdeckung", desc: "Nicht nur die Kreisstadt — Vertriebo durchsucht alle Orte in Ihrem Radius automatisch.", accent: "teal" },
-{ icon: Star, title: "Priorisierte Tagesliste", desc: "Tagesprioritäten statt Chaos. Heute fällige Rückrufe, priorisierte Neuleads und offene Angebote – Ihr Team sieht auf einen Blick, wer heute angerufen werden sollte.", accent: "amber" },
+{ icon: Star, title: "Priorisierte Tagesliste", desc: "Tagesprioritäten statt Chaos. Heute fällige Rückrufe, priorisierte Neuleads und offene Angebote – Sie sehen auf einen Blick, welche Kontakte heute bearbeitet werden sollten.", accent: "amber" },
 { icon: Phone, title: "Komplette Kontakthistorie", desc: "Alle Gespräche, E-Mails und Notizen zu jeder Firma an einem Ort. Anrufe dokumentiert, E-Mail-Verlauf, gespeicherte Notizen – nichts geht verloren.", accent: "emerald" },
 { icon: Mail, title: "E-Mails & Follow-ups", desc: "E-Mail-Vorlagen mit Ihrem Logo und Signatur, automatische Aufgaben und Follow-up-Erinnerungen – von Erstansprache bis Nachfassen alles organisiert.", accent: "purple" },
 { icon: BarChart3, title: "Vertriebssteuerung & Auswertung", desc: "Sehen Sie Fortschritt, offene Aufgaben, Aktivität und Ergebnisse Ihres Vertriebs auf einen Blick.", accent: "indigo" },

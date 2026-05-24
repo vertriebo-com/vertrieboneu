@@ -15,11 +15,19 @@
  * UX: Klick → direkt zur Firma oder Aufgabenansicht
  */
 import { Link } from "react-router-dom";
-import { AlertCircle, Phone, Mail, Search, ArrowRight, CheckCircle2, Zap, Flame, Star } from "lucide-react";
+import { AlertCircle, Phone, ArrowRight, CheckCircle2, Zap, Flame, Star, FileText } from "lucide-react";
 
 const TYPE_CONFIG = {
   task_overdue: {
     icon: AlertCircle,
+    iconColor: "text-red-600",
+    bg: "bg-red-50 border-red-200",
+    textColor: "text-red-900",
+    subColor: "text-red-700",
+    dot: "bg-red-500",
+  },
+  callback_overdue: {
+    icon: Phone,
     iconColor: "text-red-600",
     bg: "bg-red-50 border-red-200",
     textColor: "text-red-900",
@@ -34,6 +42,14 @@ const TYPE_CONFIG = {
     subColor: "text-blue-700",
     dot: "bg-blue-500",
   },
+  callback_due_today: {
+    icon: Phone,
+    iconColor: "text-blue-600",
+    bg: "bg-blue-50 border-blue-200",
+    textColor: "text-blue-900",
+    subColor: "text-blue-700",
+    dot: "bg-blue-500",
+  },
   hot_lead: {
     icon: Flame,
     iconColor: "text-orange-600",
@@ -41,6 +57,14 @@ const TYPE_CONFIG = {
     textColor: "text-orange-900",
     subColor: "text-orange-700",
     dot: "bg-orange-500",
+  },
+  offer_followup: {
+    icon: FileText,
+    iconColor: "text-indigo-600",
+    bg: "bg-indigo-50 border-indigo-200",
+    textColor: "text-indigo-900",
+    subColor: "text-indigo-700",
+    dot: "bg-indigo-500",
   },
   warm_lead_action: {
     icon: Star,
