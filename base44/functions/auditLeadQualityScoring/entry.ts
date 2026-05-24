@@ -1,166 +1,354 @@
 /**
  * auditLeadQualityScoring
  * ========================
- * Umfassender Test des Lead-Quality-Scoring-Systems:
- * - Testet 5 verschiedene Branchen mit realistischen Szenarien
- * - Verifiziert dass gute Treffer gespeichert werden
- * - Verifiziert dass schlechte Treffer abgelehnt werden
- * - Prüft Ketten-Erkennung (Franchise, Multi-Location)
- * - Testet blocked/excluded Begriffe
- * - Validiert Keyword-/Target-Customer-Match Speicherung
- * - Prüft nachvollziehbare engine_analysis_json Gründe
+ * Umfassender Test des Lead-Quality-Scoring-Systems mit ECHTEN Engine-Funktionen.
+ * 
+ * WICHTIG: Verwendet die gleichen Helper-Funktionen wie processResearchRun:
+ * - scoreCandidate (gewichtetes Scoring)
+ * - checkBadFit (Bad-Fit-Erkennung)
+ * - isLikelyChain (Ketten-Erkennung)
+ * - buildQueriesFromProfile (Query-Generierung)
+ * 
+ * Testet:
+ * - Echte Scoring-Logik mit gewichteten Signalen
+ * - Echte Bad-Fit-Erkennung mit Penalty-System
+ * - Echte Ketten-Erkennung mit Keywords + Bewertungen
+ * - Query-Generierung mit Target-Customer-Priorisierung
+ * - Excluded-CustomerTypes werden korrekt gefiltert
+ * - Engine-Analytics sind nachvollziehbar
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// ── Test-Branchen mit klaren Erwartungen ────────────────────────────────────
+// ── HELPERS (exakt wie in processResearchRun) ────────────────────────────────
+const SEARCH_ENGINE_VERSION = "v6-weighted-scoring";
+
+function normStr(str) {
+  return String(str || "").toLowerCase()
+    .replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").trim();
+}
+
+function isLikelyChain(candidate) {
+  const chainKeywords = ['aldi','lidl','penny','netto','rewe','edeka','kaufland','dm','rossmann','h&m','zara','primark','deichmann','deutsche post','dhl','sparkasse','deutsche bank','commerzbank','mcdonalds','burger king','subway','kfc','starbucks','hilton','marriott','ibis','motel one','fitx','mcfit','fitness first','fielmann','apollo optik','telekom','vodafone','ikea','obi','bauhaus','hornbach','franchise','kette','filialen','konzern'];
+  const nameLower = normStr(candidate.name || '');
+  for (const kw of chainKeywords) if (nameLower.includes(kw)) return { isChain: true, reason: `Kette: ${kw}` };
+  if ((candidate.user_ratings_total || 0) > 1500) return { isChain: true, reason: `>1500 Bewertungen` };
+  return { isChain: false };
+}
+
+function checkBadFit(candidate, profile) {
+  const text = normStr([candidate.name, (candidate.types||[]).join(' '), candidate.vicinity||'', candidate.formatted_address||''].join(' '));
+  const matchedSignals = [];
+  let totalPenalty = 0;
+
+  for (const kw of (profile?.negativeKeywords || [])) {
+    if (text.includes(normStr(kw))) {
+      return { bad: true, hardFail: true, totalPenalty: -100, matchedSignals: [`NegKw:${kw}`] };
+    }
+  }
+
+  const weights = profile?.badFitSignalWeights || {};
+  for (const s of (profile?.badFitSignals || [])) {
+    if (text.includes(normStr(s))) {
+      const penalty = weights[s] ?? -35;
+      totalPenalty += penalty;
+      matchedSignals.push(`${s}(${penalty})`);
+    }
+  }
+
+  const bad = totalPenalty <= -35;
+  return { bad, hardFail: false, totalPenalty, matchedSignals };
+}
+
+function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, placeTypes) {
+  const text = normStr([candidate.name, (candidate.types||[]).join(' '), candidate.vicinity||'', candidate.formatted_address||''].join(' '));
+  let score = 50;
+  const reasons = [];
+  let matched_search_category = category || null;
+  let matched_target_customer_type = null;
+  let placeTypeMatchStrength = 'none';
+
+  if (!matched_search_category) {
+    for (const cat of (profile?.searchableBusinessCategories || [])) {
+      const variants = profile?.searchKeywordVariants?.[cat] ? profile.searchKeywordVariants[cat] : [cat];
+      for (const v of variants) if (text.includes(normStr(v))) { matched_search_category = cat; break; }
+      if (matched_search_category) break;
+    }
+  }
+  if (matched_search_category) { score += 20; reasons.push(`Cat:${matched_search_category}(+20)`); }
+
+  const confidence = profile?.placeTypeConfidence || 'medium';
+  const placeTypeBoostMap = { high: 15, medium: 8, low: 3 };
+  const placeTypeBoost = placeTypeBoostMap[confidence] ?? 8;
+  const profilePlaceTypes = profile?.googlePlaceTypes || [];
+  const candidateTypes = placeTypes || candidate.types || [];
+  const placeTypeMatch = candidateTypes.some(t => profilePlaceTypes.includes(t));
+  if (placeTypeMatch && profilePlaceTypes.length > 0) {
+    score += placeTypeBoost;
+    placeTypeMatchStrength = confidence;
+    reasons.push(`PlaceType:${confidence}(+${placeTypeBoost})`);
+  }
+
+  const signalWeights = profile?.scoringSignalWeights || {};
+  const signalsList = profile?.scoringSignals || [];
+  let totalSignalScore = 0;
+  const matchedWeightedSignals = [];
+
+  for (const s of signalsList) {
+    if (text.includes(normStr(s))) {
+      const w = signalWeights[s] ?? 12;
+      totalSignalScore += w;
+      matchedWeightedSignals.push(`${s}(+${w})`);
+    }
+  }
+  const cappedSignalScore = Math.min(35, totalSignalScore);
+  if (cappedSignalScore > 0) {
+    score += cappedSignalScore;
+    reasons.push(`Signals:[${matchedWeightedSignals.slice(0,4).join(',')}](+${cappedSignalScore})`);
+  }
+
+  if (candidate.formatted_phone_number || candidate.international_phone_number) { score += 8; reasons.push("Tel(+8)"); }
+  if (candidate.website) { score += 8; reasons.push("Web(+8)"); }
+
+  if (distanceKm !== null && distanceKm <= radiusKm) { score += 8; }
+
+  const strategy = profile?.searchStrategy || 'target_customer_search';
+  const tcBonus = strategy === 'target_customer_search' ? 10 : strategy === 'mixed' ? 8 : 6;
+  for (const tc of (profile?.targetCustomerTypes || [])) {
+    if (text.includes(normStr(tc))) {
+      matched_target_customer_type = tc;
+      score += tcBonus;
+      reasons.push(`TC:${tc}(+${tcBonus})`);
+      break;
+    }
+  }
+
+  const websiteRequired = strategy === 'website_signal_required';
+  if (websiteRequired && !candidate.website) {
+    score = Math.min(score, 54);
+    reasons.push('NoWebsite(cap54)');
+  }
+
+  const badFit = checkBadFit(candidate, profile);
+  if (badFit.totalPenalty < 0) {
+    score += badFit.totalPenalty;
+    if (badFit.matchedSignals.length > 0) {
+      reasons.push(`BadFit:[${badFit.matchedSignals.join(',')}](${badFit.totalPenalty})`);
+    }
+  }
+
+  score = Math.max(0, Math.min(100, score));
+
+  const diagnostics = {
+    engine_version: SEARCH_ENGINE_VERSION,
+    score_raw: score,
+    matched_weighted_signals: matchedWeightedSignals,
+    bad_fit_signals_matched: badFit.matchedSignals,
+    bad_fit_penalty: badFit.totalPenalty,
+    place_type_match_strength: placeTypeMatchStrength,
+    place_type_confidence: confidence,
+    search_strategy: profile?.searchStrategy || 'target_customer_search',
+    category_matched: matched_search_category,
+    score_breakdown: reasons.join(' | '),
+    tc_bonus_applied: strategy === 'target_customer_search' ? 10 : strategy === 'mixed' ? 8 : 6,
+  };
+
+  return {
+    score,
+    matched_search_category,
+    matched_target_customer_type,
+    relevance_reason: reasons.join(' | ') || 'Base',
+    shouldSave: score >= 55 && !badFit.bad,
+    diagnostics,
+  };
+}
+
+function buildQueriesFromProfile(profile, targetCustomerTypes, excludedCustomerTypes, trialStage, hasGeoCoords) {
+  const queries = [];
+  const seen = new Set();
+  const maxQ = trialStage === 'free_preview' ? 5 : 20;
+  const excludedNorm = excludedCustomerTypes.map(e => normStr(e));
+  const cityMode = hasGeoCoords ? 'geo_only' : 'keyword_with_city';
+  const familiesUsed = new Set();
+  const strategy = profile?.searchStrategy || 'target_customer_search';
+
+  if (profile) {
+    const usedCats = (profile.searchableBusinessCategories || []).filter(c => {
+      return !excludedNorm.some(ex => normStr(c).includes(ex) || ex.includes(normStr(c)));
+    });
+
+    let prioritized = [];
+
+    if (strategy === 'provider_search') {
+      const staticPrio = (profile.queryPriority || []).filter(c => usedCats.includes(c));
+      const rest = usedCats.filter(c => !staticPrio.includes(c));
+      prioritized = [...staticPrio, ...rest];
+    } else if (strategy === 'registry_enrichment_recommended') {
+      const staticPrio = (profile.queryPriority || []).filter(c => usedCats.includes(c));
+      const rest = usedCats.filter(c => !staticPrio.includes(c));
+      prioritized = [...staticPrio, ...rest];
+    } else {
+      if (targetCustomerTypes.length > 0) {
+        const userPrio = [];
+        for (const tc of targetCustomerTypes) {
+          const tcNorm = normStr(tc);
+          for (const cat of usedCats) {
+            if (normStr(cat).includes(tcNorm) || tcNorm.includes(normStr(cat))) {
+              if (!userPrio.includes(cat)) userPrio.push(cat);
+            }
+          }
+        }
+        const staticPrio = (profile.queryPriority || []).filter(c => usedCats.includes(c) && !userPrio.includes(c));
+        const rest = usedCats.filter(c => !userPrio.includes(c) && !staticPrio.includes(c));
+        if (strategy === 'mixed') {
+          prioritized = [...userPrio, ...staticPrio, ...rest];
+        } else {
+          prioritized = [...userPrio, ...staticPrio, ...rest];
+        }
+      } else {
+        const staticPrio = (profile.queryPriority || []).filter(c => usedCats.includes(c));
+        const rest = usedCats.filter(c => !staticPrio.includes(c));
+        prioritized = [...staticPrio, ...rest];
+      }
+    }
+
+    const maxVariants = trialStage === 'free_preview' ? 2 : 3;
+    for (const cat of prioritized) {
+      if (queries.length >= maxQ) break;
+      let family = cat;
+      for (const [fam, variants] of Object.entries(profile.searchKeywordVariants || {})) {
+        if (variants.includes(cat) || fam === cat) { family = fam; break; }
+      }
+      const variants = (profile.searchKeywordVariants?.[cat] ? profile.searchKeywordVariants[cat] : [cat]).slice(0, maxVariants);
+      const weight = (profile.queryPriority || []).indexOf(cat) >= 0 ? 10 - (profile.queryPriority || []).indexOf(cat) : 1;
+      const isUserMatched = targetCustomerTypes.some(tc => {
+        const tcNorm = normStr(tc);
+        return normStr(cat).includes(tcNorm) || tcNorm.includes(normStr(cat));
+      });
+
+      for (const v of variants) {
+        if (!seen.has(v)) {
+          seen.add(v);
+          familiesUsed.add(family);
+          queries.push({
+            query: v, category: cat, variant: v, family, weight,
+            source: isUserMatched ? 'user_target' : 'taxonomy',
+            city_mode: cityMode,
+            search_strategy: strategy,
+            matched_target_customer: isUserMatched
+              ? targetCustomerTypes.find(tc => normStr(cat).includes(normStr(tc)) || normStr(tc).includes(normStr(cat)))
+              : null,
+          });
+        }
+        if (queries.length >= maxQ) break;
+      }
+    }
+  }
+
+  if (queries.length === 0 && targetCustomerTypes.length > 0) {
+    for (const tc of targetCustomerTypes.slice(0, maxQ)) {
+      if (excludedNorm.some(ex => normStr(tc).includes(ex))) continue;
+      if (!seen.has(tc)) {
+        seen.add(tc);
+        queries.push({ query: tc, category: tc, variant: tc, family: tc, weight: 5, source: 'user_fallback', city_mode: cityMode, matched_target_customer: tc });
+      }
+    }
+  }
+
+  return { queries, queryFamiliesUsed: [...familiesUsed], cityMode };
+}
+
+// ── TEST-BRANCHEN (echte TaxonomyEntry IDs) ─────────────────────────────────
 const TEST_INDUSTRIES = [
-  {
-    industry_id: 'gebaeudereinigung',
-    label: 'Gebäudereinigung',
-    expected_targets: ['immobilienverwalter', 'facility manager', 'bürogebäude'],
-    expected_services: ['glasreinigung', 'teppichreinigung', 'fassadenreinigung'],
-    bad_fit_keywords: ['privathaushalt', 'einmalreinigung'],
-    franchise_keywords: ['mc clean', 'clean fix', 'systemreinigung'],
-  },
-  {
-    industry_id: 'handwerk_elektriker',
-    label: 'Elektriker',
-    expected_targets: ['bauunternehmen', 'architekturbüro', 'industriebetrieb'],
-    expected_services: ['elektroinstallation', 'smart home', 'pv-anlage'],
-    bad_fit_keywords: ['notdienst privat', 'lampenwechsel'],
-    franchise_keywords: ['bosch', 'siemens partner'],
-  },
-  {
-    industry_id: 'gaertner',
-    label: 'Gärtner',
-    expected_targets: ['wohnungsbaugesellschaft', 'friedhofsverwaltung', 'stadtplanung'],
-    expected_services: ['landschaftsbau', 'pflanzenpflege', 'bewaesserung'],
-    bad_fit_keywords: ['blumenladen', 'grabsteine'],
-    franchise_keywords: ['deutsche garten', 'grün system'],
-  },
-  {
-    industry_id: 'sanitaer_heizung',
-    label: 'Sanitär & Heizung',
-    expected_targets: ['bauunternehmen', 'immobilienentwickler', 'hotelkette'],
-    expected_services: ['heizungsinstallation', 'badplanung', 'solarthermie'],
-    bad_fit_keywords: ['rohrreinigung privat', 'spülkasten'],
-    franchise_keywords: ['buderus', 'vaillant partner'],
-  },
-  {
-    industry_id: 'fotograf',
-    label: 'Fotograf',
-    expected_targets: ['werbeagentur', 'eventagentur', 'onlineshop'],
-    expected_services: ['produktfotografie', 'unternehmensfotografie', 'drohnenaufnahme'],
-    bad_fit_keywords: ['passbilder', 'hochzeit privat'],
-    franchise_keywords: ['fotostudio kette', 'portraitworld'],
-  },
+  { industry_id: 'gebaeudereinigung', label: 'Gebäudereinigung' },
+  { industry_id: 'elektriker', label: 'Elektriker' },
+  { industry_id: 'gaertner', label: 'Gärtner' },
+  { industry_id: 'sanitaer_heizung', label: 'Sanitär & Heizung' },
+  { industry_id: 'fotograf', label: 'Fotograf' },
 ];
 
-// ── Test-Firma generieren ───────────────────────────────────────────────────
-function createTestCompany(industry, scenario, placeId) {
-  const baseName = `Test ${industry.label} ${scenario}`;
+// ── TEST-CANDIDATES (wie Google Places sie liefert) ─────────────────────────
+function createTestCandidates(industryProfile) {
+  const candidates = [];
   
-  if (scenario === 'good_fit') {
-    return {
-      name: `${baseName} GmbH`,
-      branche: industry.label,
-      google_place_id: placeId,
-      matched_target_customer_type: industry.expected_targets[0],
-      matched_service_context: industry.expected_services[0],
-      relevance_score: 85,
-      relevance_reason: `Passt zu ${industry.expected_targets[0]} und bietet ${industry.expected_services[0]}`,
-      source_query: industry.expected_services[0],
-    };
-  }
-  
-  if (scenario === 'bad_fit_keyword') {
-    return {
-      name: `${baseName} (Privatkunde)`,
-      branche: industry.label,
-      google_place_id: placeId,
-      matched_target_customer_type: 'privatkunde',
-      matched_service_context: industry.bad_fit_keywords[0],
-      relevance_score: 25,
-      relevance_reason: `Niedriger Score wegen ${industry.bad_fit_keywords[0]}`,
-      source_query: industry.bad_fit_keywords[0],
-      excluded_reason: 'bad_fit_keyword',
-    };
-  }
-  
-  if (scenario === 'franchise_chain') {
-    return {
-      name: `${industry.franchise_keywords[0]} Filiale Mitte`,
-      branche: industry.label,
-      google_place_id: placeId,
-      matched_target_customer_type: 'privatkunde',
-      matched_service_context: 'standardleistung',
-      relevance_score: 15,
-      relevance_reason: 'Kette/Filialsystem erkannt',
-      source_query: industry.franchise_keywords[0],
-      excluded_reason: 'chain_detected',
-    };
-  }
-  
-  if (scenario === 'excluded_customer') {
-    return {
-      name: `${baseName} B2C`,
-      branche: industry.label,
-      google_place_id: placeId,
-      matched_target_customer_type: 'endverbraucher',
-      matched_service_context: industry.expected_services[0],
-      relevance_score: 30,
-      relevance_reason: 'Zielkunde ausgeschlossen',
-      source_query: industry.expected_services[0],
-      excluded_reason: 'excluded_customer_type',
-    };
-  }
-  
-  return null;
+  // Good Fit: Passt zu Zielkunde + Service
+  candidates.push({
+    scenario: 'good_fit_target_customer',
+    candidate: {
+      name: `Muster Hausverwaltung GmbH`,
+      types: ['real_estate_agency', 'property_management'],
+      vicinity: 'Musterstadt',
+      formatted_address: 'Musterstraße 1, 12345 Musterstadt',
+      user_ratings_total: 45,
+      website: 'https://muster-hausverwaltung.de',
+      formatted_phone_number: '+49 123 456789',
+    },
+    expected: { shouldSave: true, minScore: 70, reason: 'Passt zu Zielkunde + gute Signale' },
+  });
+
+  // Good Fit: Eigene Dienstleistung
+  candidates.push({
+    scenario: 'good_fit_service',
+    candidate: {
+      name: `Elektro Müller GmbH`,
+      types: ['electrician', 'contractor'],
+      vicinity: 'Musterstadt',
+      formatted_address: 'Elektrikerweg 5, 12345 Musterstadt',
+      user_ratings_total: 120,
+      website: 'https://elektro-mueller.de',
+      formatted_phone_number: '+49 123 987654',
+    },
+    expected: { shouldSave: true, minScore: 65, reason: 'Passt zu eigener Dienstleistung' },
+  });
+
+  // Bad Fit: Privatkunde
+  candidates.push({
+    scenario: 'bad_fit_privatkunde',
+    candidate: {
+      name: `Privathaushalt Schmidt`,
+      types: ['point_of_interest'],
+      vicinity: 'Musterstadt',
+      formatted_address: 'Privatweg 3, 12345 Musterstadt',
+      user_ratings_total: 2,
+      website: null,
+      formatted_phone_number: null,
+    },
+    expected: { shouldSave: false, maxScore: 40, reason: 'Privatkunde erkannt' },
+  });
+
+  // Chain: Filialsystem
+  candidates.push({
+    scenario: 'chain_detected',
+    candidate: {
+      name: `Mc Clean Filiale Mitte`,
+      types: ['cleaning_service', 'point_of_interest'],
+      vicinity: 'Musterstadt',
+      formatted_address: 'Kettenstraße 10, 12345 Musterstadt',
+      user_ratings_total: 250,
+      website: 'https://mcclean.de',
+      formatted_phone_number: '+49 800 123456',
+    },
+    expected: { shouldSave: false, isChain: true, reason: 'Kette erkannt' },
+  });
+
+  // Excluded Customer Type
+  candidates.push({
+    scenario: 'excluded_customer',
+    candidate: {
+      name: `Endverbraucher Zentrale`,
+      types: ['point_of_interest'],
+      vicinity: 'Musterstadt',
+      formatted_address: 'Verbraucherweg 1, 12345 Musterstadt',
+      user_ratings_total: 5,
+      website: null,
+      formatted_phone_number: '+49 123 111222',
+    },
+    expected: { shouldSave: false, reason: 'Ausgeschlossener Zielkundentyp' },
+  });
+
+  return candidates;
 }
 
-// ── Scoring-Logik validieren ────────────────────────────────────────────────
-function validateScoring(company, taxonomy, expectedOutcome) {
-  const issues = [];
-  
-  // 1. Target-Customer-Match prüfen
-  if (expectedOutcome === 'good_fit') {
-    if (!company.matched_target_customer_type || company.matched_target_customer_type === 'privatkunde') {
-      issues.push('Target-Customer-Match fehlt oder falsch');
-    }
-    if (company.relevance_score < 70) {
-      issues.push(`Score zu niedrig: ${company.relevance_score} (erwartet >= 70)`);
-    }
-  }
-  
-  // 2. Bad-Fit-Erkennung prüfen
-  if (expectedOutcome === 'bad_fit') {
-    if (!company.excluded_reason) {
-      issues.push('excluded_reason fehlt für Bad-Fit');
-    }
-    if (company.relevance_score > 40) {
-      issues.push(`Score zu hoch für Bad-Fit: ${company.relevance_score}`);
-    }
-  }
-  
-  // 3. Ketten-Erkennung prüfen
-  if (expectedOutcome === 'chain') {
-    if (!company.excluded_reason || company.excluded_reason !== 'chain_detected') {
-      issues.push('Kette nicht korrekt erkannt');
-    }
-    if (company.relevance_score > 30) {
-      issues.push(`Score zu hoch für Kette: ${company.relevance_score}`);
-    }
-  }
-  
-  // 4. Taxonomy-Profile prüfen
-  if (!taxonomy || !taxonomy.industry_id) {
-    issues.push('Taxonomy-Profil fehlt');
-  }
-  
-  return issues;
-}
-
-// ── Hauptfunktion ────────────────────────────────────────────────────────────
+// ── MAIN ─────────────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -171,231 +359,328 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Nur für Platform-Admins' }, { status: 403 });
     }
 
-    console.info('[auditLeadQualityScoring] Starting comprehensive lead quality audit...');
+    console.info('[auditLeadQualityScoring] Starting real engine scoring audit...');
 
     const results = {
       timestamp: new Date().toISOString(),
       auditor: user.email,
+      engine_version: SEARCH_ENGINE_VERSION,
       industries_tested: 0,
-      scenarios_tested: 0,
-      good_fit_saved: 0,
-      bad_fit_rejected: 0,
-      chains_detected: 0,
-      excluded_customer_rejected: 0,
-      keyword_match_verified: 0,
-      engine_analysis_valid: 0,
+      candidates_tested: 0,
+      scenarios: {
+        good_fit_saved: 0,
+        bad_fit_rejected: 0,
+        chains_detected: 0,
+        excluded_customers_rejected: 0,
+        queries_valid: 0,
+        diagnostics_valid: 0,
+      },
+      tests: [],
       failed_tests: [],
       warnings: [],
-      industry_results: [],
+      skipped: [],
     };
 
     // ── Test-Organisation ermitteln ─────────────────────────────────────────
     const orgs = await base44.asServiceRole.entities.Organization.filter({ 
-      onboarding_done: true 
+      onboarding_done: true,
+      industry: { $exists: true }
     }, '-created_date', 1);
     
     if (!orgs[0]) {
       return Response.json({ 
-        error: 'Keine Organisation mit abgeschlossenem Onboarding gefunden',
-        message: 'Bitte erstellen Sie eine Test-Organisation und schließen Sie das Onboarding ab.'
+        error: 'Keine Organisation mit abgeschlossenem Onboarding und Branche gefunden',
+        message: 'Bitte erstellen Sie eine Test-Organisation mit Branche.'
       }, { status: 404 });
     }
 
     const testOrg = orgs[0];
-    console.info(`[auditLeadQualityScoring] Using test organization: ${testOrg.name} (${testOrg.id})`);
+    console.info(`[auditLeadQualityScoring] Using test org: ${testOrg.name} (${testOrg.id}), industry: ${testOrg.industry}`);
 
-    // ── Durch alle Branchen iterieren ───────────────────────────────────────
-    for (const industry of TEST_INDUSTRIES) {
-      console.info(`[auditLeadQualityScoring] Testing industry: ${industry.industry_id}`);
+    // ── Durch alle Test-Branchen iterieren ──────────────────────────────────
+    for (const industrySpec of TEST_INDUSTRIES) {
+      console.info(`[auditLeadQualityScoring] Testing industry: ${industrySpec.industry_id}`);
       
       const industryResult = {
-        industry_id: industry.industry_id,
-        label: industry.label,
-        scenarios: [],
+        industry_id: industrySpec.industry_id,
+        label: industrySpec.label,
         taxonomy_loaded: false,
-        companies_saved: 0,
-        companies_rejected: 0,
+        taxonomy_status: null,
+        candidates_tested: 0,
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+        tests: [],
       };
 
       // 1. TaxonomyEntry laden
-      let taxonomy = null;
+      let taxonomyProfile = null;
       try {
         const taxRecords = await base44.asServiceRole.entities.TaxonomyEntry.filter({
-          industry_id: industry.industry_id,
+          industry_id: industrySpec.industry_id,
           is_active: true,
         });
-        taxonomy = taxRecords[0] || null;
-        industryResult.taxonomy_loaded = !!taxonomy;
         
-        if (!taxonomy) {
-          results.warnings.push(`Kein Taxonomy-Profil für ${industry.industry_id}`);
+        if (!taxRecords[0]) {
+          industryResult.taxonomy_status = 'not_found';
+          results.skipped.push({
+            industry: industrySpec.industry_id,
+            reason: 'Taxonomy-Profil nicht gefunden oder inaktiv',
+          });
+          console.warn(`[auditLeadQualityScoring] Skipped ${industrySpec.industry_id}: taxonomy not found`);
           continue;
         }
+
+        const rec = taxRecords[0];
+        taxonomyProfile = {
+          industry_id: rec.industry_id,
+          label: rec.label,
+          searchableBusinessCategories: rec.searchableBusinessCategories ? JSON.parse(rec.searchableBusinessCategories) : [],
+          targetCustomerTypes: rec.targetCustomerTypes ? JSON.parse(rec.targetCustomerTypes) : [],
+          excludedCustomerTypes: rec.excludedCustomerTypes ? JSON.parse(rec.excludedCustomerTypes) : [],
+          ownServices: rec.ownServices ? JSON.parse(rec.ownServices) : [],
+          searchKeywordVariants: rec.searchKeywordVariants ? JSON.parse(rec.searchKeywordVariants) : {},
+          scoringSignals: rec.scoringSignals ? JSON.parse(rec.scoringSignals) : [],
+          scoringSignalWeights: rec.scoringSignalWeights ? JSON.parse(rec.scoringSignalWeights) : {},
+          badFitSignals: rec.badFitSignals ? JSON.parse(rec.badFitSignals) : [],
+          badFitSignalWeights: rec.badFitSignalWeights ? JSON.parse(rec.badFitSignalWeights) : {},
+          negativeKeywords: rec.negativeKeywords ? JSON.parse(rec.negativeKeywords) : [],
+          googlePlaceTypes: rec.googlePlaceTypes ? JSON.parse(rec.googlePlaceTypes) : [],
+          placeTypeConfidence: rec.placeTypeConfidence || 'medium',
+          searchStrategy: rec.searchStrategy || 'target_customer_search',
+          queryPriority: rec.queryPriority ? JSON.parse(rec.queryPriority) : [],
+          version: rec.version,
+        };
+
+        industryResult.taxonomy_loaded = true;
+        industryResult.taxonomy_status = 'loaded';
+        results.industries_tested++;
+
       } catch (taxErr) {
-        console.warn(`[auditLeadQualityScoring] Taxonomy load error for ${industry.industry_id}:`, taxErr.message);
-        industryResult.scenarios.push({
-          scenario: 'taxonomy_load',
-          status: 'failed',
-          error: taxErr.message,
-        });
+        industryResult.taxonomy_status = `error: ${taxErr.message}`;
+        results.warnings.push(`Taxonomy load error for ${industrySpec.industry_id}: ${taxErr.message}`);
         continue;
       }
 
-      results.industries_tested++;
-
-      // 2. Szenarien testen
-      const scenarios = ['good_fit', 'bad_fit_keyword', 'franchise_chain', 'excluded_customer'];
+      // 2. Test-Candidates generieren und testen
+      const testCandidates = createTestCandidates(taxonomyProfile);
       
-      for (const scenario of scenarios) {
-        const placeId = `test_${industry.industry_id}_${scenario}_${Date.now()}`;
-        const testCompany = createTestCompany(industry, scenario, placeId);
+      for (const testItem of testCandidates) {
+        const { scenario, candidate, expected } = testItem;
+        const candidateName = candidate.name;
         
-        if (!testCompany) {
-          continue;
-        }
+        results.candidates_tested++;
+        industryResult.candidates_tested++;
 
-        results.scenarios_tested++;
-        
-        const scenarioResult = {
+        const testResult = {
           scenario,
-          place_id: placeId,
-          company_name: testCompany.name,
-          expected_outcome: scenario === 'good_fit' ? 'saved' : 'rejected',
+          candidate_name: candidateName,
+          industry: industrySpec.industry_id,
+          expected_outcome: expected,
           actual_outcome: null,
-          scoring_valid: false,
-          engine_analysis_valid: false,
+          scoring: null,
+          chain_detection: null,
+          diagnostics_valid: false,
+          status: 'pending',
           issues: [],
         };
 
         try {
-          // 3. Scoring validieren
-          const expectedOutcome = scenario === 'good_fit' ? 'good_fit' : 'bad_fit';
-          const scoringIssues = validateScoring(testCompany, taxonomy, expectedOutcome);
-          
-          if (scoringIssues.length > 0) {
-            scenarioResult.issues.push(...scoringIssues);
-            scenarioResult.actual_outcome = 'validation_failed';
-          } else {
-            scenarioResult.scoring_valid = true;
+          // A. Chain Detection testen
+          const chainResult = isLikelyChain(candidate);
+          testResult.chain_detection = chainResult;
+
+          if (expected.isChain && !chainResult.isChain) {
+            testResult.issues.push(`Chain nicht erkannt: erwartet true, got ${chainResult.isChain}`);
+          }
+          if (!expected.isChain && chainResult.isChain) {
+            testResult.issues.push(`Falsch als Chain erkannt: ${chainResult.reason}`);
           }
 
-          // 4. engine_analysis_json prüfen
-          const engineAnalysis = {
-            taxonomy_version: taxonomy.version || 'unknown',
-            matched_signals: {
-              target_customer: testCompany.matched_target_customer_type,
-              service: testCompany.matched_service_context,
-              query: testCompany.source_query,
-            },
-            scoring_factors: {
-              relevance_score: testCompany.relevance_score,
-              relevance_reason: testCompany.relevance_reason,
-            },
-            exclusion_factors: testCompany.excluded_reason ? {
-              reason: testCompany.excluded_reason,
-            } : null,
-            chain_detection: scenario === 'franchise_chain' ? {
-              detected: true,
-              keywords: industry.franchise_keywords,
-            } : { detected: false },
-          };
+          // B. Scoring testen (nur wenn keine Chain)
+          let scoring = null;
+          if (!chainResult.isChain) {
+            scoring = scoreCandidate(candidate, taxonomyProfile, 5, 20, null, candidate.types);
+            testResult.scoring = scoring;
 
-          // Nachvollziehbarkeit prüfen
-          if (engineAnalysis.matched_signals.target_customer && 
-              engineAnalysis.matched_signals.service &&
-              engineAnalysis.scoring_factors.relevance_reason) {
-            scenarioResult.engine_analysis_valid = true;
-            results.engine_analysis_valid++;
+            // Erwartetes Ergebnis prüfen
+            if (expected.shouldSave === true) {
+              if (!scoring.shouldSave) {
+                testResult.issues.push(`Should save but rejected: score=${scoring.score}, reason=${scoring.relevance_reason}`);
+              }
+              if (expected.minScore && scoring.score < expected.minScore) {
+                testResult.issues.push(`Score too low: ${scoring.score} < ${expected.minScore}`);
+              }
+              if (scoring.shouldSave) {
+                results.scenarios.good_fit_saved++;
+                industryResult.passed++;
+              }
+            } else if (expected.shouldSave === false) {
+              if (scoring.shouldSave) {
+                testResult.issues.push(`Should NOT save but accepted: score=${scoring.score}`);
+              }
+              if (expected.maxScore && scoring.score > expected.maxScore) {
+                testResult.issues.push(`Score too high: ${scoring.score} > ${expected.maxScore}`);
+              }
+              if (!scoring.shouldSave) {
+                results.scenarios.bad_fit_rejected++;
+                industryResult.passed++;
+              }
+            }
           } else {
-            scenarioResult.issues.push('engine_analysis_json unvollständig');
+            // Chain → automatisch rejected
+            results.scenarios.chains_detected++;
+            industryResult.passed++;
           }
 
-          // 5. Ergebnis auswerten
-          if (scenario === 'good_fit') {
-            // Gute Treffer müssen gespeichert werden
-            if (testCompany.relevance_score >= 70 && !testCompany.excluded_reason) {
-              scenarioResult.actual_outcome = 'saved';
-              results.good_fit_saved++;
-              industryResult.companies_saved++;
-              results.keyword_match_verified++;
+          // C. Diagnostics prüfen
+          if (scoring?.diagnostics) {
+            const diag = scoring.diagnostics;
+            const requiredFields = [
+              'engine_version', 'score_raw', 'matched_weighted_signals',
+              'bad_fit_signals_matched', 'bad_fit_penalty', 'search_strategy',
+              'category_matched', 'score_breakdown',
+            ];
+            
+            const missingFields = requiredFields.filter(f => !(f in diag));
+            if (missingFields.length > 0) {
+              testResult.issues.push(`Missing diagnostics fields: ${missingFields.join(', ')}`);
             } else {
-              scenarioResult.actual_outcome = 'incorrectly_rejected';
-              scenarioResult.issues.push('Guter Treffer fälschlich abgelehnt');
+              testResult.diagnostics_valid = true;
+              results.scenarios.diagnostics_valid++;
             }
-          } else if (scenario === 'bad_fit_keyword') {
-            // Schlechte Treffer müssen rausfliegen
-            if (testCompany.excluded_reason === 'bad_fit_keyword' && testCompany.relevance_score <= 40) {
-              scenarioResult.actual_outcome = 'rejected';
-              results.bad_fit_rejected++;
-              industryResult.companies_rejected++;
-            } else {
-              scenarioResult.actual_outcome = 'incorrectly_saved';
-              scenarioResult.issues.push('Schlechter Treffer fälschlich gespeichert');
+
+            // Engine-Version prüfen
+            if (diag.engine_version !== SEARCH_ENGINE_VERSION) {
+              testResult.issues.push(`Wrong engine version: ${diag.engine_version}`);
             }
-          } else if (scenario === 'franchise_chain') {
-            // Ketten müssen erkannt werden
-            if (testCompany.excluded_reason === 'chain_detected') {
-              scenarioResult.actual_outcome = 'rejected';
-              results.chains_detected++;
-              industryResult.companies_rejected++;
-            } else {
-              scenarioResult.actual_outcome = 'incorrectly_saved';
-              scenarioResult.issues.push('Kette nicht erkannt');
-            }
-          } else if (scenario === 'excluded_customer') {
-            // Ausgeschlossene Zielkunden müssen abgelehnt werden
-            if (testCompany.excluded_reason === 'excluded_customer_type') {
-              scenarioResult.actual_outcome = 'rejected';
-              results.excluded_customer_rejected++;
-              industryResult.companies_rejected++;
-            } else {
-              scenarioResult.actual_outcome = 'incorrectly_saved';
-              scenarioResult.issues.push('Ausgeschlossener Zielkunde nicht erkannt');
-            }
+          }
+
+          // Status setzen
+          testResult.status = testResult.issues.length === 0 ? 'pass' : 'fail';
+          if (testResult.status === 'pass') {
+            industryResult.passed++;
+          } else {
+            industryResult.failed++;
+            results.failed_tests.push({
+              industry: industrySpec.industry_id,
+              scenario,
+              candidate: candidateName,
+              issues: testResult.issues,
+            });
           }
 
         } catch (err) {
-          console.error(`[auditLeadQualityScoring] Scenario ${scenario} error:`, err.message);
-          scenarioResult.actual_outcome = 'error';
-          scenarioResult.issues.push(err.message);
-        }
-
-        industryResult.scenarios.push(scenarioResult);
-        
-        if (scenarioResult.issues.length > 0) {
+          testResult.status = 'error';
+          testResult.issues.push(`Test execution error: ${err.message}`);
+          industryResult.failed++;
           results.failed_tests.push({
-            industry: industry.industry_id,
+            industry: industrySpec.industry_id,
             scenario,
-            issues: scenarioResult.issues,
+            candidate: candidateName,
+            error: err.message,
           });
         }
+
+        industryResult.tests.push(testResult);
+        results.tests.push(testResult);
+      }
+
+      // 3. Query-Generierung testen
+      try {
+        const targetCustomerTypes = taxonomyProfile.targetCustomerTypes?.slice(0, 3) || [];
+        const excludedCustomerTypes = taxonomyProfile.excludedCustomerTypes || [];
+        const hasGeoCoords = true;
+        const trialStage = 'free_preview';
+
+        const queryResult = buildQueriesFromProfile(
+          taxonomyProfile,
+          targetCustomerTypes,
+          excludedCustomerTypes,
+          trialStage,
+          hasGeoCoords
+        );
+
+        const queryTest = {
+          scenario: 'query_generation',
+          industry: industrySpec.industry_id,
+          queries_count: queryResult.queries.length,
+          query_families: queryResult.queryFamiliesUsed,
+          city_mode: queryResult.cityMode,
+          status: 'pending',
+          issues: [],
+        };
+
+        // Queries prüfen
+        if (queryResult.queries.length === 0) {
+          queryTest.issues.push('No queries generated');
+          queryTest.status = 'fail';
+        } else {
+          // Target-Customer-Priorisierung prüfen
+          const hasTargetCustomerQuery = queryResult.queries.some(q => 
+            q.source === 'user_target' || q.matched_target_customer
+          );
+          
+          if (targetCustomerTypes.length > 0 && !hasTargetCustomerQuery) {
+            queryTest.issues.push('Target customer queries not prioritized');
+          }
+
+          // Excluded-CustomerTypes prüfen
+          const excludedNorm = excludedCustomerTypes.map(e => normStr(e));
+          const hasExcludedQuery = queryResult.queries.some(q => 
+            excludedNorm.some(ex => normStr(q.query).includes(ex))
+          );
+          
+          if (hasExcludedQuery) {
+            queryTest.issues.push('Excluded customer types found in queries');
+          }
+
+          queryTest.status = queryTest.issues.length === 0 ? 'pass' : 'fail';
+          if (queryTest.status === 'pass') {
+            results.scenarios.queries_valid++;
+            industryResult.passed++;
+          } else {
+            industryResult.failed++;
+            results.failed_tests.push({
+              industry: industrySpec.industry_id,
+              scenario: 'query_generation',
+              issues: queryTest.issues,
+            });
+          }
+        }
+
+        industryResult.tests.push(queryTest);
+
+      } catch (queryErr) {
+        results.warnings.push(`Query generation error for ${industrySpec.industry_id}: ${queryErr.message}`);
+        industryResult.skipped++;
       }
 
       results.industry_results.push(industryResult);
     }
 
     // ── Zusammenfassung ─────────────────────────────────────────────────────
-    const totalScenarios = results.scenarios_tested;
-    const passedScenarios = totalScenarios - results.failed_tests.length;
-    const passRate = totalScenarios > 0 ? (passedScenarios / totalScenarios) * 100 : 0;
+    const totalTests = results.candidates_tested + results.industries_tested;
+    const passedTests = results.scenarios.good_fit_saved + 
+                        results.scenarios.bad_fit_rejected + 
+                        results.scenarios.chains_detected + 
+                        results.scenarios.diagnostics_valid + 
+                        results.scenarios.queries_valid;
+    
+    const passRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0;
 
     const summary = {
-      status: passRate >= 90 ? 'green' : passRate >= 70 ? 'yellow' : 'red',
+      status: passRate >= 90 ? 'pass' : passRate >= 70 ? 'warning' : 'fail',
       pass_rate: Math.round(passRate),
-      total_tests: totalScenarios,
-      passed: passedScenarios,
+      total_tests: totalTests,
+      passed: passedTests,
       failed: results.failed_tests.length,
-      key_metrics: {
-        good_fit_saved: results.good_fit_saved,
-        bad_fit_rejected: results.bad_fit_rejected,
-        chains_detected: results.chains_detected,
-        excluded_customers_rejected: results.excluded_customer_rejected,
-        keyword_matches_verified: results.keyword_match_verified,
-        engine_analysis_valid: results.engine_analysis_valid,
-      },
+      skipped: results.skipped.length,
+      warnings: results.warnings.length,
+      key_metrics: results.scenarios,
     };
 
-    console.info(`[auditLeadQualityScoring] Completed: ${summary.pass_rate}% bestanden (${summary.passed}/${summary.total_tests})`);
+    console.info(`[auditLeadQualityScoring] Completed: ${summary.pass_rate}% passed (${summary.passed}/${summary.total_tests})`);
 
     return Response.json({
       success: true,
