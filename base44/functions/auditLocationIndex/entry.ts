@@ -99,15 +99,25 @@ Deno.serve(async (req) => {
     }
 
     // ── Bundesland-Verteilung ─────────────────────────────────────────────
+    // Sonderfaelle: Jungholz (state_code='', oesterr. Exklave) + Schneefernerhaus (state_code='02', GeoNames-Fehler)
+    // states_count=17 erklaerung: 16 echte DE-Bundeslaender + 1 Sondergruppe (leer/nicht-ISO-2)
+    const emptyStateCodes = active.filter(r => !r.state_code || r.state_code === '');
+    const nonIsoStateCodes = active.filter(r => r.state_code && (r.state_code.length !== 2 || !/^[A-Z]{2}$/.test(r.state_code)));
+    const specialStateEntries = [
+      ...emptyStateCodes.slice(0, 3).map(r => ({ postal_code: r.postal_code, city: r.city, state_code: '(leer)', note: 'Exklave/Sonderfall ohne DE-Bundesland' })),
+      ...nonIsoStateCodes.slice(0, 3).map(r => ({ postal_code: r.postal_code, city: r.city, state_code: r.state_code, note: 'Nicht-ISO-2-state_code (GeoNames-Datenfehler)' })),
+    ];
+
     const stateDistrib = {};
     for (const r of active) {
-      const sk = r.state_code || 'unbekannt';
-      if (!stateDistrib[sk]) stateDistrib[sk] = { count: 0, state: r.state || sk };
+      const sk = r.state_code || '(kein BL)';
+      const isStandard = !!(r.state_code && r.state_code.length === 2 && /^[A-Z]{2}$/.test(r.state_code));
+      if (!stateDistrib[sk]) stateDistrib[sk] = { count: 0, state: r.state || sk, is_standard: isStandard };
       stateDistrib[sk].count++;
     }
     const stateSorted = Object.entries(stateDistrib)
       .sort((a, b) => b[1].count - a[1].count)
-      .map(([code, v]) => ({ state_code: code, state: v.state, count: v.count }));
+      .map(([code, v]) => ({ state_code: code, state: v.state, count: v.count, is_standard_de_bundesland: v.is_standard }));
 
     // ── Sample Einträge ────────────────────────────────────────────────────
     const sampleCities = ['koblenz', 'neuwied', 'bendorf', 'köln', 'koeln', 'berlin', 'münchen', 'muenchen'];
@@ -212,12 +222,14 @@ Deno.serve(async (req) => {
         duplicate_count: duplicateCount,
         duplicate_examples: duplicateEntries.slice(0, 5).map(([key, count]) => ({ key, count })),
         states_count: statesSet.size,
+        states_count_explanation: `${statesSet.size} = 16 echte DE-Bundeslaender + ${statesSet.size - 16} Sondergruppe (Exklave/GeoNames-Fehler)`,
         postal_codes_count: postalCodesSet.size,
         cities_count: citiesSet.size,
         missing_coords: missingCoords,
         missing_postal: missingPostal,
         quality_distribution: qualityBuckets,
         state_distribution: stateSorted,
+        special_state_entries: specialStateEntries,
         sample_cities: sampleEntries,
         sample_inactive: sampleInactive,
         sample_special_recipients: sampleSpecial,

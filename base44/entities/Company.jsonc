@@ -255,6 +255,31 @@
         "api"
       ],
       "default": "manual"
+    },
+    "matched_location_city": {
+      "type": "string",
+      "title": "Gefundener Ort (LocationIndex)",
+      "description": "Stadt aus LocationIndex, die als Suchzentrum f\u00fcr diesen Lead verwendet wurde"
+    },
+    "matched_location_postal_code": {
+      "type": "string",
+      "title": "Gefundene PLZ (LocationIndex)",
+      "description": "PLZ aus LocationIndex, die als Suchzentrum f\u00fcr diesen Lead verwendet wurde"
+    },
+    "matched_location_distance_km": {
+      "type": "number",
+      "title": "Entfernung zum LocationIndex-Suchzentrum (km)",
+      "description": "Distanz zwischen gefundenem Lead und dem verwendeten LocationIndex-Ort"
+    },
+    "search_coverage_source": {
+      "type": "string",
+      "title": "Coverage-Quelle f\u00fcr diesen Lead",
+      "enum": [
+        "location_index",
+        "grid",
+        "additional_location"
+      ],
+      "description": "Welche Suchpunktstrategie diesen Lead gefunden hat"
     }
   },
   "required": [

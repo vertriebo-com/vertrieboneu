@@ -200,6 +200,38 @@
       "type": "string",
       "title": "Verarbeitet von (Worker-Key)",
       "description": "Eindeutiger Worker-Key des aktiven Verarbeiters"
+    },
+    "coverage_mode": {
+      "type": "string",
+      "title": "Coverage-Modus",
+      "enum": [
+        "location_index_plus_grid",
+        "grid_only",
+        "location_index_only"
+      ],
+      "description": "Welche Suchpunkt-Strategie verwendet wurde"
+    },
+    "covered_locations_count": {
+      "type": "number",
+      "title": "Anzahl Orte im Suchgebiet (LocationIndex)",
+      "description": "Gesamtzahl aktiver Orte im Radius laut LocationIndex"
+    },
+    "selected_locations_count": {
+      "type": "number",
+      "title": "Ausgew\u00e4hlte Orte f\u00fcr Recherche (Plan-Limit)",
+      "description": "Anzahl Orte die laut Plan-Limit tats\u00e4chlich durchsucht werden"
+    },
+    "locations_searched_count": {
+      "type": "number",
+      "title": "Tats\u00e4chlich durchsuchte Orte",
+      "default": 0,
+      "description": "Anzahl Orte aus LocationIndex die aktiv als Suchzentrum genutzt wurden"
+    },
+    "search_points_used_count": {
+      "type": "number",
+      "title": "Verwendete Suchpunkte gesamt",
+      "default": 0,
+      "description": "Gesamt-Anzahl Koordinaten-Punkte die f\u00fcr Google-API-Calls genutzt wurden (Grid + LocationIndex)"
     }
   },
   "required": [

@@ -829,6 +829,9 @@ Deno.serve(async (req) => {
       targetCustomerTypes = [], excludedCustomerTypes = [],
       trialStage, cityCoords, allPoints = [], allCenters = [],
       effectiveTarget, taxonomyProfile, taxonomyHash, taxonomyVersion,
+      // LocationIndex Coverage
+      coveredLocations = [],
+      coverageMode = 'grid_only',
     } = searchPlan;
 
     // ── PUNKT 3: Batch-Index und Target frisch aus DB lesen ──────────────────
@@ -977,22 +980,38 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, done: true, status: 'completed', leads_saved: currentLeadsSaved, progress_percent: 100 });
     }
 
-    // ── Search Points: Batch-rotierende Punkt-Auswahl ────────────────────────
-    // KERNFIX: Nicht immer slice(0, 3) – stattdessen rotieren über alle Punkte.
-    //
-    // Strategie: Jeder Batch verarbeitet QUERIES_PER_BATCH Queries × POINTS_PER_BATCH Punkte.
-    // Die Punkte werden über batch_index rotiert, sodass über mehrere Batches alle
-    // Grid-Punkte abgedeckt werden.
-    //
-    // pointOffset = batchIndex * POINTS_PER_BATCH (wraps around wenn alle Punkte durch)
-    //
-    // Beispiel: 7 Punkte, POINTS_PER_BATCH=3
-    //   Batch 0: Punkte [0,1,2]
-    //   Batch 1: Punkte [3,4,5]
-    //   Batch 2: Punkte [6,0,1] (wrap-around)
+    // ── Search Points: Grid + LocationIndex-Orte kombiniert ─────────────────
+    // Wenn coveredLocations aus LocationIndex vorhanden → Location-Punkte einmischen.
+    // Strategie: coveredLocations als zusätzliche Named-Points mit city-Kontext.
+    // Grid-Punkte bleiben als Fallback-Basis erhalten.
 
     const basePoint = cityCoords ? { lat: cityCoords.lat, lng: cityCoords.lng, label:'center', centerLat: cityCoords.lat, centerLng: cityCoords.lng, centerCity: city } : null;
-    const allAvailablePoints = allPoints.length > 0 ? allPoints : basePoint ? [basePoint] : [];
+    const gridPoints = allPoints.length > 0 ? allPoints : basePoint ? [basePoint] : [];
+
+    // LocationIndex-Punkte: als Suchzentren mit PLZ/Stadt-Kontext
+    // Nur wenn coverageMode = location_index_plus_grid und coveredLocations vorhanden
+    const locationIndexPoints = (coverageMode === 'location_index_plus_grid' && coveredLocations.length > 0)
+      ? coveredLocations.map(l => ({
+          lat: l.lat,
+          lng: l.lng,
+          label: `loc_${l.postal_code}_${l.city}`,
+          centerLat: l.lat,
+          centerLng: l.lng,
+          centerCity: l.city,
+          // Zusatz-Kontext für Query-Building und Company-Tracking
+          locationCity: l.city,
+          locationPostalCode: l.postal_code,
+          coverageSource: 'location_index',
+        }))
+      : [];
+
+    // Kombination: erst LocationIndex-Punkte (Priorität), dann Grid als Ergänzung
+    // Limit: max 50 Punkte gesamt (Performance)
+    const allAvailablePoints = locationIndexPoints.length > 0
+      ? [...locationIndexPoints, ...gridPoints].slice(0, 50)
+      : gridPoints;
+
+    console.info(`[processResearchRun] Points: locationIndex=${locationIndexPoints.length} grid=${gridPoints.length} combined=${allAvailablePoints.length} coverageMode=${coverageMode}`);
 
     if (allAvailablePoints.length === 0) {
       await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
@@ -1020,10 +1039,14 @@ Deno.serve(async (req) => {
 
     console.info(`[processResearchRun] Search points: total=${allAvailablePoints.length} offset=${pointOffset} using=${pointsToSearch.length} pointRadiusMeters=${Math.round(pointRadiusMeters)} batchIndex=${batchIndex}`);
     let newLeadsSavedThisBatch = 0, rawHitsThisBatch = 0, dupSkippedThisBatch = 0, noMatchThisBatch = 0, outsideRadiusThisBatch = 0, placeDetailsUsed = 0;
+    // Track welche LocationIndex-Orte tatsächlich durchsucht wurden
+    const locationsSearchedSet = new Set();
 
     outer:
     for (const point of pointsToSearch) {
       const pointCenter = { lat: point.centerLat || cityCoords?.lat, lng: point.centerLng || cityCoords?.lng, city: point.centerCity || city };
+      // LocationIndex-Tracking
+      if (point.locationCity) locationsSearchedSet.add(`${point.locationPostalCode}_${point.locationCity}`);
 
       for (const qItem of batchQueries) {
         const { query, category, variant, family, matched_target_customer } = qItem;
@@ -1141,6 +1164,13 @@ Deno.serve(async (req) => {
               engine_version: SEARCH_ENGINE_VERSION,
               engine_confidence: scoring.score,
               engine_last_analyzed_at: new Date().toISOString(),
+              // LocationIndex Coverage-Diagnostik
+              matched_location_city: point.locationCity || null,
+              matched_location_postal_code: point.locationPostalCode || null,
+              matched_location_distance_km: point.locationCity && placeLat && point.lat
+                ? Math.round(haversineKm(point.lat, point.lng, placeLat, placeLng || point.lng) * 10) / 10
+                : null,
+              search_coverage_source: point.coverageSource || 'grid',
             });
             
             companyId = companyRes.id;
@@ -1241,6 +1271,9 @@ Deno.serve(async (req) => {
       current_step: newStep,
       seen_place_ids: JSON.stringify([...seenPlaceIds].slice(-500)),
       charged_lead_generation: totalLeadsSaved > 0,
+      // LocationIndex Coverage-Diagnostik
+      locations_searched_count: (freshRun.locations_searched_count || 0) + locationsSearchedSet.size,
+      search_points_used_count: (freshRun.search_points_used_count || 0) + pointsToSearch.length,
       // VITAL: Lock muss AKTIV bleiben solange Run nicht completed ist
       // Sonst ruft Banner nochmal auf bevor Status-Update committed ist
       processing_lock_until: isDone ? null : new Date(Date.now() + LOCK_DURATION_MS).toISOString(),

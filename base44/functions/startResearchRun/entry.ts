@@ -523,11 +523,49 @@ Deno.serve(async (req) => {
       } catch {}
     }
 
-    // ── Suchplan zusammenbauen (Taxonomie-Profil eingebettet) ────────────────
+    // ── LocationIndex: Coverage für diesen Suchbereich auflösen ─────────────
+    // resolveCoverageLocations gibt aktive, deduplizierte Orte im Radius zurück.
+    // Diese werden in search_plan_json eingebettet und in processResearchRun genutzt.
+    let coveredLocations = [];
+    let coveredLocationsTotal = 0;
+    let selectedLocationsCount = 0;
+    let coverageMode = 'grid_only'; // Fallback wenn LocationIndex nicht verfügbar
+
+    try {
+      const coverageRes = await base44.functions.invoke('resolveCoverageLocations', {
+        center_lat: cityCoords.lat,
+        center_lng: cityCoords.lng,
+        radius_km: radiusKm,
+        organization_id,
+      });
+      const coverageData = coverageRes?.data;
+      if (coverageData?.success && coverageData.locations?.length > 0) {
+        const selected = coverageData.locations.filter(l => l.selected_for_search);
+        coveredLocations = selected.map(l => ({
+          city: l.city,
+          postal_code: l.postal_code,
+          lat: l.lat,
+          lng: l.lng,
+          state_code: l.state_code,
+          distance_km: l.distance_km,
+          priority_score: l.priority_score,
+        }));
+        coveredLocationsTotal = coverageData.summary?.total_in_radius || 0;
+        selectedLocationsCount = coveredLocations.length;
+        coverageMode = selectedLocationsCount > 0 ? 'location_index_plus_grid' : 'grid_only';
+        console.info(`[startResearchRun] LocationIndex: ${coveredLocationsTotal} Orte im Radius, ${selectedLocationsCount} ausgewählt (Plan-Limit), Mode=${coverageMode}`);
+      } else {
+        console.warn('[startResearchRun] LocationIndex leer oder Fehler → fallback grid_only');
+      }
+    } catch (coverageErr) {
+      console.warn(`[startResearchRun] resolveCoverageLocations Fehler (non-blocking): ${coverageErr?.message} → fallback grid_only`);
+    }
+
+    // ── Suchplan zusammenbauen (Taxonomie-Profil + LocationIndex eingebettet) ─
     const searchPlanData = {
       industry,
       industryId,
-      industrySource, // Dokumentiert woher industry kommt
+      industrySource,
       usedFallbackProfile: usedFallbackProfile || false,
       city,
       radiusKm,
@@ -540,10 +578,15 @@ Deno.serve(async (req) => {
       allCenters,
       effectiveTarget,
       remainingPreviewLeads,
-      // Taxonomie-Profil eingebettet → processResearchRun braucht kein eigenes Inline-Objekt
       taxonomyProfile,
       taxonomyHash,
       taxonomyVersion,
+      // LocationIndex Coverage
+      coverageMode,
+      coveredLocations,
+      coveredLocationsTotal,
+      selectedLocationsCount,
+      locationSource: 'LocationIndex',
     };
 
     // ── ResearchRun erstellen ────────────────────────────────────────────────
@@ -568,10 +611,14 @@ Deno.serve(async (req) => {
       seen_place_ids: JSON.stringify([]),
       started_at: now,
       created_by: user.email,
-      // Taxonomie-Metadaten direkt im Run
       taxonomy_version: taxonomyVersion || 'unknown',
-      taxonomy_hash: taxonomyHash || 'unknown',
       industry_id: industryId,
+      // LocationIndex Coverage-Diagnostik
+      coverage_mode: coverageMode,
+      covered_locations_count: coveredLocationsTotal,
+      selected_locations_count: selectedLocationsCount,
+      locations_searched_count: 0,
+      search_points_used_count: 0,
     });
 
     console.info(`[startResearchRun] Created run=${run.id} org=${organization_id} target=${effectiveTarget} city=${city}`);
