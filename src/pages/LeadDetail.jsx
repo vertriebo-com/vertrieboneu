@@ -16,6 +16,7 @@ import AddContactLogDialog from "../components/AddContactLogDialog";
 import AddTaskDialog from "../components/AddTaskDialog";
 import SendEmailDialog from "../components/SendEmailDialog";
 import OutcomeFeedback from "../components/lead-detail/OutcomeFeedback";
+import RelevanceSection from "../components/lead-detail/RelevanceSection";
 import { toast } from "sonner";
 import moment from "moment";
 import { useRef } from "react";
@@ -49,6 +50,7 @@ export default function LeadDetail() {
   const [currentUser, setCurrentUser] = useState(null);
   const [orgId, setOrgId] = useState(null);
   const [orgOwnerEmail, setOrgOwnerEmail] = useState(null);
+  const [learnedSignals, setLearnedSignals] = useState(null);
 
   useEffect(() => { loadData(); }, [id]);
 
@@ -68,11 +70,13 @@ export default function LeadDetail() {
       setOrgId(orgId);
       setOrgOwnerEmail(org?.owner_email || null);
 
-      const [comp, logs, allTasks] = await Promise.all([
+      const [comp, logs, allTasks, signals] = await Promise.all([
         base44.entities.Company.filter({ id, organization_id: orgId }),
         base44.entities.ContactLog.filter({ company_id: id, organization_id: orgId }),
         base44.entities.Task.filter({ company_id: id, organization_id: orgId }),
+        base44.entities.OrgLearnedSignals.filter({ organization_id: orgId }, '-updated_date', 1),
       ]);
+      setLearnedSignals(signals?.[0] || null);
 
       if (!comp || comp.length === 0) {
         toast.error("Lead nicht gefunden oder kein Zugriff");
@@ -550,6 +554,11 @@ export default function LeadDetail() {
 
         {/* ── RECHTE SPALTE: Nächste beste Aktion + Aufgaben + Engine ── */}
         <div className="space-y-4">
+
+          {/* Warum dieser Lead? */}
+          {company.matched_target_customer_type && (
+            <RelevanceSection company={company} learnedSignals={learnedSignals} />
+          )}
 
           {/* Aufgaben / Nächste Aktionen */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">

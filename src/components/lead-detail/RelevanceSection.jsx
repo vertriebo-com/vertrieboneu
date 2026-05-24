@@ -1,6 +1,6 @@
-import { Target, MapPin, Sparkles, CheckCircle2 } from "lucide-react";
+import { Target, MapPin, Sparkles, Brain } from "lucide-react";
 
-export default function RelevanceSection({ company }) {
+export default function RelevanceSection({ company, learnedSignals }) {
   if (!company) return null;
 
   // Relevanz-Infos aus Company extrahieren
@@ -61,6 +61,21 @@ export default function RelevanceSection({ company }) {
           </div>
         </div>
       </div>
+
+      {/* Violetter "Warum priorisiert?" Hinweis - nur wenn Learning aktiv */}
+      {learnedSignals && (learnedSignals.total_outcomes_analyzed || 0) >= 5 && company.matched_target_customer_type && (
+        <div className="mt-3 flex items-start gap-2.5 p-3 bg-violet-50 border border-violet-200 rounded-lg">
+          <div className="w-6 h-6 rounded-md bg-violet-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Brain className="w-3.5 h-3.5 text-violet-600" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-violet-900">Warum priorisiert?</p>
+            <p className="text-xs text-violet-700 mt-0.5 leading-relaxed">
+              Vertriebo hat gelernt, dass <span className="font-semibold">{company.matched_target_customer_type}</span> zu Ihren erfolgreichsten Zielkunden gehört – basierend auf {learnedSignals.total_outcomes_analyzed} Rückmeldungen.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

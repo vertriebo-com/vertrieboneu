@@ -1,5 +1,6 @@
 import { base44 } from "@/api/base44Client";
 import { Link, useNavigate } from "react-router-dom";
+import LearningLoopBox from "@/components/dashboard/LearningLoopBox";
 import { useLeadsFilter } from "../hooks/useLeadsFilter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
@@ -105,6 +106,18 @@ export default function Dashboard() {
         setDisplayName(authName || "");
       });
   }, [orgData?.id, dashboardData?.user?.full_name]);
+
+  // OrgLearnedSignals für LearningLoopBox
+  const { data: learnedSignals } = useQuery({
+    queryKey: ["learned-signals", activeOrg?.id],
+    queryFn: async () => {
+      if (!activeOrg?.id) return null;
+      const res = await base44.entities.OrgLearnedSignals.filter({ organization_id: activeOrg.id }, '-updated_date', 1);
+      return res?.[0] || null;
+    },
+    enabled: !!activeOrg?.id,
+    staleTime: 60000,
+  });
 
   // Skeleton solange: org lädt, query lädt, oder query enabled aber dashboardData noch null (erster Load)
   const isFirstLoad = orgLoading || isLoading || (!activeOrg?.id) || (!!activeOrg?.id && !dashboardData && !error);
@@ -381,6 +394,9 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Learning Loop Box */}
+      <LearningLoopBox learnedSignals={learnedSignals} />
 
       {/* Usage-Info aus usage_summary */}
       {(() => {
