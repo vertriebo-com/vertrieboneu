@@ -65,6 +65,7 @@ Deno.serve(async (req) => {
 
     // ── 3. TaxonomyEntry laden ───────────────────────────────────────────────
     let taxonomyProfile = null;
+    let taxonomyLoadError = null;
     try {
       const taxRecords = await base44.asServiceRole.entities.TaxonomyEntry.filter({ 
         industry_id: industryId, 
@@ -82,7 +83,8 @@ Deno.serve(async (req) => {
         };
       }
     } catch (taxErr) {
-      console.warn('[generateKeywordSuggestions] Taxonomie-Ladefehler:', taxErr.message);
+      taxonomyLoadError = taxErr instanceof Error ? taxErr.message : String(taxErr);
+      console.warn('[generateKeywordSuggestions] Taxonomie-Ladefehler:', taxonomyLoadError);
     }
 
     if (!taxonomyProfile) {
@@ -95,6 +97,7 @@ Deno.serve(async (req) => {
 
     // ── 4. OrgLearnedSignals laden (bereits gelernte Keywords) ───────────────
     let learnedSignals = null;
+    let learnedLoadError = null;
     try {
       const learnedRecords = await base44.asServiceRole.entities.OrgLearnedSignals.filter({ 
         organization_id: orgId 
@@ -102,7 +105,10 @@ Deno.serve(async (req) => {
       if (learnedRecords[0]) {
         learnedSignals = learnedRecords[0];
       }
-    } catch {}
+    } catch (learnedErr) {
+      learnedLoadError = learnedErr instanceof Error ? learnedErr.message : String(learnedErr);
+      console.warn('[generateKeywordSuggestions] OrgLearnedSignals-Ladefehler:', learnedLoadError);
+    }
 
     // ── 5. Bestehende KeywordProfile laden (Duplikate vermeiden) ─────────────
     const existingProfiles = await base44.asServiceRole.entities.OrganizationKeywordProfile.filter({ 
@@ -207,7 +213,10 @@ Deno.serve(async (req) => {
             }
           });
         }
-      } catch {}
+      } catch (parseErr) {
+        const parseError = parseErr instanceof Error ? parseErr.message : String(parseErr);
+        console.warn('[generateKeywordSuggestions] Boosted-Keywords-Parsefehler:', parseError);
+      }
     }
 
     // ── 7. Duplikate entfernen und nach priority_score sortieren ────────────
@@ -261,7 +270,8 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('[generateKeywordSuggestions] Error:', error.message);
-    return Response.json({ error: error.message, success: false }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[generateKeywordSuggestions] Error:', errorMessage, error instanceof Error ? error.stack : undefined);
+    return Response.json({ error: errorMessage, success: false }, { status: 500 });
   }
 });
