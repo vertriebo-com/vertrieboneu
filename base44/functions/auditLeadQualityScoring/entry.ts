@@ -659,13 +659,15 @@ Deno.serve(async (req) => {
       results.industry_results.push(industryResult);
     }
 
-    // ── Zusammenfassung ─────────────────────────────────────────────────────
-    const totalTests = results.candidates_tested + results.industries_tested;
-    const passedTests = results.scenarios.good_fit_saved + 
-                        results.scenarios.bad_fit_rejected + 
-                        results.scenarios.chains_detected + 
-                        results.scenarios.diagnostics_valid + 
-                        results.scenarios.queries_valid;
+    // ── Zusammenfassung (alle TestResult-Objekte zählen) ────────────────────
+    // Zählt alle Tests direkt aus results.tests[] für korrekte Pass-Rate
+    const allTests = results.tests.flat();
+    const totalTests = allTests.length;
+    
+    const passedTests = allTests.filter(t => t.status === 'pass').length;
+    const failedTests = allTests.filter(t => t.status === 'fail' || t.status === 'error').length;
+    const skippedTests = allTests.filter(t => t.status === 'skipped').length;
+    const warningTests = allTests.filter(t => t.status === 'warning').length;
     
     const passRate = totalTests > 0 ? (passedTests / totalTests) * 100 : 0;
 
@@ -674,9 +676,9 @@ Deno.serve(async (req) => {
       pass_rate: Math.round(passRate),
       total_tests: totalTests,
       passed: passedTests,
-      failed: results.failed_tests.length,
-      skipped: results.skipped.length,
-      warnings: results.warnings.length,
+      failed: failedTests,
+      skipped: skippedTests,
+      warnings: warningTests + results.warnings.length,
       key_metrics: results.scenarios,
     };
 
