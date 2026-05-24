@@ -532,6 +532,32 @@ Deno.serve(async (req) => {
 
     // ── Learning Loop anwenden (wenn genug Outcomes vorhanden) ───────────────
     let boostedKeywordsForPlan = [];
+    
+    // ── KeywordProfile IMMER anwenden (Phase 2) ───────────────────────────────
+    // Active Keywords: Zu targetCustomerTypes hinzufügen (unabhängig vom Learning)
+    if (activeKeywords.length > 0) {
+      const existingLower = new Set(targetCustomerTypes.map(t => t.toLowerCase()));
+      const newActiveKeywords = activeKeywords.filter(kw => 
+        kw && !existingLower.has(kw.toLowerCase())
+      );
+      if (newActiveKeywords.length > 0) {
+        targetCustomerTypes = [...targetCustomerTypes, ...newActiveKeywords];
+        console.info(`[startResearchRun] KeywordProfile: ${newActiveKeywords.length} active Keywords hinzugefügt: ${newActiveKeywords.join(', ')}`);
+      }
+    }
+    
+    // Blocked Keywords: Zu excludedCustomerTypes hinzufügen (unabhängig vom Learning)
+    if (blockedKeywords.length > 0) {
+      const blockedFromProfile = blockedKeywords.filter(kw => 
+        kw && !excludedCustomerTypes.map(e => e.toLowerCase()).includes(kw.toLowerCase())
+      );
+      if (blockedFromProfile.length > 0) {
+        excludedCustomerTypes = [...excludedCustomerTypes, ...blockedFromProfile];
+        console.info(`[startResearchRun] KeywordProfile: ${blockedFromProfile.length} Keywords ausgeschlossen (blocked/reduced): ${blockedFromProfile.join(', ')}`);
+      }
+    }
+    
+    // Learning Loop (nur wenn >= 5 Outcomes)
     if (learningApplied) {
       // 1. targetCustomerTypes nach priority_categories sortieren
       //    Gelernte Prioritäts-Kategorien kommen nach vorne
@@ -585,18 +611,7 @@ Deno.serve(async (req) => {
         console.info(`[startResearchRun] Learning: boostedKeywords aus Signals (${learningWeightLevel}): ${boostedKeywordsForPlan.join(', ')}`);
       }
 
-      // 3. excluded_categories zu excludedCustomerTypes hinzufügen
-      //    JETZT: blockedKeywords aus KeywordProfile + learned excluded
-      if (blockedKeywords.length > 0) {
-        const blockedFromProfile = blockedKeywords.filter(kw => 
-          !excludedCustomerTypes.map(e => e.toLowerCase()).includes(kw.toLowerCase())
-        );
-        if (blockedFromProfile.length > 0) {
-          excludedCustomerTypes = [...excludedCustomerTypes, ...blockedFromProfile];
-          console.info(`[startResearchRun] KeywordProfile: ${blockedFromProfile.length} Keywords ausgeschlossen (blocked/reduced)`);
-        }
-      }
-      
+      // 3. excluded_categories zu excludedCustomerTypes hinzufügen (Learning)
       if (learnedExcludedCategories.length > 0) {
         const excludedFromLearning = learnedExcludedCategories
           .map(c => c.category || c)
