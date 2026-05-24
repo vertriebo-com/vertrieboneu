@@ -445,16 +445,99 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
+    // ── OrgLearnedSignals laden ──────────────────────────────────────────────
+    // Learning Loop: Nutzerverhalten (LeadOutcome) fließt in Suchplanung ein.
+    // Mindestdaten-Regel: < 5 Outcomes → nur speichern, nicht priorisieren
+    //                      5–14 Outcomes → leichte Gewichtung
+    //                     15+ Outcomes → stärkere Gewichtung
+    let learnedSignals = null;
+    let learningApplied = false;
+    let learningWeightLevel = 'none';
+    let learningTotalOutcomes = 0;
+    let learnedPriorityCategories = [];
+    let learnedBoostedKeywords = [];
+    let learnedExcludedCategories = [];
+
+    try {
+      const learnedRecords = await base44.asServiceRole.entities.OrgLearnedSignals.filter({ organization_id }, '-updated_date', 1);
+      if (learnedRecords[0]) {
+        const rec = learnedRecords[0];
+        learningTotalOutcomes = rec.total_outcomes_analyzed || 0;
+        learnedPriorityCategories = rec.priority_categories ? JSON.parse(rec.priority_categories) : [];
+        learnedBoostedKeywords = rec.boosted_keywords ? JSON.parse(rec.boosted_keywords) : [];
+        learnedExcludedCategories = rec.excluded_categories ? JSON.parse(rec.excluded_categories) : [];
+
+        // Gewichtungsstufe bestimmen
+        if (learningTotalOutcomes >= 15) {
+          learningWeightLevel = 'strong';
+          learningApplied = true;
+        } else if (learningTotalOutcomes >= 5) {
+          learningWeightLevel = 'light';
+          learningApplied = true;
+        } else {
+          learningWeightLevel = 'none';
+          learningApplied = false; // < 5 Outcomes: speichern aber nicht anwenden
+        }
+        learnedSignals = rec;
+        console.info(`[startResearchRun] LearnedSignals: outcomes=${learningTotalOutcomes} weight=${learningWeightLevel} priorityCats=${learnedPriorityCategories.length} boostedKW=${learnedBoostedKeywords.length} excludedCats=${learnedExcludedCategories.length}`);
+      }
+    } catch (learningErr) {
+      console.warn(`[startResearchRun] OrgLearnedSignals Ladefehler (non-blocking): ${learningErr?.message}`);
+    }
+
     // ── Target Customer Types: Settings ODER Taxonomie-Fallback ─────────────
     // WICHTIG: Wenn Settings leer → Taxonomie-Profil als Fallback nutzen
     // Verhindert "Keine Suchkategorien"-Fehler bei unvollständigem Onboarding
     let targetCustomerTypes = (settings.target_customer_types || settings.zielkunden || '').split(/,|, /).map(x => x.trim()).filter(Boolean);
-    const excludedCustomerTypes = (settings.excluded_customer_types || settings.zielkunden_ausschluss || '').split(/,|, /).map(x => x.trim()).filter(Boolean);
+    let excludedCustomerTypes = (settings.excluded_customer_types || settings.zielkunden_ausschluss || '').split(/,|, /).map(x => x.trim()).filter(Boolean);
     
     // Fallback: Wenn Settings leer → Taxonomie-Profil nutzen (JETZT SICHER: taxonomyProfile ist geladen)
     if (targetCustomerTypes.length === 0 && taxonomyProfile?.target_customer_types?.length > 0) {
       targetCustomerTypes = taxonomyProfile.target_customer_types.slice(0, 5); // Max 5 für initiale Suche
       console.info(`[startResearchRun] Fallback: targetCustomerTypes aus Taxonomie (${targetCustomerTypes.length})`);
+    }
+
+    // ── Learning Loop anwenden (wenn genug Outcomes vorhanden) ───────────────
+    let boostedKeywordsForPlan = [];
+    if (learningApplied) {
+      // 1. targetCustomerTypes nach priority_categories sortieren
+      //    Gelernte Prioritäts-Kategorien kommen nach vorne
+      if (learnedPriorityCategories.length > 0) {
+        const prioritySet = new Set(learnedPriorityCategories.map(c => (c.category || c).toLowerCase()));
+        const prioritized = targetCustomerTypes.filter(t => prioritySet.has(t.toLowerCase()));
+        const rest = targetCustomerTypes.filter(t => !prioritySet.has(t.toLowerCase()));
+        // Für "strong": gelernte Kategorien zusätzlich hinzufügen wenn noch nicht vorhanden
+        const extraCats = learningWeightLevel === 'strong'
+          ? learnedPriorityCategories
+              .map(c => c.category || c)
+              .filter(c => !targetCustomerTypes.map(t => t.toLowerCase()).includes(c.toLowerCase()))
+              .slice(0, 2)
+          : [];
+        targetCustomerTypes = [...prioritized, ...extraCats, ...rest];
+        console.info(`[startResearchRun] Learning: targetCustomerTypes neu sortiert (${learningWeightLevel}): ${targetCustomerTypes.slice(0,3).join(', ')}`);
+      }
+
+      // 2. boosted_keywords als zusätzliche Suchbegriffe aufnehmen
+      if (learnedBoostedKeywords.length > 0) {
+        const maxKW = learningWeightLevel === 'strong' ? 3 : 2;
+        boostedKeywordsForPlan = learnedBoostedKeywords
+          .map(k => k.keyword || k)
+          .filter(Boolean)
+          .slice(0, maxKW);
+        console.info(`[startResearchRun] Learning: boostedKeywords aufgenommen: ${boostedKeywordsForPlan.join(', ')}`);
+      }
+
+      // 3. excluded_categories zu excludedCustomerTypes hinzufügen
+      //    Nur wenn total >= 3 und not_relevant > 60% (bereits durch processLeadOutcomeFeedback gefiltert)
+      if (learnedExcludedCategories.length > 0) {
+        const excludedFromLearning = learnedExcludedCategories
+          .map(c => c.category || c)
+          .filter(c => c && !excludedCustomerTypes.map(e => e.toLowerCase()).includes(c.toLowerCase()));
+        if (excludedFromLearning.length > 0) {
+          excludedCustomerTypes = [...excludedCustomerTypes, ...excludedFromLearning];
+          console.info(`[startResearchRun] Learning: ${excludedFromLearning.length} Kategorien ausgeschlossen`);
+        }
+      }
     }
 
     // ── Koordinaten auflösen ─────────────────────────────────────────────────
@@ -603,7 +686,7 @@ Deno.serve(async (req) => {
       console.warn(`[startResearchRun] LocationIndex inline Fehler (non-blocking): ${coverageErr?.message} → fallback grid_only`);
     }
 
-    // ── Suchplan zusammenbauen (Taxonomie-Profil + LocationIndex eingebettet) ─
+    // ── Suchplan zusammenbauen (Taxonomie-Profil + LocationIndex + Learning eingebettet) ─
     const searchPlanData = {
       industry,
       industryId,
@@ -629,6 +712,13 @@ Deno.serve(async (req) => {
       coveredLocationsTotal,
       selectedLocationsCount,
       locationSource: 'LocationIndex',
+      // ── Learning Loop Transparenz ──────────────────────────────────────────
+      learning_applied: learningApplied,
+      learning_weight_level: learningWeightLevel,
+      learning_total_outcomes: learningTotalOutcomes,
+      learned_priority_categories: learnedPriorityCategories,
+      learned_boosted_keywords: boostedKeywordsForPlan,
+      learned_excluded_categories: learnedExcludedCategories,
     };
 
     // ── ResearchRun erstellen ────────────────────────────────────────────────

@@ -69,7 +69,7 @@ const FEATURES = [
 { icon: Mail, title: "E-Mails & Follow-ups", desc: "E-Mail-Vorlagen mit Ihrem Logo und Signatur, automatische Aufgaben und Follow-up-Erinnerungen – von Erstansprache bis Nachfassen alles organisiert.", accent: "purple" },
 { icon: BarChart3, title: "Vertriebssteuerung & Auswertung", desc: "Sehen Sie Fortschritt, offene Aufgaben, Aktivität und Ergebnisse Ihres Vertriebs auf einen Blick.", accent: "indigo" },
 { icon: Layout, title: "Alles leicht bedienbar", desc: "Keine komplizierte CRM-Einrichtung. Zielgebiet festlegen, Kontakte recherchieren, losarbeiten.", accent: "slate" },
-{ icon: Brain, title: "System das mitlernt", desc: "Je mehr Sie nutzen, desto besser wird Vertriebo. Erfolgreiche Branchen werden automatisch priorisiert.", accent: "orange" },
+{ icon: Brain, title: "System das mitlernt", desc: "Je mehr Sie nutzen, desto besser wird Vertriebo. Erfolgreiche Zielgruppen und Suchkategorien werden stärker berücksichtigt.", accent: "orange" },
 { icon: BarChart3, title: "Echtzeit-Erfolgsquoten", desc: "Sehen Sie sofort, wie Ihr Vertrieb läuft: Kontaktquote, beste Branchen, ROI der Recherche.", accent: "rose" }];
 
 const ACCENT_COLORS = {
