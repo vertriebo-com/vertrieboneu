@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Mail, ArrowLeft, Copy, ExternalLink, CheckCircle2, Loader2 } from "lucide-react";
+import { Mail, ArrowLeft, Copy, ExternalLink, CheckCircle2, Loader2, CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
 import { TEMPLATES, dbTemplateToRuntimeTemplate, buildSignature } from "./emailTemplates";
 
@@ -32,6 +32,7 @@ function EmailEditor({ tpl, company, orgId, fromName, orgSettings, onBack, onDon
   const [bodyPlain, setBodyPlain] = useState(() => stripHtml(tpl.body(company, { orgSettings })));
   const [copied, setCopied] = useState(false);
   const [documenting, setDocumenting] = useState(false);
+  const [createFollowup, setCreateFollowup] = useState(true);
 
   useEffect(() => {
     const html = tpl.body(company, { datum, uhrzeit, notiz, orgSettings });
@@ -105,7 +106,41 @@ function EmailEditor({ tpl, company, orgId, fromName, orgSettings, onBack, onDon
       await base44.entities.Company.update(company.id, {
         last_contact_date: new Date().toISOString(),
       });
-      toast.success("Kontakt dokumentiert ✓");
+
+      // Optional: Follow-up-Aufgabe erstellen (nur wenn keine offene Nachfassen-Task existiert)
+      if (createFollowup) {
+        const existingTasks = await base44.entities.Task.filter({ company_id: company.id, organization_id: orgIdForLog });
+        const hasOpenFollowup = existingTasks.some(t =>
+          !t.erledigt && (t.typ === 'Nachfassen' || (t.titel || '').toLowerCase().includes('nachfassen'))
+        );
+        if (!hasOpenFollowup) {
+          // 3 Werktage voraus berechnen
+          const due = new Date();
+          let daysAdded = 0;
+          while (daysAdded < 3) {
+            due.setDate(due.getDate() + 1);
+            const day = due.getDay();
+            if (day !== 0 && day !== 6) daysAdded++; // Wochenenden überspringen
+          }
+          await base44.entities.Task.create({
+            organization_id: orgIdForLog,
+            company_id: company.id,
+            company_name: company.name,
+            titel: `E-Mail nachfassen – ${betreff}`,
+            beschreibung: `Follow-up zur E-Mail (Vorlage: ${tpl.label})`,
+            typ: 'Nachfassen',
+            prioritaet: 'Mittel',
+            faellig_am: due.toISOString(),
+            erledigt: false,
+            assigned_to: me.email,
+          });
+          toast.success("Kontakt dokumentiert + Follow-up-Aufgabe erstellt ✓");
+        } else {
+          toast.success("Kontakt dokumentiert ✓ (Follow-up-Aufgabe bereits vorhanden)");
+        }
+      } else {
+        toast.success("Kontakt dokumentiert ✓");
+      }
       onDone();
     } catch (e) {
       toast.error("Fehler beim Dokumentieren: " + e.message);
@@ -187,6 +222,21 @@ function EmailEditor({ tpl, company, orgId, fromName, orgSettings, onBack, onDon
           </>
         )}
       </div>
+
+      {/* Follow-up Checkbox */}
+      <label className="flex items-center gap-2.5 cursor-pointer select-none bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+        <input
+          type="checkbox"
+          checked={createFollowup}
+          onChange={e => setCreateFollowup(e.target.checked)}
+          className="w-4 h-4 accent-blue-600 cursor-pointer"
+        />
+        <div>
+          <span className="text-sm font-semibold text-blue-900">Follow-up-Aufgabe in 3 Werktagen erstellen</span>
+          <p className="text-[11px] text-blue-700 mt-0.5">Wird nur erstellt wenn noch keine offene Nachfassen-Aufgabe existiert.</p>
+        </div>
+        <CalendarPlus className="w-4 h-4 text-blue-500 shrink-0 ml-auto" />
+      </label>
 
       {/* Actions */}
       <div className="border-t border-slate-200 pt-4 space-y-2">
@@ -271,6 +321,7 @@ export default function SendEmailDialog({ company }) {
           services: map.services || map.dienstleistungen || '',
           targetCustomerTypes: map.target_customer_types || map.zielkunden || '',
           industryName: map.industry_name || '',
+          logoUrl: map.email_logo_url || '',
         });
 
         // Canonical Keys bevorzugen, Legacy-Fallbacks für Rückwärtskompatibilität

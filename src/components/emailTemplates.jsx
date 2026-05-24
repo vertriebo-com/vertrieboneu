@@ -45,6 +45,14 @@ function getServiceContext(c) {
   return c?.matched_service_context || null;
 }
 
+// ─── Logo Header helper ───────────────────────────────────────────────────────
+export function buildLogoHeader(logoUrl) {
+  if (!logoUrl) return "";
+  return `<div style="text-align:center;padding:20px 0 12px;">
+  <img src="${logoUrl}" alt="Logo" style="max-height:56px;max-width:220px;object-fit:contain;" />
+</div>`;
+}
+
 // ─── Static fallback TEMPLATES (industry-aware) ───────────────────────────────
 // These are used when an org has no EmailTemplate records yet.
 export const TEMPLATES = [
@@ -63,7 +71,7 @@ export const TEMPLATES = [
         : serviceText
         ? `ich möchte mich kurz vorstellen und fragen, ob unser Angebot im Bereich <strong>${serviceText}</strong> für Sie passt.`
         : `ich möchte mich kurz bei Ihnen vorstellen und fragen, ob wir für Sie eine passende Dienstleistung anbieten können.`;
-      return `
+      return `${buildLogoHeader(extra?.orgSettings?.logoUrl)}
 <p style="margin:0 0 18px;font-size:15px;font-weight:700;color:#111827;">Sehr geehrte${c?.ansprechpartner ? " " + c.ansprechpartner : " Damen und Herren"},</p>
 <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.8;">${intro}</p>
 <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.8;">
