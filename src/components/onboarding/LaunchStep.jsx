@@ -43,7 +43,7 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
 
   // Polling + Processing for research run
   // LaunchStep muss SELBST processResearchRun aufrufen da ActiveResearchBanner im Onboarding nicht gemountet ist
-  // ABER: onLaunch wird nur aufgerufen wenn User im Onboarding bleibt (nicht bei vorzeitigem Redirect)
+  // WICHTIG: Polling nur für UI-Feedback wenn User NOCH im Onboarding ist (nicht nach redirect)
   useEffect(() => {
     if (!researchRunId || isDone) return;
 
@@ -61,9 +61,14 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
           const data = status.data;
           if (data) {
             setProgress(data.progress_percent || 0);
-            setMessage(data.current_step || 'Recherche läuft...');
+            setMessage(data.progress_percent > 0 ? data.progress_percent : 5);
             setLeadsFound(data.leads_saved || 0);
             setRunStatus(data.status);
+            
+            // Message nur updaten wenn nicht schon "Wir öffnen das Dashboard…"
+            if (!message.includes('öffnet das Dashboard')) {
+              setMessage(data.current_step || 'Recherche läuft...');
+            }
 
             // Check if done → onLaunch aufrufen (nur wenn User noch im Onboarding ist)
             if (data.done || ['completed', 'partial', 'failed'].includes(data.status)) {
@@ -135,12 +140,21 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
         target_count: FIRST_VALUE_TARGET_COUNT,
       });
       
-      if (run.data?.research_run_id) {
-        // SOFORT: run_id vorhanden → Onboarding ruft handleLaunch auf welches sofort ins Dashboard navigiert
-        setResearchRunId(run.data.research_run_id);
-        setMessage('Recherche wird gestartet…');
-        // Nicht warten bis processResearchRun fertig ist!
-        // Polling im Hintergrund weiterlaufen lassen für UI-Feedback
+      const runId = run.data?.research_run_id;
+      if (runId) {
+        // SOFORT: Nach erfolgreichem startResearchRun → onLaunch aufrufen für sofortigen Dashboard-Redirect
+        setResearchRunId(runId);
+        setMessage('Recherche wurde gestartet. Wir öffnen das Dashboard…');
+        
+        // onLaunch mit minimalen Daten → handleLaunch navigiert sofort ins Dashboard
+        onLaunch({
+          research_run_id: runId,
+          status: 'queued',
+          leads_saved: 0,
+          research_started: true
+        });
+        // Nicht zurücksetzen! onLaunch macht die Navigation
+        return;
       } else {
         const reason = run.data?.reason || run.data?.error || '';
         const monthly = run.data?.monthly_usage;
