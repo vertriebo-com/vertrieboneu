@@ -1,5 +1,27 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+// Generische Begriffe die keine Keyword-Qualität haben
+const GENERIC_TERMS = new Set([
+  'dienstleister', 'firma', 'unternehmen', 'gmbh', 'service', 'deutschland',
+  'unbekannt', 'sonstiges', 'betrieb', 'gesellschaft', 'co', 'kg', 'ag',
+  'holding', 'gruppe', 'verbund', 'team', 'büro', 'office', 'ug'
+]);
+
+function isGenericTerm(kw) {
+  if (!kw || kw.trim().length < 3) return true;
+  const lower = kw.trim().toLowerCase();
+  return GENERIC_TERMS.has(lower);
+}
+
+function normalizeKeyword(kw) {
+  if (!kw) return null;
+  // Saubere Normalisierung: trim, max 60 Zeichen, kein reiner Zahlen-String
+  const cleaned = kw.trim().slice(0, 60);
+  if (!cleaned || /^\d+$/.test(cleaned)) return null;
+  if (isGenericTerm(cleaned)) return null;
+  return cleaned;
+}
+
 // ── Hilfsfunktion: Feedback für eine einzelne Organisation verarbeiten ──
 async function processFeedbackForOrg(base44, organization_id) {
   // Alle Outcomes dieser Organisation laden
@@ -24,38 +46,58 @@ async function processFeedbackForOrg(base44, organization_id) {
 
   // ── Kategorie-Stats, Keywords, Signals ──────────────────────────
   const categoryStats = {};
-  const keywordWins = {};
+  // keyword → { won_count, relevant_count, not_relevant_count, total_count, last_seen_at }
+  const keywordStats = {};
   const signalWins = {};
 
   for (const outcome of outcomes) {
     const company = companyMap[outcome.company_id];
     if (!company) continue;
 
-    const category = company.matched_search_category || company.source_query || null;
-    const keyword = company.source_query || null;
-    const signals = (company.relevance_reason || '').split(' | ');
+    const otype = outcome.outcome_type; // 'won' | 'relevant' | 'not_relevant'
+    const now = outcome.created_date || new Date().toISOString();
 
-    // Kategorie-Stats
+    // ── Kategorie für Ausschluss/Priorisierung ──
+    const category = company.matched_search_category || company.matched_target_customer_type || company.source_query || null;
     if (category) {
       if (!categoryStats[category]) {
         categoryStats[category] = { won: 0, relevant: 0, not_relevant: 0, total: 0 };
       }
       categoryStats[category].total++;
-      if (outcome.outcome_type === 'won') categoryStats[category].won++;
-      else if (outcome.outcome_type === 'relevant') categoryStats[category].relevant++;
-      else if (outcome.outcome_type === 'not_relevant') categoryStats[category].not_relevant++;
+      if (otype === 'won') categoryStats[category].won++;
+      else if (otype === 'relevant') categoryStats[category].relevant++;
+      else if (otype === 'not_relevant') categoryStats[category].not_relevant++;
     }
 
-    // Keywords die zu Abschlüssen geführt haben
-    if (keyword && outcome.outcome_type === 'won') {
-      keywordWins[keyword] = (keywordWins[keyword] || 0) + 1;
+    // ── Keyword-Quellen sammeln ──
+    const rawKeywords = [];
+    if (company.source_query) rawKeywords.push(company.source_query);
+    if (company.matched_target_customer_type) rawKeywords.push(company.matched_target_customer_type);
+    if (company.matched_search_category && company.matched_search_category !== company.source_query) rawKeywords.push(company.matched_search_category);
+    // branche nur wenn nicht generisch
+    if (company.branche && company.branche !== company.matched_target_customer_type) rawKeywords.push(company.branche);
+
+    for (const rawKw of rawKeywords) {
+      const kw = normalizeKeyword(rawKw);
+      if (!kw) continue;
+
+      if (!keywordStats[kw]) {
+        keywordStats[kw] = { won_count: 0, relevant_count: 0, not_relevant_count: 0, total_count: 0, last_seen_at: now };
+      }
+      keywordStats[kw].total_count++;
+      if (otype === 'won') keywordStats[kw].won_count++;
+      else if (otype === 'relevant') keywordStats[kw].relevant_count++;
+      else if (otype === 'not_relevant') keywordStats[kw].not_relevant_count++;
+      // last_seen_at = neuestes Datum
+      if (now > keywordStats[kw].last_seen_at) keywordStats[kw].last_seen_at = now;
     }
 
-    // Scoring-Signale die zu Abschlüssen geführt haben
-    if (outcome.outcome_type === 'won') {
+    // ── Scoring-Signale aus Abschlüssen ──
+    if (otype === 'won') {
+      const signals = (company.relevance_reason || '').split(' | ');
       for (const signal of signals) {
         const s = signal.replace('Signal: ', '').replace(/"/g, '').trim();
-        if (s && s.length > 2) {
+        if (s && s.length > 2 && !isGenericTerm(s)) {
           signalWins[s] = (signalWins[s] || 0) + 1;
         }
       }
@@ -63,7 +105,7 @@ async function processFeedbackForOrg(base44, organization_id) {
   }
 
   // ── Kategorie-Score berechnen ──────────────────────────────────
-  // Score 0-100: won=+3, relevant=+1, not_relevant=-2
+  // Score 0-100: Basis 50 + won×3 + relevant×1 - not_relevant×2
   const categoryScores = Object.entries(categoryStats).map(([cat, stats]) => ({
     category: cat,
     ...stats,
@@ -77,11 +119,27 @@ async function processFeedbackForOrg(base44, organization_id) {
     .filter(c => c.total >= 3 && (c.not_relevant / c.total) > 0.6)
     .map(c => c.category);
 
-  // ── Top-Keywords nach Abschlüssen ──────────────────────────────
-  const boostedKeywords = Object.entries(keywordWins)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([keyword, won_count]) => ({ keyword, won_count, source: 'outcome_won' }));
+  const badCategorySet = new Set(badCategories.map(c => c.toLowerCase()));
+
+  // ── Keyword-Scoring (won=+3, relevant=+1, not_relevant=-2) ─────
+  // Mindestbedingungen: total_count >= 2, score > 0, nicht generisch, nicht excluded
+  const boostedKeywords = Object.entries(keywordStats)
+    .map(([keyword, stats]) => {
+      const score = (stats.won_count * 3) + (stats.relevant_count * 1) - (stats.not_relevant_count * 2);
+      return {
+        keyword,
+        won_count: stats.won_count,
+        relevant_count: stats.relevant_count,
+        not_relevant_count: stats.not_relevant_count,
+        total_count: stats.total_count,
+        score,
+        source: 'outcome_feedback',
+        last_seen_at: stats.last_seen_at,
+      };
+    })
+    .filter(k => k.total_count >= 2 && k.score > 0 && !badCategorySet.has(k.keyword.toLowerCase()))
+    .sort((a, b) => b.score - a.score || b.won_count - a.won_count)
+    .slice(0, 15);
 
   // ── Winning Signals nach Abschlüssen ────────────────────────────
   const winningSignals = Object.entries(signalWins)
@@ -147,13 +205,13 @@ async function processFeedbackForOrg(base44, organization_id) {
       target_type: 'organization',
       target_id: organization_id,
       organization_id: organization_id,
-      reason: `Auto-ausgeschlossen: ${badCategories.join(', ')}`
+      reason: `Auto-ausgeschlossen: ${badCategories.join(', ')} | boosted_keywords: ${boostedKeywords.slice(0,3).map(k=>k.keyword).join(', ')}`
     });
   } catch (auditErr) {
     console.warn('[processLeadOutcomeFeedback] Audit-Log-Fehler:', auditErr.message);
   }
 
-  console.info(`[processLeadOutcomeFeedback] org=${organization_id} categories=${categoryScores.length} won=${Object.values(categoryStats).reduce((s,c)=>s+c.won,0)} excluded=${badCategories.length}`);
+  console.info(`[processLeadOutcomeFeedback] org=${organization_id} categories=${categoryScores.length} keywords=${boostedKeywords.length} won=${outcomes.filter(o=>o.outcome_type==='won').length} excluded=${badCategories.length}`);
 
   return {
     success: true,
@@ -161,6 +219,7 @@ async function processFeedbackForOrg(base44, organization_id) {
     categories_analyzed: categoryScores.length,
     bad_categories: badCategories,
     boosted_keywords: boostedKeywords.length,
+    boosted_keywords_preview: boostedKeywords.slice(0, 5).map(k => `${k.keyword} (score=${k.score})`),
     winning_signals: winningSignals.length,
     total_outcomes: outcomes.length
   };

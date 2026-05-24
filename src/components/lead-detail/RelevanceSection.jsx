@@ -1,14 +1,105 @@
-import { Target, MapPin, Sparkles, Brain } from "lucide-react";
+import { Target, MapPin, Sparkles, Brain, Search, TrendingDown } from "lucide-react";
 
+/**
+ * RelevanceSection
+ * Zeigt warum ein Lead gefunden wurde und – wenn Learning aktiv –
+ * konkrete Lernhinweise basierend auf boosted_keywords und priority_categories.
+ */
 export default function RelevanceSection({ company, learnedSignals }) {
   if (!company) return null;
 
-  // Relevanz-Infos aus Company extrahieren
   const targetCustomer = company.matched_target_customer_type || company.branche || "–";
   const reason = company.relevance_reason || "Automatisch gefunden";
-  const distance = company.distance_km !== null ? `${company.distance_km.toFixed(1)} km` : "–";
+  const distance = company.distance_km != null ? `${Number(company.distance_km).toFixed(1)} km` : "–";
   const searchArea = company.search_center_city || "–";
   const searchRadius = company.search_radius_km || 25;
+
+  // ── Learning-Analyse ──
+  const totalOutcomes = learnedSignals?.total_outcomes_analyzed || 0;
+  const learningActive = totalOutcomes >= 5;
+
+  let matchesPriorityCategory = false;
+  let matchedKeyword = null;
+  let matchedKeywordStats = null;
+  let isReducedCategory = false;
+
+  if (learningActive && learnedSignals) {
+    // Priority Categories prüfen
+    const priorityCats = (() => {
+      try { return JSON.parse(learnedSignals.priority_categories || "[]"); }
+      catch { return []; }
+    })();
+    const topCats = priorityCats.filter(c => c.score > 50 && (c.won > 0 || c.relevant > 0));
+    const tcLower = (company.matched_target_customer_type || '').toLowerCase();
+    matchesPriorityCategory = topCats.some(c => {
+      const catLower = (c.category || c).toLowerCase();
+      return tcLower && (catLower === tcLower || catLower.includes(tcLower) || tcLower.includes(catLower));
+    });
+
+    // Boosted Keywords prüfen (gegen source_query und matched_search_category)
+    const boostedKws = (() => {
+      try { return JSON.parse(learnedSignals.boosted_keywords || "[]"); }
+      catch { return []; }
+    })();
+    const sourceQuery = (company.source_query || '').toLowerCase();
+    const matchedCat = (company.matched_search_category || '').toLowerCase();
+
+    for (const kw of boostedKws) {
+      const kwLower = (kw.keyword || '').toLowerCase();
+      if (!kwLower) continue;
+      if (
+        (sourceQuery && (sourceQuery.includes(kwLower) || kwLower.includes(sourceQuery))) ||
+        (matchedCat && (matchedCat.includes(kwLower) || kwLower.includes(matchedCat)))
+      ) {
+        matchedKeyword = kw.keyword;
+        matchedKeywordStats = kw;
+        break;
+      }
+    }
+
+    // Excluded Categories prüfen
+    const excludedCats = (() => {
+      try { return JSON.parse(learnedSignals.excluded_categories || "[]"); }
+      catch { return []; }
+    })();
+    const brancheLower = (company.branche || '').toLowerCase();
+    isReducedCategory = excludedCats.some(c => {
+      const catLower = (c.category || c).toLowerCase();
+      return brancheLower && catLower && (catLower === brancheLower || brancheLower.includes(catLower));
+    });
+  }
+
+  // ── Learning-Hinweis zusammenbauen ──
+  let learningHint = null;
+  if (learningActive) {
+    if (matchesPriorityCategory && matchedKeyword) {
+      learningHint = {
+        text: `Diese Zielgruppe und der verwendete Suchbegriff „${matchedKeyword}" wurden in Ihrer Vergangenheit positiv bewertet.`,
+        type: 'double_match',
+      };
+    } else if (matchesPriorityCategory) {
+      learningHint = {
+        text: `Diese Zielgruppe wurde bereits positiv bewertet und wird deshalb stärker priorisiert.`,
+        type: 'category_match',
+      };
+    } else if (matchedKeyword) {
+      const stats = matchedKeywordStats;
+      const detail = stats?.won_count > 0
+        ? ` (${stats.won_count}× gewonnen)`
+        : stats?.relevant_count > 0
+          ? ` (${stats.relevant_count}× relevant)`
+          : '';
+      learningHint = {
+        text: `Der Suchbegriff „${matchedKeyword}"${detail} gehört zu Ihren stärkeren Mustern.`,
+        type: 'keyword_match',
+      };
+    } else if (isReducedCategory && !matchesPriorityCategory) {
+      learningHint = {
+        text: `Diese Kategorie wird aktuell vorsichtiger bewertet – sie wurde häufiger als weniger passend markiert.`,
+        type: 'reduced',
+      };
+    }
+  }
 
   return (
     <div className="bg-gradient-to-r from-blue-50 to-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
@@ -30,6 +121,16 @@ export default function RelevanceSection({ company, learnedSignals }) {
               <span className="text-xs font-medium text-blue-800 flex-shrink-0">Passt wegen:</span>
               <span className="text-sm text-blue-800 text-right leading-snug">{reason}</span>
             </div>
+
+            {/* Suchbegriff */}
+            {company.source_query && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-blue-800 flex items-center gap-1">
+                  <Search className="w-3 h-3" /> Suchbegriff:
+                </span>
+                <span className="text-xs font-semibold text-blue-900">{company.source_query}</span>
+              </div>
+            )}
 
             {/* Entfernung */}
             {distance !== "–" && (
@@ -62,16 +163,30 @@ export default function RelevanceSection({ company, learnedSignals }) {
         </div>
       </div>
 
-      {/* Violetter "Warum priorisiert?" Hinweis - nur wenn Learning aktiv */}
-      {learnedSignals && (learnedSignals.total_outcomes_analyzed || 0) >= 5 && company.matched_target_customer_type && (
-        <div className="mt-3 flex items-start gap-2.5 p-3 bg-violet-50 border border-violet-200 rounded-lg">
-          <div className="w-6 h-6 rounded-md bg-violet-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Brain className="w-3.5 h-3.5 text-violet-600" />
+      {/* ── Lernhinweis (spezifisch) ── */}
+      {learningHint && (
+        <div className={`mt-3 flex items-start gap-2.5 p-3 rounded-lg border ${
+          learningHint.type === 'reduced'
+            ? "bg-amber-50 border-amber-200"
+            : "bg-violet-50 border-violet-200"
+        }`}>
+          <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${
+            learningHint.type === 'reduced' ? "bg-amber-100" : "bg-violet-100"
+          }`}>
+            {learningHint.type === 'reduced'
+              ? <TrendingDown className="w-3.5 h-3.5 text-amber-600" />
+              : <Brain className="w-3.5 h-3.5 text-violet-600" />
+            }
           </div>
           <div>
-            <p className="text-xs font-bold text-violet-900">Warum priorisiert?</p>
-            <p className="text-xs text-violet-700 mt-0.5 leading-relaxed">
-              Vertriebo hat gelernt, dass <span className="font-semibold">{company.matched_target_customer_type}</span> zu Ihren erfolgreichsten Zielkunden gehört – basierend auf {learnedSignals.total_outcomes_analyzed} Rückmeldungen.
+            <p className={`text-xs font-bold ${learningHint.type === 'reduced' ? "text-amber-900" : "text-violet-900"}`}>
+              Warum priorisiert?
+            </p>
+            <p className={`text-xs mt-0.5 leading-relaxed ${learningHint.type === 'reduced' ? "text-amber-700" : "text-violet-700"}`}>
+              {learningHint.text}
+            </p>
+            <p className={`text-[10px] mt-1 ${learningHint.type === 'reduced' ? "text-amber-500" : "text-violet-500"}`}>
+              Basierend auf {totalOutcomes} Rückmeldungen · Vertriebo erkennt Muster aus Ihrem Feedback
             </p>
           </div>
         </div>

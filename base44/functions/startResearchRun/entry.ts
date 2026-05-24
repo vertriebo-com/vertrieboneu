@@ -518,13 +518,22 @@ Deno.serve(async (req) => {
       }
 
       // 2. boosted_keywords als zusätzliche Suchbegriffe aufnehmen
+      //    light → max 2, strong → max 5
       if (learnedBoostedKeywords.length > 0) {
-        const maxKW = learningWeightLevel === 'strong' ? 3 : 2;
+        const maxKW = learningWeightLevel === 'strong' ? 5 : 2;
+        const existingLower = new Set(targetCustomerTypes.map(t => t.toLowerCase()));
         boostedKeywordsForPlan = learnedBoostedKeywords
           .map(k => k.keyword || k)
           .filter(Boolean)
+          .filter(kw => !existingLower.has(kw.toLowerCase())) // Keine Duplikate zu bestehenden Zielkunden
           .slice(0, maxKW);
-        console.info(`[startResearchRun] Learning: boostedKeywords aufgenommen: ${boostedKeywordsForPlan.join(', ')}`);
+        // Boosted Keywords als zusätzliche targetCustomerTypes einfügen (am Ende, nach bestehenden)
+        // So generiert processResearchRun automatisch Queries dafür
+        const newTargets = boostedKeywordsForPlan.filter(kw => !existingLower.has(kw.toLowerCase()));
+        if (newTargets.length > 0) {
+          targetCustomerTypes = [...targetCustomerTypes, ...newTargets];
+        }
+        console.info(`[startResearchRun] Learning: boostedKeywords als Suchbegriffe aufgenommen (${learningWeightLevel}): ${boostedKeywordsForPlan.join(', ')}`);
       }
 
       // 3. excluded_categories zu excludedCustomerTypes hinzufügen
@@ -719,6 +728,8 @@ Deno.serve(async (req) => {
       learned_priority_categories: learnedPriorityCategories,
       learned_boosted_keywords: boostedKeywordsForPlan,
       learned_excluded_categories: learnedExcludedCategories,
+      boosted_queries_added: boostedKeywordsForPlan,
+      boosted_keywords_used_count: boostedKeywordsForPlan.length,
     };
 
     // ── ResearchRun erstellen ────────────────────────────────────────────────
