@@ -43,6 +43,7 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
 
   // Polling + Processing for research run
   // LaunchStep muss SELBST processResearchRun aufrufen da ActiveResearchBanner im Onboarding nicht gemountet ist
+  // ABER: onLaunch wird nur aufgerufen wenn User im Onboarding bleibt (nicht bei vorzeitigem Redirect)
   useEffect(() => {
     if (!researchRunId || isDone) return;
 
@@ -64,15 +65,15 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
             setLeadsFound(data.leads_saved || 0);
             setRunStatus(data.status);
 
-            // Check if done
+            // Check if done → onLaunch aufrufen (nur wenn User noch im Onboarding ist)
             if (data.done || ['completed', 'partial', 'failed'].includes(data.status)) {
-              if (isDone) return; // Verhindert doppelte onLaunch-Aufrufe
-              // Kundenfreundliche Meldung bei Kill-Switch (platform_disabled)
+              if (isDone) return;
               if (data.error === 'platform_disabled' || data.stop_reason === 'platform_config_kill_switch') {
                 setMessage('Die Recherche ist aktuell kurz nicht verfügbar. Bitte versuchen Sie es in wenigen Minuten erneut.');
               }
               setIsDone(true);
               polling = false;
+              // onLaunch nur wenn User nicht schon weitergeleitet wurde
               setTimeout(() => {
                 onLaunch(data);
               }, 1000);
@@ -109,7 +110,7 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
                 }
               } catch (processErr) {
                 console.warn('[LaunchStep] processResearchRun error:', processErr?.message);
-                // Weiter pollen, vielleicht übernimmt Banner später
+                // Weiter pollen, Banner übernimmt später
               }
             }
           }
@@ -135,8 +136,11 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
       });
       
       if (run.data?.research_run_id) {
+        // SOFORT: run_id vorhanden → Onboarding ruft handleLaunch auf welches sofort ins Dashboard navigiert
         setResearchRunId(run.data.research_run_id);
-        setMessage('Recherche wird vorbereitet...');
+        setMessage('Recherche wird gestartet…');
+        // Nicht warten bis processResearchRun fertig ist!
+        // Polling im Hintergrund weiterlaufen lassen für UI-Feedback
       } else {
         const reason = run.data?.reason || run.data?.error || '';
         const monthly = run.data?.monthly_usage;
@@ -145,7 +149,8 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
           setIsSearching(false);
         } else if (reason === 'research_run_already_active') {
           setIsSearching(false);
-          onLaunch({ error: 'Eine Recherche läuft bereits. Bitte warten Sie, bis diese abgeschlossen ist.' });
+          // Kein harter Fehler → onLaunch mit Info damit Dashboard mit Banner öffnet
+          onLaunch({ error: 'Eine Recherche läuft bereits. Wir zeigen Ihnen den Fortschritt im Dashboard.' });
         } else {
           setIsSearching(false);
           onLaunch({ error: run.data?.message || 'Recherche konnte nicht gestartet werden.' });
@@ -164,7 +169,7 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
         onLaunch({ error: 'Recherche gerade ausgelastet. Bitte in wenigen Minuten erneut versuchen.' });
       } else if (e?.response?.status === 409 || axiosData?.error === 'research_run_already_active') {
         setIsSearching(false);
-        onLaunch({ error: 'Eine Recherche läuft bereits. Bitte warten Sie, bis diese abgeschlossen ist.' });
+        onLaunch({ error: 'Eine Recherche läuft bereits. Wir zeigen Ihnen den Fortschritt im Dashboard.' });
       } else {
         setIsSearching(false);
         onLaunch({ error: 'Recherche konnte nicht gestartet werden. Bitte erneut versuchen.' });
@@ -355,11 +360,25 @@ export default function LaunchStep({ onBack, onLaunch, loading, organization, or
 
         <Button
           onClick={handleClick}
-          disabled={loading}
+          disabled={loading || isSearching}
           className="w-full gap-2 bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-5 h-5" />}
-          Erste Firmenkontakte finden
+          {isSearching && !researchRunId ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Recherche wird vorbereitet…
+            </>
+          ) : isSearching && researchRunId ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Recherche läuft im Hintergrund…
+            </>
+          ) : (
+            <>
+              <Zap className="w-5 h-5" />
+              Erste Firmenkontakte finden
+            </>
+          )}
         </Button>
 
         <p className="text-xs text-slate-500">Nach der Recherche sehen Sie sofort Ihre Leads im Dashboard.</p>

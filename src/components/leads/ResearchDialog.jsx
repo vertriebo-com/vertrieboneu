@@ -77,6 +77,8 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [errorInfo, setErrorInfo] = useState(null); // { type, title, message, resetDate }
   const [quotaHint, setQuotaHint] = useState(null); // { remaining, limit } – sanfter Hinweis wenn Kontingent knapp
+  const [startingTimeout, setStartingTimeout] = useState(false); // >3s waiting
+  const [startingLongWait, setStartingLongWait] = useState(false); // >10s waiting
 
   const pollRef = useRef(null);
   const processingRef = useRef(false);
@@ -111,9 +113,17 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
     setPhase("starting");
     setErrorMsg("");
     setErrorInfo(null);
+    setStartingTimeout(false);
+    setStartingLongWait(false);
+
+    // Timeout-UX: >3s und >10s Messages
+    const timeoutTimer = setTimeout(() => setStartingTimeout(true), 3000);
+    const longWaitTimer = setTimeout(() => setStartingLongWait(true), 10000);
 
     // Org-ID prüfen
     if (!orgId) {
+      clearTimeout(timeoutTimer);
+      clearTimeout(longWaitTimer);
       setErrorInfo({
         type: 'error',
         title: 'Keine Organisation gefunden',
@@ -129,6 +139,9 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
         target_count: 25,
       });
 
+      clearTimeout(timeoutTimer);
+      clearTimeout(longWaitTimer);
+
       if (!res?.data?.success) {
         const info = getFriendlyResearchError(null, res?.data);
         setErrorInfo(info);
@@ -138,8 +151,9 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
 
       const runId = res.data.research_run_id;
       setResearchRunId(runId);
+      // SOFORT: UI-Feedback dass Recherche läuft (optimistisch)
       setPhase("running");
-      setCurrentStep("Recherche wird gestartet…");
+      setCurrentStep("Suchauftrag wurde erstellt. Recherche läuft im Hintergrund…");
       setProgressPercent(5);
 
       // Wenn effectiveTarget < 25 (Kontingent war knapp) → sanften Hinweis setzen
@@ -149,10 +163,12 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
         setQuotaHint({ remaining: monthly.remaining, limit: monthly.monthly_limit });
       }
 
-      // Polling starten
+      // Polling starten (für Fortschrittsanzeige)
       startPolling(runId);
 
     } catch (err) {
+      clearTimeout(timeoutTimer);
+      clearTimeout(longWaitTimer);
       // Axios wirft bei 4xx/5xx – response.data enthält den strukturierten Backend-Body
       console.error("[ResearchDialog] Start error:", err?.message, err?.response?.data);
       const info = getFriendlyResearchError(err, err?.response?.data);
@@ -276,13 +292,34 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* STARTING: Kurzer Spinner */}
+          {/* STARTING: Kurzer Spinner mit Timeout-UX */}
           {isStarting && (
             <div className="flex flex-col items-center gap-3 py-6">
               <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
                 <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
               </div>
-              <p className="text-sm font-semibold text-slate-900">Recherche wird gestartet…</p>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-slate-900">
+                  {!startingLongWait ? 'Recherche wird vorbereitet…' : 'Die Anfrage dauert länger als erwartet. Bitte nicht erneut klicken.'}
+                </p>
+                {startingTimeout && !startingLongWait && (
+                  <p className="text-xs text-slate-600 mt-1">Wir bereiten Ihre Recherche vor. Das kann kurz dauern…</p>
+                )}
+                {startingLongWait && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      stopPolling();
+                      onClose?.();
+                      window.location.href = '/dashboard';
+                    }}
+                    className="mt-2 text-xs"
+                  >
+                    Im Dashboard prüfen
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -294,8 +331,17 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
                   <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-semibold text-slate-900">Recherche läuft im Hintergrund</div>
-                  <div className="text-xs text-slate-600 mt-1 leading-relaxed">{currentStep || "Firmenprofile werden gesucht…"}</div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {researchRunId ? 'Recherche läuft im Hintergrund' : 'Suchauftrag wird erstellt…'}
+                  </div>
+                  <div className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    {currentStep || (researchRunId ? "Firmenprofile werden gesucht…" : "Recherche wird vorbereitet…")}
+                  </div>
+                  {researchRunId && (
+                    <p className="text-xs text-emerald-700 font-medium mt-1">
+                      ✓ Neue Firmen erscheinen automatisch in Ihrer Leadliste
+                    </p>
+                  )}
                 </div>
               </div>
 

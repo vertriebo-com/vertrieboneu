@@ -190,7 +190,19 @@ export default function Onboarding() {
   const handleLaunch = async (researchResult) => {
     // researchResult comes from LaunchStep after research completes
     if (researchResult?.error) {
+      // "Eine Recherche läuft bereits" ist KEIN harter Fehler → Dashboard mit Banner
+      if (researchResult.error.includes('bereits')) {
+        toast.info(researchResult.error);
+        navigate("/dashboard?research_started=1");
+        return;
+      }
       toast.error("Recherche fehlgeschlagen: " + researchResult.error);
+      navigate("/dashboard");
+      return;
+    }
+
+    // QUOTA REACHED: Auch weiter zu Dashboard
+    if (researchResult?.quota_reached) {
       navigate("/dashboard");
       return;
     }
@@ -207,25 +219,16 @@ export default function Onboarding() {
       const status = researchResult?.status;
       const runId = researchResult?.research_run_id;
 
-      // Intelligentes Routing basierend auf Ergebnis
-      if (status === 'completed' || status === 'partial') {
-        if (leadsFound > 0) {
-          // ERFOLG: Zur Leadseite mit Filter auf neue Leads
-          toast.success(`${leadsFound} Firmenkontakte gefunden!`);
-          navigate(`/leads?new_run=${runId}`);
-        } else {
-          // 0 LEADS: Zur Leadseite mit Empty-State-Alternativen
-          toast.info('Keine passenden Firmen gefunden - bitte Suchgebiet anpassen');
-          navigate('/leads?onboarding_zero_leads=true');
-        }
-      } else if (status === 'failed') {
-        // FEHLER: Zur Leadseite mit Recovery-Optionen
-        toast.error('Recherche konnte nicht abgeschlossen werden');
-        navigate('/leads?onboarding_failed=true');
-      } else {
-        // DEFAULT: Dashboard
-        navigate("/dashboard");
+      // SOFORT: Nach erfolgreichem startResearchRun ins Dashboard (nicht warten bis Leads fertig!)
+      // processResearchRun läuft im Hintergrund weiter
+      if (runId) {
+        toast.success('Recherche gestartet! Wir zeigen Ihnen den Fortschritt im Dashboard.');
+        navigate(`/dashboard?research_started=1&run_id=${runId}`);
+        return;
       }
+
+      // Fallback: Wenn keine runId (sollte nicht passieren)
+      navigate("/dashboard");
     } catch (e) {
       toast.error("Fehler: " + e.message);
       navigate("/dashboard");
