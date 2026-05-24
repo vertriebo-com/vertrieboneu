@@ -710,7 +710,7 @@ Deno.serve(async (req) => {
     // ── PROCESSING LOCK (Run-Level) ───────────────────────────────────────────
     const lockUntil = run.processing_lock_until ? new Date(run.processing_lock_until).getTime() : 0;
     const lockBy = run.processing_by || null;
-    const workerKey = `${user.email}:${Date.now()}`;
+    workerKey = `${user.email}:${Date.now()}`; // outer-scope Variable zuweisen (kein const!)
     const isLockActive = lockUntil > Date.now() && lockBy !== null;
 
     if (isLockActive) {
@@ -761,12 +761,10 @@ Deno.serve(async (req) => {
     // ── OPTIMISTIC LOCK: Schreibe Lock + unique workerKey, dann nochmal lesen ──
     // Zwei parallele Workers schreiben beide ihren workerKey. Der zweite überschreibt
     // den ersten. Nach 300ms lesen beide nochmal — nur einer sieht seinen eigenen Key.
-    // workerKey wird hier gesetzt (nach Lock-Write) für catch-Block
-    workerKey = `${user.email}:${Date.now()}`;
     const lockExpires = new Date(Date.now() + LOCK_DURATION_MS).toISOString();
     await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
       processing_lock_until: lockExpires,
-      processing_by: workerKey,
+      processing_by: workerKey, // outer-scope Variable verwenden
       worker_attempts: (run.worker_attempts || 0) + 1,
     });
 
