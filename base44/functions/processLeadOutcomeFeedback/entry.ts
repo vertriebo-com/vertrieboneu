@@ -1,10 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // Generische Begriffe die keine Keyword-Qualität haben
+// Generische Begriffe ohne Branchenbezug – keine Zielgruppen, keine Suchbegriffe
+// WICHTIG: Keine branchenspezifischen Begriffe hier – diese Liste nur für echte Non-Keywords
 const GENERIC_TERMS = new Set([
   'dienstleister', 'firma', 'unternehmen', 'gmbh', 'service', 'deutschland',
   'unbekannt', 'sonstiges', 'betrieb', 'gesellschaft', 'co', 'kg', 'ag',
-  'holding', 'gruppe', 'verbund', 'team', 'büro', 'office', 'ug'
+  'holding', 'gruppe', 'verbund', 'team', 'office', 'ug', 'inc', 'ltd'
 ]);
 
 function isGenericTerm(kw) {

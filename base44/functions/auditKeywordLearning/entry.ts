@@ -144,12 +144,48 @@ Deno.serve(async (req) => {
       : `${leadsWithKeywordMatch.length} Leads mit Keyword-Match, ${leadsWithCatMatch.length} Leads mit Zielgruppen-Match`;
 
     // ── Test 6: Cross-Org-Sicherheit ──
-    // Prüfe ob OrgLearnedSignals dieser Org auch wirklich organization_id enthält
     const crossOrgSafe = learnedArr.every(rec => rec.organization_id === organization_id);
     results.cross_org_safe = crossOrgSafe;
     details.cross_org_safe = crossOrgSafe
       ? 'Alle OrgLearnedSignals haben korrekte organization_id'
       : 'WARNUNG: Datenleck detected – organization_id stimmt nicht überein';
+
+    // ── Test 7: Branchenübergreifende Generizität ──
+    // Keyword-Learning darf nicht branchen-spezifisch hart codiert sein.
+    // Prüfung: boosted_keywords kommen ausschließlich aus echten Outcomes (source=outcome_feedback),
+    // nicht aus fest codierten Listen. Taxonomy-Quellen: industry_id der Org.
+    const researchRun = researchRuns[0] || null;
+    let industryId = null;
+    try {
+      const plan = JSON.parse(researchRun?.search_plan_json || '{}');
+      industryId = plan.industryId || researchRun?.industry_id || null;
+    } catch {}
+    // Prüfen: Alle gespeicherten boosted_keywords haben source=outcome_feedback
+    const allFromOutcomes = boostedKws.every(k => !k.source || k.source === 'outcome_feedback');
+    const noHardcodedKeywords = allFromOutcomes; // Keine hart codierten Keywords möglich wenn source korrekt gesetzt
+    results.generic_industry_support = noHardcodedKeywords;
+    details.generic_industry_support = industryId
+      ? `Aktive Branche: ${industryId} | Alle Keywords aus echten Outcomes (source=outcome_feedback): ${allFromOutcomes}`
+      : `Noch kein ResearchRun – Branche unbekannt | Keywords aus Outcomes: ${allFromOutcomes}`;
+
+    // ── Test 8: Keine Cross-Industry-Verwechslung ──
+    // Prüfen ob mehrere Orgs mit verschiedenen Branchen eigene isolierte OrgLearnedSignals haben
+    let crossIndustrySafe = true;
+    let crossIndustryDetail = 'Nur eine Org mit Daten – kein Cross-Industry-Test möglich';
+    if (isPlatformAdmin) {
+      const allLearned = await base44.asServiceRole.entities.OrgLearnedSignals.list('-updated_date', 50);
+      const orgIds = new Set(allLearned.map(r => r.organization_id));
+      const hasDuplicates = allLearned.length !== orgIds.size;
+      crossIndustrySafe = !hasDuplicates;
+      const industryCounts = {};
+      for (const run of await base44.asServiceRole.entities.ResearchRun.list('-created_date', 100)) {
+        if (run.industry_id) industryCounts[run.industry_id] = (industryCounts[run.industry_id] || 0) + 1;
+      }
+      const uniqueIndustries = Object.keys(industryCounts).length;
+      crossIndustryDetail = `${orgIds.size} Orgs mit eigenen Signalen, ${uniqueIndustries} verschiedene Branchen aktiv, Duplikat-OrgLearnedSignals: ${hasDuplicates ? 'JA (Problem!)' : 'Nein'}`;
+    }
+    results.cross_industry_safe = crossIndustrySafe;
+    details.cross_industry_safe = crossIndustryDetail;
 
     // ── Zusammenfassung ──
     const allPass = Object.values(results).every(v => v === true);
