@@ -28,7 +28,24 @@ export default function TrialStatusBanner({
   const getVerifiedTrialContent = () => {
     const planLimit = plan?.max_leads_per_month ?? 300;
     const planName = plan?.name || 'Starter';
-    const usedContacts = usageInfo?.leads_created || 0;
+    
+    // usageInfo kann null sein während des Ladens → nicht 0 anzeigen!
+    if (usageInfo === null || usageInfo === undefined) {
+      return {
+        icon: <Clock className="w-5 h-5" />,
+        title: `${planName}-Testphase`,
+        description: `Sie testen den ${planName}-Plan kostenlos. Nach der Testphase monatlich kündbar.`,
+        stats: 'Nutzung wird geladen…',
+        ctaLabel: 'Abo verwalten',
+        ctaAction: onManagePlan,
+        bgColor: 'bg-amber-50 border-amber-200',
+        textColor: 'text-amber-900',
+        iconColor: 'text-amber-500',
+      };
+    }
+    
+    // Zentrale UsageSummary verwenden (monthly_used = nur Plan-Leads, OHNE Preview)
+    const usedContacts = usageInfo?.monthly_used ?? usageInfo?.leads_created ?? 0;
     const available = planLimit === -1 ? 'unbegrenzt' : Math.max(0, planLimit - usedContacts);
     
     return {

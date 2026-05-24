@@ -360,6 +360,8 @@ export default function BillingSettings({ org: orgProp, user }) {
         trial_leads_granted={org?.trial_leads_granted || 0}
         onUpgrade={() => window.location.href = "/settings#upgrade"}
         onManagePlan={handlePortal}
+        plan={plan}
+        usageInfo={usageSummary}
       />
 
       {/* Plan-Auswahl für Free Preview */}
