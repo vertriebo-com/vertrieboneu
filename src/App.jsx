@@ -26,6 +26,8 @@ import Impressum from './pages/Impressum';
 import Datenschutz from './pages/Datenschutz';
 import AGB from './pages/AGB';
 import AccountSuspended from './pages/AccountSuspended';
+import AnmeldenPage from './pages/AnmeldenPage';
+import RegisterPage from './pages/RegisterPage';
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
@@ -65,6 +67,8 @@ const PublicApp = () => {
       <Route path="/datenschutz" element={<Datenschutz />} />
       <Route path="/agb" element={<AGB />} />
       <Route path="/account-suspended" element={<AccountSuspended />} />
+      <Route path="/anmelden" element={<AnmeldenPage />} />
+      <Route path="/registrieren" element={<RegisterPage />} />
       {/* Everything else goes through the authenticated app */}
       <Route path="*" element={<AuthenticatedApp />} />
     </Routes>
