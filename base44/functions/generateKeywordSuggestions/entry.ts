@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
       for (const target of taxonomyProfile.target_customer_types.slice(0, 8)) {
         const kwLower = target.toLowerCase();
         if (existingKeywords.has(kwLower)) continue;
-        if (alreadyChosenLower.has(kwLower)) continue; // NICHT doppelt vorschlagen!
+        if (alreadyChosenLower.has(kwLower)) continue;
         
         suggestions.push({
           keyword: target,
@@ -182,6 +182,7 @@ Deno.serve(async (req) => {
           reason: `Typische Zielgruppe für ${taxonomyProfile.label}`,
           priority_score: 80,
           status: 'suggested',
+          keyword_type: 'research_target_keyword',
           metadata: { category: 'target_customer' }
         });
       }
@@ -195,7 +196,7 @@ Deno.serve(async (req) => {
         for (const kw of keywords.slice(0, 3)) {
           const kwLower = kw.toLowerCase();
           if (existingKeywords.has(kwLower)) continue;
-          if (alreadyChosenLower.has(kwLower)) continue; // NICHT doppelt vorschlagen!
+          if (alreadyChosenLower.has(kwLower)) continue;
           
           suggestions.push({
             keyword: kw,
@@ -203,31 +204,33 @@ Deno.serve(async (req) => {
             reason: `Passender Suchbegriff aus Kategorie "${category}"`,
             priority_score: 70,
             status: 'suggested',
+            keyword_type: 'research_target_keyword',
             metadata: { category: 'keyword_variant', variant_category: category }
           });
         }
       }
     }
 
-    // 6c) Aus own_services (Taxonomie) - NUR wenn NICHT bereits im Onboarding gewählt
+    // 6c) Aus own_services (Taxonomie) - als service_keyword, NICHT als research_target
     if (taxonomyProfile.own_services) {
       for (const service of taxonomyProfile.own_services.slice(0, 5)) {
         const kwLower = service.toLowerCase();
         if (existingKeywords.has(kwLower)) continue;
-        if (alreadyChosenLower.has(kwLower)) continue; // NICHT doppelt vorschlagen!
+        if (alreadyChosenLower.has(kwLower)) continue;
         
         suggestions.push({
           keyword: service,
           source: 'taxonomy',
-          reason: `Typische Dienstleistung für ${taxonomyProfile.label}`,
-          priority_score: 65,
+          reason: `Typische Dienstleistung für ${taxonomyProfile.label} (kein Recherche-Zielkunde)`,
+          priority_score: 55, // Niedriger Score: nicht für Research-Queries
           status: 'suggested',
+          keyword_type: 'service_keyword',
           metadata: { category: 'own_service' }
         });
       }
     }
 
-    // 6d) Aus OrgLearnedSignals (bereits gelernte, aber noch nicht als Profile) - NUR wenn NICHT bereits gewählt
+    // 6d) Aus OrgLearnedSignals (bereits gelernte) - als learned_keyword
     if (learnedSignals && learnedSignals.boosted_keywords) {
       try {
         const boostedKws = JSON.parse(learnedSignals.boosted_keywords);
@@ -235,7 +238,7 @@ Deno.serve(async (req) => {
           const kw = typeof kwObj === 'string' ? kwObj : (kwObj.keyword || '');
           const kwLower = kw.toLowerCase();
           if (existingKeywords.has(kwLower) || !kw) continue;
-          if (alreadyChosenLower.has(kwLower)) continue; // NICHT doppelt vorschlagen!
+          if (alreadyChosenLower.has(kwLower)) continue;
           
           const stats = typeof kwObj === 'object' ? kwObj : { score: 1, total_count: 1 };
           
@@ -245,6 +248,7 @@ Deno.serve(async (req) => {
             reason: `Aus ${stats.total_count || 1} Lead-Ergebnissen gelernt`,
             priority_score: Math.min(100, 60 + (stats.score || 0) * 5),
             status: 'suggested',
+            keyword_type: 'learned_keyword',
             metadata: { 
               category: 'learned',
               won_count: stats.won_count || 0,
@@ -270,19 +274,23 @@ Deno.serve(async (req) => {
       let statusHint = 'suggested';
       if (onboardingTargets.some(t => t.toLowerCase() === kwLower)) {
         statusHint = 'already_active_target_customer';
-      } else if (onboardingServices.some(s => s.toLowerCase() === kwLower)) {
+      } else if (onboardingServices.some(sv => sv.toLowerCase() === kwLower)) {
         statusHint = 'already_active_service';
       } else if (onboardingExcluded.some(e => e.toLowerCase() === kwLower)) {
         statusHint = 'blocked';
       }
       
+      // keyword_type: aus Suggestion übernehmen (bereits gesetzt), Fallback über metadata
+      const resolvedType = s.keyword_type ||
+        (s.metadata?.category === 'target_customer' ? 'research_target_keyword' :
+         s.metadata?.category === 'own_service' ? 'service_keyword' :
+         s.metadata?.category === 'keyword_variant' ? 'research_target_keyword' :
+         s.metadata?.category === 'learned' ? 'learned_keyword' : 'research_target_keyword');
+
       uniqueSuggestions.push({
         ...s,
         status_hint: statusHint,
-        keyword_type: s.metadata?.category === 'target_customer' ? 'target_customer' :
-                      s.metadata?.category === 'own_service' ? 'service' :
-                      s.metadata?.category === 'keyword_variant' ? 'search_variant' :
-                      s.metadata?.category === 'learned' ? 'learned_query' : 'manual'
+        keyword_type: resolvedType,
       });
     }
 

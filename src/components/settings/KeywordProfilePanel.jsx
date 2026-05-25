@@ -80,6 +80,7 @@ export default function KeywordProfilePanel({ organizationId }) {
       await base44.entities.OrganizationKeywordProfile.create({
         organization_id: orgId,
         keyword,
+        keyword_type: 'research_target_keyword', // Manuell hinzugefügt = immer Recherche-Zielkunde
         source: 'manual_user_added',
         status: 'active',
         score: 5,
@@ -112,6 +113,22 @@ export default function KeywordProfilePanel({ organizationId }) {
     boosted: { color: "bg-violet-100 text-violet-700 border-violet-200", icon: TrendingUp, label: "Boosted" },
     reduced: { color: "bg-amber-100 text-amber-700 border-amber-200", icon: TrendingDown, label: "Reduziert" },
     blocked: { color: "bg-red-100 text-red-700 border-red-200", icon: XCircle, label: "Blockiert" },
+  };
+
+  // Intent-Badge: Zeigt dem Nutzer wofür ein Keyword genutzt wird
+  // Fallback-Logik für Legacy-Profile ohne keyword_type
+  const getIntentBadge = (profile) => {
+    // Expliziter Typ
+    const type = profile.keyword_type;
+    if (type === 'research_target_keyword') return { label: "Recherche-Zielkunde", color: "bg-blue-50 text-blue-700 border-blue-200", title: "Wird für Firmensuche verwendet" };
+    if (type === 'service_keyword') return { label: "Eigene Leistung", color: "bg-orange-50 text-orange-700 border-orange-200", title: "Kontext für Scoring – nicht als Suchzielkunde" };
+    if (type === 'learned_keyword') return { label: "Gelernt", color: "bg-teal-50 text-teal-700 border-teal-200", title: "Aus Lead-Ergebnissen gelernt" };
+    if (type === 'marketing_ad_keyword') return { label: "Marketing", color: "bg-yellow-50 text-yellow-700 border-yellow-200", title: "Marketing-Keyword – nicht für Firmenrecherche" };
+    if (type === 'negative_keyword' || profile.status === 'blocked' || profile.status === 'reduced') {
+      return { label: "Ausschluss", color: "bg-red-50 text-red-700 border-red-200", title: "Wird ausgeschlossen" };
+    }
+    // Legacy: kein keyword_type gesetzt → Fallback
+    return { label: "Recherche-Zielkunde", color: "bg-blue-50 text-blue-600 border-blue-100", title: "Wird für Firmensuche verwendet (Standard)" };
   };
 
   return (
@@ -178,13 +195,21 @@ export default function KeywordProfilePanel({ organizationId }) {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{profile.keyword}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <Badge className={`text-[10px] ${config.color}`}>
                           {config.label}
                         </Badge>
+                        {(() => {
+                          const intent = getIntentBadge(profile);
+                          return (
+                            <span title={intent.title} className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${intent.color}`}>
+                              {intent.label}
+                            </span>
+                          );
+                        })()}
                         {profile.total_count > 0 && (
                           <span className="text-[10px] text-slate-500">
-                            {profile.total_count}× genutzt · Score: {profile.score}
+                            {profile.total_count}× · Score: {profile.score}
                           </span>
                         )}
                         {profile.source === 'manual_user_added' && (
@@ -238,22 +263,30 @@ export default function KeywordProfilePanel({ organizationId }) {
             Empfohlene Suchbegriffe
           </h4>
           <div className="flex flex-wrap gap-1.5">
-            {suggestionsData.suggestions.slice(0, 8).map((s, i) => (
-              <Badge 
-                key={i} 
-                variant="outline" 
-                className="text-[10px] bg-violet-50 border-violet-200 text-violet-700 cursor-pointer hover:bg-violet-100 transition-colors"
-                onClick={() => {
-                  setNewKeyword(s.keyword);
-                  setShowAddKeyword(true);
-                }}
-              >
-                {s.keyword}
-              </Badge>
-            ))}
+            {suggestionsData.suggestions.slice(0, 8).map((s, i) => {
+              const isService = s.keyword_type === 'service_keyword';
+              return (
+                <Badge 
+                  key={i} 
+                  variant="outline" 
+                  title={isService ? "Eigene Leistung – kein Recherche-Zielkunde" : "Als Recherche-Zielkunde hinzufügen"}
+                  className={`text-[10px] cursor-pointer transition-colors ${
+                    isService
+                      ? "bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+                      : "bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100"
+                  }`}
+                  onClick={() => {
+                    setNewKeyword(s.keyword);
+                    setShowAddKeyword(true);
+                  }}
+                >
+                  {s.keyword}{isService ? " ⚙" : ""}
+                </Badge>
+              );
+            })}
           </div>
           <p className="text-[10px] text-slate-500 mt-1.5">
-            {suggestionsData.total_suggestions} Vorschläge verfügbar · Klicken zum Hinzufügen
+            {suggestionsData.total_suggestions} Vorschläge · Klicken zum Hinzufügen · <span className="text-orange-600">⚙ = eigene Leistung</span>
           </p>
         </div>
       )}
@@ -287,7 +320,7 @@ export default function KeywordProfilePanel({ organizationId }) {
                 className="text-sm bg-white border-slate-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
               />
               <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
-                Dieser Begriff wird aktiv für Ihre Recherchen genutzt und verbessert die Ergebnisqualität.
+                Tragen Sie Firmentypen ein, die Sie als Kunden suchen (z.B. „Hausverwaltung", „Produktionsfirma"). Geben Sie <strong>nicht</strong> Ihre eigenen Leistungen oder Google-Werbebegriffe ein.
               </p>
             </div>
             <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">

@@ -510,18 +510,37 @@ Deno.serve(async (req) => {
       const profiles = await base44.asServiceRole.entities.OrganizationKeywordProfile.filter({ organization_id });
       keywordProfiles = profiles;
       
-      // Nach Status filtern
+      // KEYWORD-INTENT-ROUTING (v2 2026-05-25):
+      // research_target_keyword + learned_keyword + null (legacy) → Research-Queries
+      // service_keyword + marketing_ad_keyword → NICHT als Zielkunden-Query
+      // negative_keyword + blocked/reduced → Ausschlüsse
+      const RESEARCH_TYPES = new Set(['research_target_keyword', 'learned_keyword']);
+      const EXCLUDED_TYPES = new Set(['service_keyword', 'marketing_ad_keyword', 'negative_keyword']);
+
       activeKeywords = profiles
         .filter(p => p.status === 'active')
+        .filter(p => {
+          // Legacy ohne keyword_type → erlaubt (research_target Fallback)
+          if (!p.keyword_type) return true;
+          // Expliziter Ausschluss für Nicht-Research-Typen
+          return RESEARCH_TYPES.has(p.keyword_type);
+        })
         .map(p => p.keyword);
       
       boostedKeywordsFromProfile = profiles
         .filter(p => p.status === 'boosted' || p.is_boosted === true)
+        .filter(p => !p.keyword_type || RESEARCH_TYPES.has(p.keyword_type))
         .map(p => p.keyword);
       
-      blockedKeywords = profiles
-        .filter(p => p.status === 'blocked' || p.is_reduced === true)
+      // Excluded: blocked/reduced + negative_keyword/service_keyword bei active/boosted Status
+      const explicitlyExcluded = profiles
+        .filter(p => p.keyword_type && EXCLUDED_TYPES.has(p.keyword_type) && ['active', 'boosted'].includes(p.status))
         .map(p => p.keyword);
+
+      blockedKeywords = [
+        ...profiles.filter(p => p.status === 'blocked' || p.is_reduced === true).map(p => p.keyword),
+        ...explicitlyExcluded,
+      ];
       
       suggestedKeywords = profiles
         .filter(p => p.status === 'suggested')

@@ -254,11 +254,23 @@ Deno.serve(async (req) => {
       'excludedCustomerTypes = settings.excluded_customer_types + blocked/reduced aus KeywordProfile + learnedExcludedCategories — alle drei Quellen korrekt zusammengeführt'
     );
 
-    // 4d. marketing_ad_keyword-Schutz: Wenn keyword_type=marketing_ad_keyword gesetzt wäre, würde es nicht explizit ausgeschlossen
-    warn('startResearchRun', 'no_explicit_marketing_keyword_guard',
-      'startResearchRun hat keinen expliziten Guard für keyword_type=marketing_ad_keyword. Solche Keywords existieren derzeit nicht in OrganizationKeywordProfile — aber falls Nutzer sie hinzufügt und aktiviert, würden sie als Research-Query enden.',
-      'startResearchRun: beim Filtern aus KeywordProfile sicherstellen dass marketing_ad_keyword-Typen NICHT in targetCustomerTypes fließen. Quick-Fix: keyword_type NOT IN [service, marketing_ad_keyword] als Filterregel.'
-    );
+    // 4d. marketing_ad_keyword-Guard: jetzt implementiert (v2 2026-05-25)
+    // RESEARCH_TYPES = {research_target_keyword, learned_keyword}
+    // EXCLUDED_TYPES = {service_keyword, marketing_ad_keyword, negative_keyword}
+    const activeMarketingKeywords = profilesActiveOrBoosted.filter(p => p.keyword_type === 'marketing_ad_keyword');
+    const activeServiceKeywordsInResearch = profilesActiveOrBoosted.filter(p => p.keyword_type === 'service_keyword');
+    const marketingUsedInResearch = activeMarketingKeywords.length;
+    const serviceUsedInResearch = activeServiceKeywordsInResearch.length;
+
+    if (marketingUsedInResearch === 0 && serviceUsedInResearch === 0) {
+      pass('startResearchRun', 'marketing_and_service_keyword_guard_active',
+        'startResearchRun: RESEARCH_TYPES-Filter aktiv — marketing_ad_keyword + service_keyword werden NICHT als Research-Queries verwendet (Fix v2 2026-05-25)'
+      );
+    } else {
+      risk('startResearchRun', 'wrong_type_keywords_in_research',
+        `${marketingUsedInResearch} marketing_ad_keyword + ${serviceUsedInResearch} service_keyword mit active/boosted Status würden ohne Filter als Research-Query enden`
+      );
+    }
 
     // ════════════════════════════════════════════════════════════════════════
     // CHECK 5: processResearchRun / Quality-Tier
@@ -299,11 +311,9 @@ Deno.serve(async (req) => {
       'Dialog-Text anpassen: "Tragen Sie hier Firmentypen ein, die Sie als Kunden suchen (z.B. Hausverwaltungen, Produktionsfirmen). Geben Sie NICHT Ihre eigenen Dienstleistungen oder Google-Suchbegriffe ein."'
     );
 
-    // 6b. Manuell hinzugefügte Keywords bekommen keyword_type? 
-    // Code: addKeywordMutation erstellt ohne keyword_type-Feld
-    warn('ui_keyword_panel', 'manual_keyword_no_type_assigned',
-      'KeywordProfilePanel: Manuell hinzugefügte Keywords werden ohne keyword_type erstellt (nur source=manual_user_added). Nutzer hat keine Möglichkeit den Intent (Zielkunde vs. Dienstleistung) anzugeben.',
-      'Beim manuellen Hinzufügen ein Intent-Auswahlfeld anbieten: "Was ist dieser Begriff? → Zielkunde (Firmentyp) / Eigene Leistung / Ausschlussbegriff". keyword_type entsprechend setzen.'
+    // 6b. Manuell hinzugefügte Keywords bekommen keyword_type? (Fix v2 2026-05-25)
+    pass('ui_keyword_panel', 'manual_keyword_type_assigned',
+      'KeywordProfilePanel: Manuell hinzugefügte Keywords bekommen keyword_type=research_target_keyword (Fix v2 2026-05-25)'
     );
 
     // 6c. Blockierte Keywords als Ausschluss erkennbar?
@@ -311,16 +321,14 @@ Deno.serve(async (req) => {
       'KeywordProfilePanel: blocked-Status hat rotes Icon (XCircle) und Label "Blockiert" — visuell klar als Ausschluss erkennbar'
     );
 
-    // 6d. Unterschied service_keyword vs. target_keyword im UI erklärt?
-    warn('ui_keyword_panel', 'no_intent_type_display',
-      'KeywordProfilePanel zeigt keyword_type nicht an. Nutzer sieht nicht ob ein Begriff als Zielkunde oder Dienstleistung klassifiziert ist.',
-      'keyword_type als Badge anzeigen: "🎯 Zielkunde", "⚙️ Leistung", "🚫 Ausschluss", "🔬 Gelernt". Hilft dem Nutzer zu verstehen was mit dem Begriff passiert.'
+    // 6d. Intent-Badge im UI vorhanden? (Fix v2 2026-05-25)
+    pass('ui_keyword_panel', 'intent_type_badge_displayed',
+      'KeywordProfilePanel: Intent-Badge (Recherche-Zielkunde / Eigene Leistung / Ausschluss / Gelernt / Marketing) wird pro Keyword angezeigt — mit Tooltip was der Begriff bewirkt (Fix v2 2026-05-25)'
     );
 
-    // 6e. Vorschläge-Bereich: Intent der Vorschläge erklärt?
-    warn('ui_keyword_panel', 'suggestions_no_intent_context',
-      'Vorschläge-Badges zeigen nur den Begriff, nicht den Typ (Zielkunde vs. Leistung). Nutzer könnte eine eigene Dienstleistung aktivieren und glauben, Vertriebo sucht danach als Zielkunde.',
-      'Vorschlags-Badge mit Typ-Info ergänzen: "Hausverwaltung [Zielkunde]" vs. "Fensterreinigung [Leistung]". Oder Suggestions nach Intent gruppieren.'
+    // 6e. Vorschläge-Bereich: service_keyword visuell unterschieden? (Fix v2 2026-05-25)
+    pass('ui_keyword_panel', 'suggestions_intent_differentiated',
+      'Suggestions: service_keyword-Vorschläge sind orange markiert (⚙) und mit Tooltip "Eigene Leistung – kein Recherche-Zielkunde" versehen. Dialog-Wording wurde präzisiert (Fix v2 2026-05-25)'
     );
 
     // ════════════════════════════════════════════════════════════════════════
@@ -407,12 +415,17 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════════════════
     const acceptanceCriteria = {
       research_target_keywords_separated_from_services: !activeServiceKeywords.length,
-      generate_suggestions_no_duplicates: true, // Dedupe-Guard ist implementiert
+      generate_suggestions_no_duplicates: true,
       start_research_correct_keyword_routing: activeServiceKeywords.length === 0,
-      services_not_as_research_queries: true, // own_services nie in targetCustomerTypes direkt
-      negative_keywords_only_as_exclusions: true, // Hard-Fail in checkBadFit
+      marketing_ad_keyword_used_in_research: marketingUsedInResearch === 0,
+      service_keyword_used_as_target: serviceUsedInResearch === 0,
+      negative_keyword_used_as_positive: true, // Hard-Fail in checkBadFit
+      services_not_as_research_queries: true,
+      negative_keywords_only_as_exclusions: true,
       query_intent_match_clean: true,
       no_hardcoded_industry_terms: hardcodeFound === 0,
+      ui_intent_badge_exists: true, // Fix v2
+      new_keywords_get_keyword_type: true, // Fix v2
     };
 
     const claimStatus = risks.length > 0 ? 'red' : warnings.length > 0 ? 'yellow' : 'green';
@@ -437,14 +450,19 @@ Deno.serve(async (req) => {
         keyword_profiles_checked: totalProfilesChecked,
         profiles_with_keyword_type: profilesWithType.length,
         profiles_without_keyword_type: profilesWithoutType.length,
+        legacy_profiles_without_type: profilesWithoutType.length,
         keyword_type_distribution: typeDistribution,
         status_distribution: Object.fromEntries(
           EXPECTED_STATUSES.map(s => [s, sampleProfiles.filter(p => p.status === s).length])
         ),
         blocked_keywords_resuggested: blockedResuggested.length,
         marketing_keywords_in_taxonomy: marketingContaminations.length,
+        marketing_ad_keyword_used_in_research: marketingUsedInResearch,
+        service_keyword_used_as_target: serviceUsedInResearch,
         active_service_keywords_in_research: activeServiceKeywords.length,
         negative_keywords_as_hard_fail: true,
+        ui_intent_badge_exists: true,
+        new_keywords_get_keyword_type: true,
         tested_industries: TEST_INDUSTRY_IDS,
         test_branch_results: branchTests,
       },
