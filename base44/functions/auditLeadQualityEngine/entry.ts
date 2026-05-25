@@ -133,16 +133,18 @@ Deno.serve(async (req) => {
         hasTCMatch = false, strategy = 'target_customer_search',
         badFitPenalty = 0, websiteRequired = false,
         scoringSignals = 0,
+        queryIntentMatch = false, // NEU: Kandidat aus nutzer-gewählter Zielkunden-Query
       } = overrides;
 
       let score = 50;
 
-      // Evidence-Flags (identisch mit processResearchRun)
+      // Evidence-Flags (identisch mit processResearchRun inkl. query_intent_match)
       const evidenceFlags = {
         category_match: hasCat,
         place_type_match: hasPlaceType,
         scoring_signal_match: scoringSignals > 0,
         target_customer_match: hasTCMatch,
+        query_intent_match: queryIntentMatch,
         phone: hasPhone,
         website: hasWebsite,
         address: hasAddress,
@@ -154,20 +156,25 @@ Deno.serve(async (req) => {
       score += sigScore;
       if (hasPhone) score += 8;
       if (hasWebsite) score += 8;
-      if (distanceOk) score += 8; // Distanz zählt zum Score, aber NICHT als starke Evidenz
+      if (distanceOk) score += 8;
       const tcBonus = strategy === 'target_customer_search' ? 10 : strategy === 'mixed' ? 8 : 6;
       if (hasTCMatch) score += tcBonus;
       if (websiteRequired && !hasWebsite) score = Math.min(score, 54);
       score += badFitPenalty;
       score = Math.max(0, Math.min(100, score));
 
-      // Quality-Tier-Mapping (identisch mit processResearchRun)
-      const strongEvidenceCount = ['category_match','place_type_match','scoring_signal_match','target_customer_match']
+      // Quality-Tier-Mapping (identisch mit processResearchRun inkl. query_intent Sonderfall)
+      const strongEvidenceCount = ['category_match','place_type_match','scoring_signal_match','target_customer_match','query_intent_match']
         .filter(k => evidenceFlags[k]).length;
+      const weakEvidenceCount = ['phone','website','address'].filter(k => evidenceFlags[k]).length;
       let qualityTier, qualityConfidence;
       if (score >= 85 && strongEvidenceCount >= 3) { qualityTier = 'premium'; qualityConfidence = 'high'; }
       else if (score >= 75 && strongEvidenceCount >= 2) { qualityTier = 'strong'; qualityConfidence = 'high'; }
       else if (score >= 65 && strongEvidenceCount >= 2) { qualityTier = 'good'; qualityConfidence = 'medium'; }
+      else if (queryIntentMatch && hasCat && weakEvidenceCount >= 1 && score >= 65) {
+        // Sonderfall: query_intent + category + contactable → good
+        qualityTier = 'good'; qualityConfidence = 'medium';
+      }
       else { qualityTier = 'weak'; qualityConfidence = 'low'; }
 
       return {
@@ -185,6 +192,21 @@ Deno.serve(async (req) => {
         params: { hasCat: true, hasPlaceType: true, hasPhone: true, hasWebsite: true, distanceOk: true, hasTCMatch: true },
         expectedSave: true,
         expectedTier: "premium",
+      },
+      {
+        name: "target_customer_query_match_good: user_target Query + category + address → good/medium",
+        params: { hasCat: true, hasAddress: true, queryIntentMatch: true, distanceOk: true },
+        expectedSave: true,
+        expectedTier: "good",
+        expectedConfidence: "medium",
+        note: "Baustoffhändler per 'user_target'-Query gefunden + Adresse = good, nicht weak",
+      },
+      {
+        name: "pure_taxonomy_category_address: nur taxonomy Query + cat + address → weak",
+        params: { hasCat: true, hasAddress: true, queryIntentMatch: false, distanceOk: true },
+        expectedSave: true,
+        expectedTier: "weak",
+        note: "Taxonomy-Query ohne user_target, nur cat_match + address = bleibt weak",
       },
       {
         name: "Nur Basis + Distanz (Score 58, 0 starke Evidenzen)",

@@ -109,8 +109,25 @@ function haversineKm(lat1, lng1, lat2, lng2) {
 function isLikelyChain(candidate) {
   const chainKeywords = ['aldi','lidl','penny','netto','rewe','edeka','kaufland','dm','rossmann','h&m','zara','primark','deichmann','deutsche post','dhl','sparkasse','deutsche bank','commerzbank','mcdonalds','burger king','subway','kfc','starbucks','hilton','marriott','ibis','motel one','fitx','mcfit','fitness first','fielmann','apollo optik','telekom','vodafone','ikea','obi','bauhaus','hornbach','franchise','kette','filialen','konzern'];
   const nameLower = normStr(candidate.name || '');
-  for (const kw of chainKeywords) if (nameLower.includes(kw)) return { isChain: true, reason: `Kette: ${kw}` };
-  if ((candidate.user_ratings_total || 0) > 1500) return { isChain: true, reason: `>1500 Bewertungen` };
+  // Wortgrenz-sensitiver Match: keyword muss als eigenständiges Token vorkommen
+  // Verhindert False Positives wie "STREETBOOSTER" → matched "obi" als Substring
+  for (const kw of chainKeywords) {
+    const idx = nameLower.indexOf(kw);
+    if (idx === -1) continue;
+    // Prüfe ob Zeichen vor und nach dem Treffer keine Wortzeichen sind (Wortgrenze)
+    const before = idx === 0 ? true : /[\s\-_\/\(\)\.,]/.test(nameLower[idx - 1]);
+    const after = idx + kw.length >= nameLower.length ? true : /[\s\-_\/\(\)\.,]/.test(nameLower[idx + kw.length]);
+    if (before && after) {
+      return {
+        isChain: true,
+        reason: `Kette: ${kw}`,
+        matched_chain_keyword: kw,
+        matched_in_field: 'name',
+        raw_text_excerpt: nameLower.slice(Math.max(0, idx - 10), idx + kw.length + 10),
+      };
+    }
+  }
+  if ((candidate.user_ratings_total || 0) > 1500) return { isChain: true, reason: `>1500 Bewertungen`, matched_chain_keyword: null, matched_in_field: 'rating_count', raw_text_excerpt: `${candidate.user_ratings_total} Bewertungen` };
   return { isChain: false };
 }
 
@@ -233,6 +250,14 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
     }
   }
 
+  // ── Query-Intent-Match: Kandidat stammt aus einer vom Nutzer gewählten Zielkunden-Suche ──
+  // Dies ist starke semantische Evidenz auch wenn TC-Keyword nicht im Firmennamen steht.
+  // Unterschied zu target_customer_match: dieser prüft Namen/Text; query_intent_match prüft Query-Herkunft.
+  // Wird von scoreCandidate nicht selbst befüllt – muss vom Aufrufer (outer scope) per qItem injiziert werden.
+  // Wird als default false initialisiert; der Aufrufer setzt evidenceFlags.query_intent_match nach Aufruf.
+  evidenceFlags.query_intent_match = false;
+  // (Wird von scoreCandidate nicht gesetzt – der Aufrufer muss es setzen, da qItem hier nicht sichtbar ist)
+
   // ── Website-Signal für website_signal_required ──
   const websiteRequired = strategy === 'website_signal_required';
   if (websiteRequired && !candidate.website) {
@@ -252,31 +277,36 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
   score = Math.max(0, Math.min(100, score));
 
   // ── EVIDENCE-AUSWERTUNG ──────────────────────────────────────────────────
-  // strong_evidence: semantische Übereinstimmung (Kategorie, PlaceType, Signal, TC)
+  // strong_evidence: semantische Übereinstimmung (Kategorie, PlaceType, Signal, TC, Query-Intent)
   // weak_evidence:   Kontaktdaten (erreichbar, aber kein semantischer Match)
-  const strongEvidenceKeys = ['category_match', 'place_type_match', 'scoring_signal_match', 'target_customer_match'];
+  // HINWEIS: evidenceFlags.query_intent_match wird vom Aufrufer NACH scoreCandidate gesetzt.
+  // Hier als false initialisiert, danach im Aufrufer überschrieben bevor Tier-Berechnung.
+  // Tier-Berechnung erfolgt daher NICHT hier, sondern nach dem query_intent_match-Inject im outer scope.
+  // (Tier-Berechnung siehe unten nach dem scoreCandidate-Aufruf in der Batch-Schleife)
+  const strongEvidenceKeys = ['category_match', 'place_type_match', 'scoring_signal_match', 'target_customer_match', 'query_intent_match'];
   const weakEvidenceKeys   = ['phone', 'website', 'address'];
+  // Zähler werden nach query_intent_match-Inject in outer scope neu berechnet – hier als Zwischenstand
   const strongEvidenceCount = strongEvidenceKeys.filter(k => evidenceFlags[k]).length;
   const weakEvidenceCount   = weakEvidenceKeys.filter(k => evidenceFlags[k]).length;
   const positiveEvidenceCount = strongEvidenceCount + weakEvidenceCount;
 
-  // ── QUALITY-TIER-MAPPING ─────────────────────────────────────────────────
-  // Distanz zählt NICHT als Evidenz. Tier = f(score, strong_evidence_count).
-  let qualityTier, qualityConfidence;
+  // ── QUALITY-TIER-MAPPING (Basis ohne query_intent_match – wird im outer scope neu berechnet) ─
+  let qualityTier, qualityConfidence, qualityReasonDetail;
   if (score >= 85 && strongEvidenceCount >= 3) {
-    qualityTier = 'premium'; qualityConfidence = 'high';
+    qualityTier = 'premium'; qualityConfidence = 'high'; qualityReasonDetail = 'strong_match';
   } else if (score >= 75 && strongEvidenceCount >= 2) {
-    qualityTier = 'strong'; qualityConfidence = 'high';
+    qualityTier = 'strong'; qualityConfidence = 'high'; qualityReasonDetail = 'strong_match';
   } else if (score >= 65 && strongEvidenceCount >= 2) {
-    qualityTier = 'good'; qualityConfidence = 'medium';
+    qualityTier = 'good'; qualityConfidence = 'medium'; qualityReasonDetail = 'good_match';
   } else {
-    // Alles andere: weak – Score 55-64 ODER zu wenig starke Evidenz
     qualityTier = 'weak'; qualityConfidence = 'low';
+    qualityReasonDetail = evidenceFlags.category_match ? 'weak_category_address_only' : 'base_only';
   }
 
   // Save-Reason-Code: kurze lesbare Zusammenfassung der positiven Evidenzen
   const saveReasonParts = [];
   if (evidenceFlags.target_customer_match) saveReasonParts.push('tc_match');
+  if (evidenceFlags.query_intent_match) saveReasonParts.push('target_query');
   if (evidenceFlags.category_match) saveReasonParts.push('cat_match');
   if (evidenceFlags.place_type_match) saveReasonParts.push('placetype');
   if (evidenceFlags.scoring_signal_match) saveReasonParts.push('signal');
@@ -285,7 +315,7 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
   if (evidenceFlags.address) saveReasonParts.push('address');
   const saveReasonCode = saveReasonParts.join('+') || 'base_only';
 
-  // ── Diagnostics-Objekt ──
+  // ── Diagnostics-Objekt (query_intent_match wird nach Aufruf injiziert) ──
   const diagnostics = {
     engine_version: SEARCH_ENGINE_VERSION,
     score_raw: score,
@@ -298,14 +328,19 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
     category_matched: matched_search_category,
     score_breakdown: reasons.join(' | '),
     tc_bonus_applied: strategy === 'target_customer_search' ? 10 : strategy === 'mixed' ? 8 : 6,
-    // Evidence-Diagnostics
+    // Evidence-Diagnostics (query_intent_match=false bis outer scope injiziert)
     evidence_flags: evidenceFlags,
     positive_evidence_count: positiveEvidenceCount,
     strong_evidence_count: strongEvidenceCount,
     weak_evidence_count: weakEvidenceCount,
     quality_tier: qualityTier,
     quality_confidence: qualityConfidence,
+    quality_reason_detail: qualityReasonDetail,
     save_reason_code: saveReasonCode,
+    // query_intent_match-Felder – werden vom Aufrufer befüllt
+    query_intent_match: false,
+    query_source: null,
+    query_matched_target_customer: null,
   };
 
   return {
@@ -314,10 +349,13 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
     matched_target_customer_type,
     relevance_reason: reasons.join(' | ') || 'Base',
     shouldSave: score >= 55 && !badFit.bad,
+    // Tier/Code/Confidence = Zwischenstand; wird nach query_intent_match-Inject neu gesetzt
     qualityTier,
     qualityConfidence,
+    qualityReasonDetail,
     saveReasonCode,
     diagnostics,
+    evidenceFlags, // zurückgeben damit outer scope query_intent_match injizieren kann
   };
 }
 
@@ -1197,6 +1235,10 @@ Deno.serve(async (req) => {
               chainSkippedExamplesThisBatch.push({
                 name: place.name,
                 reason: chainCheck.reason,
+                // Neu: präzise Chain-Match-Diagnostik für False-Positive-Prüfung
+                matched_chain_keyword: chainCheck.matched_chain_keyword || null,
+                matched_in_field: chainCheck.matched_in_field || 'name',
+                raw_text_excerpt: chainCheck.raw_text_excerpt || null,
                 source_query: qItem.variant || qItem.query,
                 search_category: qItem.category,
                 matched_target_customer: qItem.matched_target_customer || null,
@@ -1216,6 +1258,63 @@ Deno.serve(async (req) => {
 
           const scoring = scoreCandidate(place, taxonomyProfile, distanceKm, radiusKm, category, place.types);
           if (!scoring.shouldSave) { noMatchThisBatch++; continue; }
+
+          // ── Query-Intent-Match: nach scoreCandidate injizieren ──────────────
+          // query_intent_match = true wenn der Kandidat aus einer nutzer-gewählten Zielkunden-Suche stammt.
+          // Unterschied zu target_customer_match (Textmatch im Namen): hier Herkunft der Query.
+          const queryIntentMatch = qItem.source === 'user_target' || qItem.source === 'user_fallback' || !!qItem.matched_target_customer;
+          if (queryIntentMatch) {
+            scoring.evidenceFlags.query_intent_match = true;
+            scoring.diagnostics.query_intent_match = true;
+            scoring.diagnostics.query_source = qItem.source;
+            scoring.diagnostics.query_matched_target_customer = qItem.matched_target_customer || null;
+
+            // Tier neu berechnen mit query_intent_match als starke Evidenz
+            const strongKeys = ['category_match','place_type_match','scoring_signal_match','target_customer_match','query_intent_match'];
+            const weakKeys   = ['phone','website','address'];
+            const sc = strongKeys.filter(k => scoring.evidenceFlags[k]).length;
+            const wc = weakKeys.filter(k => scoring.evidenceFlags[k]).length;
+            scoring.diagnostics.strong_evidence_count = sc;
+            scoring.diagnostics.weak_evidence_count = wc;
+            scoring.diagnostics.positive_evidence_count = sc + wc;
+
+            // Tier-Mapping mit query_intent_match
+            if (scoring.score >= 85 && sc >= 3) {
+              scoring.qualityTier = 'premium'; scoring.qualityConfidence = 'high'; scoring.diagnostics.quality_reason_detail = 'strong_match';
+            } else if (scoring.score >= 75 && sc >= 2) {
+              scoring.qualityTier = 'strong'; scoring.qualityConfidence = 'high'; scoring.diagnostics.quality_reason_detail = 'strong_match';
+            } else if (scoring.score >= 65 && sc >= 2) {
+              scoring.qualityTier = 'good'; scoring.qualityConfidence = 'medium'; scoring.diagnostics.quality_reason_detail = 'good_match';
+            } else if (
+              // Sonderfall: query_intent + category_match + mindestens 1 weak evidence
+              scoring.evidenceFlags.query_intent_match &&
+              scoring.evidenceFlags.category_match &&
+              wc >= 1 &&
+              scoring.score >= 65
+            ) {
+              scoring.qualityTier = 'good'; scoring.qualityConfidence = 'medium'; scoring.diagnostics.quality_reason_detail = 'found_via_target_customer_query';
+            } else {
+              scoring.qualityTier = 'weak'; scoring.qualityConfidence = 'low';
+              scoring.diagnostics.quality_reason_detail = scoring.evidenceFlags.category_match
+                ? (wc >= 1 ? 'weak_category_address_only' : 'weak_category_only')
+                : 'base_only';
+            }
+            scoring.diagnostics.quality_tier = scoring.qualityTier;
+            scoring.diagnostics.quality_confidence = scoring.qualityConfidence;
+
+            // Save-Reason-Code neu aufbauen mit target_query
+            const src = [];
+            if (scoring.evidenceFlags.target_customer_match) src.push('tc_match');
+            src.push('target_query');
+            if (scoring.evidenceFlags.category_match) src.push('cat_match');
+            if (scoring.evidenceFlags.place_type_match) src.push('placetype');
+            if (scoring.evidenceFlags.scoring_signal_match) src.push('signal');
+            if (scoring.evidenceFlags.phone) src.push('phone');
+            if (scoring.evidenceFlags.website) src.push('website');
+            if (scoring.evidenceFlags.address) src.push('address');
+            scoring.saveReasonCode = src.join('+') || 'target_query';
+            scoring.diagnostics.save_reason_code = scoring.saveReasonCode;
+          }
 
           const details = await getPlaceDetails(place.place_id, GOOGLE_PLACES_API_KEY);
           placeDetailsUsed++;
