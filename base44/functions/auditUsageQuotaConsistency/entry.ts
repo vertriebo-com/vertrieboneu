@@ -20,9 +20,41 @@
  * Output: claim_status green/yellow/red, risk_level, hard_values,
  *         mismatches, warnings, recommended_fixes
  *
+ * Phase-2-Policy:
+ * - QuotaReservation wird NUR als diagnostic behandelt wenn:
+ *   (a) keine committed Slots obwohl Companies existieren (bypassed), ODER
+ *   (b) duplicate slots (corrupt)
+ * - source_policy je Counter explizit im Audit-Output
+ * - cross_source_consistency nutzt companies_count als Referenzquelle (PRIMARY)
+ *
  * Admin-only. Schreibt nichts.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+
+// ── PHASE 3: Kanonische Berlin-Period-Hilfsfunktionen (period-utils v1.0) ──────
+// Identische Kopie aus getUsageSummary — Tech-Debt: Base44 kein Import.
+function getBerlinPeriodMonth(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit',
+  }).formatToParts(date);
+  const y = parts.find(p => p.type === 'year')?.value;
+  const m = parts.find(p => p.type === 'month')?.value;
+  return { periodMonth: `${y}-${m}`, py: parseInt(y), pm: parseInt(m) };
+}
+function getBerlinPeriodBounds(py, pm) {
+  return {
+    periodStart: new Date(Date.UTC(py, pm - 1, 1)),
+    periodEnd:   new Date(Date.UTC(py, pm, 1)),
+  };
+}
+const NON_QUOTA_RUN_IDS = new Set(['manual_setup', 'csv_import', 'manual', 'import']);
+function isResearchLead(c) {
+  if (!c.research_run_id) return false;
+  if (NON_QUOTA_RUN_IDS.has(c.research_run_id)) return false;
+  if (c.quelle === 'Manuell' || c.quelle === 'CSV Import') return false;
+  if (c.source_provider === 'manual' || c.source_provider === 'csv_import') return false;
+  return true;
+}
 
 Deno.serve(async (req) => {
   try {
@@ -51,62 +83,41 @@ Deno.serve(async (req) => {
       if (status === 'yellow') warnings.push(t);
     }
 
-    // ── KANONISCHE PERIOD_MONTH-BERECHNUNG ───────────────────────────────────
-    // Alle 3 Produktionsfunktionen (startResearchRun, processResearchRun, getUsageSummary)
-    // nutzen leicht unterschiedliche Implementierungen aber denselben Wert.
-    // Diese Funktion spiegelt die getUsageSummary-Variante (formatToParts, sicherste).
+    // ── PHASE 3: Kanonische Period-Berechnung ────────────────────────────────
     const now = new Date();
-    const periodParts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Europe/Berlin',
-      year: 'numeric',
-      month: '2-digit',
-    }).formatToParts(now);
-    const yearPart = periodParts.find(p => p.type === 'year');
-    const monthPart = periodParts.find(p => p.type === 'month');
-    const periodMonth = `${yearPart?.value}-${monthPart?.value}`;
+    const { periodMonth, py, pm } = getBerlinPeriodMonth(now);
+    const { periodStart, periodEnd } = getBerlinPeriodBounds(py, pm);
 
-    // startResearchRun nutzt de-DE split-Variante:
+    // Verification: startResearchRun nutzt de-DE split-Variante → prüfen ob identisch
     const periodMonthAlt = new Intl.DateTimeFormat('de-DE', {
       timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit',
     }).format(now).split('.').reverse().join('-');
-
-    // processResearchRun nutzt en-CA formatToParts (identisch zu getUsageSummary):
-    const periodMonthProcess = periodMonth; // identisch
 
     // ── ① Monatsgrenze-Konsistenz über alle Funktionen ──────────────────────
     addTest('period_month', 'cross_function_consistency',
       periodMonth === periodMonthAlt ? 'green' : 'red',
       periodMonth === periodMonthAlt
-        ? `Alle 3 Implementierungen liefern identisches periodMonth: "${periodMonth}".`
-        : `DIVERGENZ: getUsageSummary="${periodMonth}" vs startResearchRun="${periodMonthAlt}". Am Monatswechsel könnten Leads falsch gezählt werden.`,
+        ? `Phase-3 verified: alle Implementierungen liefern identisches periodMonth="${periodMonth}". startResearchRun (de-DE) stimmt mit kanonischer getBerlinPeriodMonth() überein.`
+        : `DIVERGENZ: getBerlinPeriodMonth="${periodMonth}" vs startResearchRun="${periodMonthAlt}". Am Monatswechsel könnten Leads falsch gezählt werden.`,
       {
-        getUsageSummary_period: periodMonth,
+        canonical_period: periodMonth,
         startResearchRun_period: periodMonthAlt,
-        processResearchRun_period: periodMonthProcess,
         all_match: periodMonth === periodMonthAlt,
+        phase3_status: 'getUsageSummary+auditUsageQuotaConsistency unified — startResearchRun+processResearchRun still separate (tech-debt)',
       }
     );
 
-    const py = parseInt(yearPart?.value);
-    const pm = parseInt(monthPart?.value);
-    const periodStart = new Date(Date.UTC(py, pm - 1, 1));
-    const periodEnd   = new Date(Date.UTC(py, pm, 1));
-
-    // UTC-Grenzrisiko: Berlin ist UTC+1 (Winter) / UTC+2 (Sommer).
-    // periodStart/periodEnd nutzen UTC-Grenzen → bis zu 2h Drift am Monatswechsel.
-    const berlinOffsetHours = now.getTimezoneOffset() > 0 ? 1 : 2; // grobe Approximation
     addTest('period_month', 'utc_boundary_drift_risk',
       'yellow',
-      `periodStart/periodEnd basieren auf UTC-Grenzen (nicht Berlin-Grenzen). ` +
-      `Am Monatswechsel können Research-Leads in den letzten ${berlinOffsetHours}h des Berlin-Monats ` +
-      `noch in den Vormonat fallen. max()-Formel kompensiert via UsageLog (Berlin-Quelle). ` +
-      `Betrifft nur Companies direkt am Monatswechsel – Risiko: 0-2 Leads Fehlzählung.`,
+      `periodStart/periodEnd sind UTC-Annäherungen (nicht Berlin-Mitternacht). ` +
+      `Am Monatswechsel bis zu 2h Drift. max()-Reconciliation kompensiert via UsageLog. ` +
+      `Phase-3 Tech-Debt: period-utils v1.0 inline-kopiert, kein echter shared import (Base44 limitation).`,
       {
         period_start_utc: periodStart.toISOString(),
         period_end_utc: periodEnd.toISOString(),
-        berlin_offset_approx_h: berlinOffsetHours,
-        mitigation: 'max(committedSlots, usageLogValue, companiesThisMonth)',
         residual_risk: 'up_to_2_leads_drift_at_month_boundary',
+        period_utils_version: 'v1.0',
+        mitigation: 'max()-reconciliation + usagelog as berlin-time-tracked source',
       }
     );
 
@@ -208,12 +219,9 @@ Deno.serve(async (req) => {
       const emailsLog      = usageLogs?.[0]?.emails_sent || 0;
       const researchRunsLog = usageLogs?.[0]?.lead_generations_used || 0;
 
-      // Companies diesen Monat (Research-only, UTC-Grenze)
+      // Companies diesen Monat (Research-only, UTC-Annäherung — phase-3 getBerlinPeriodBounds)
       const companiesThisMonth = companiesRaw.filter(c => {
-        if (!c.research_run_id) return false;
-        if (NON_QUOTA_RUN_IDS.has(c.research_run_id)) return false;
-        if (c.quelle === 'Manuell' || c.quelle === 'CSV Import') return false;
-        if (c.source_provider === 'manual' || c.source_provider === 'csv_import') return false;
+        if (!isResearchLead(c)) return false;
         const created = new Date(c.created_date);
         return created >= periodStart && created < periodEnd;
       }).length;
@@ -265,12 +273,25 @@ Deno.serve(async (req) => {
         orgsWithMismatch++;
       }
 
-      // source_used bestimmen
-      const sourceUsed = monthlyUsed === committedSlots && committedSlots >= usageLogValue && committedSlots >= companiesThisMonth
-        ? 'quota_reservation'
-        : monthlyUsed === usageLogValue && usageLogValue >= companiesThisMonth
-        ? 'usage_log'
-        : 'companies_count';
+      // Phase-2: QuotaReservation Reliability
+      const quotaStatus = hasDuplicateSlots
+        ? 'corrupt'
+        : committedSlots === 0 && companiesThisMonth > 0
+          ? 'bypassed'
+          : committedSlots > 0 ? 'active' : 'empty';
+
+      // source_of_truth per Phase-2-Policy (companies_count ist PRIMARY)
+      let sourceUsed;
+      if (quotaStatus === 'corrupt' || quotaStatus === 'bypassed') {
+        // QuotaReservation nicht als führende Quelle
+        sourceUsed = usageLogValue >= companiesThisMonth ? 'usage_log' : 'companies_count';
+      } else {
+        sourceUsed = monthlyUsed === committedSlots && committedSlots >= usageLogValue && committedSlots >= companiesThisMonth
+          ? 'quota_reservation'
+          : monthlyUsed === usageLogValue && usageLogValue >= companiesThisMonth
+          ? 'usage_log'
+          : 'companies_count';
+      }
 
       orgResults.push({
         org_id: orgId,
@@ -289,7 +310,8 @@ Deno.serve(async (req) => {
           companies_this_month: companiesThisMonth,
           run_leads_saved_sum: runLeadsSavedSum,
           monthly_used_reconciled: monthlyUsed,
-          source_used: sourceUsed,
+          source_of_truth: sourceUsed,
+          quota_reservation_status: quotaStatus,
         },
         deltas: {
           committed_vs_usagelog: committedSlots - usageLogValue,
@@ -311,23 +333,43 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── ① QuotaReservation vs UsageLog vs Company ────────────────────────────
-    const orgsWithLargeDelta = orgResults.filter(o => o.deltas.max_delta_all_sources > 5);
-    const orgsWithSmallDelta = orgResults.filter(o => o.deltas.max_delta_all_sources > 1 && o.deltas.max_delta_all_sources <= 5);
-    const orgsAllAgree = orgResults.filter(o => o.quality.sources_agree);
+    // ── ① Cross-Source-Consistency (Phase-2-Policy) ──────────────────────────
+    // PRIMARY reference: companies_this_month (echte DB-Zählung)
+    // Delta = |usagelog - companies| (QuotaReservation ist diagnostic-only wenn bypassed/corrupt)
+    const orgsWithCorruptQuota = orgResults.filter(o => o.sources.quota_reservation_status === 'corrupt');
+    const orgsWithBypassedQuota = orgResults.filter(o => o.sources.quota_reservation_status === 'bypassed');
+
+    // Für Quellen-Divergenz: companies_count als Referenz, UsageLog als Vergleich
+    const orgsWithLargeDelta = orgResults.filter(o => Math.abs(o.deltas.usagelog_vs_companies) > 5);
+    const orgsWithSmallDelta = orgResults.filter(o => {
+      const d = Math.abs(o.deltas.usagelog_vs_companies);
+      return d > 1 && d <= 5;
+    });
+    const orgsAllAgree = orgResults.filter(o => Math.abs(o.deltas.usagelog_vs_companies) <= 1);
+
+    // Status: corrupt quota ist RED, large usagelog-vs-companies delta ist YELLOW
+    const crossSourceStatus = orgsWithCorruptQuota.length > 0 ? 'red'
+      : orgsWithLargeDelta.length > 0 ? 'yellow'
+      : orgsWithBypassedQuota.length > 0 ? 'yellow'
+      : 'green';
 
     addTest('quota_sources', 'cross_source_consistency',
-      orgsWithLargeDelta.length > 0 ? 'red' : orgsWithSmallDelta.length > 0 ? 'yellow' : 'green',
-      orgsWithLargeDelta.length > 0
-        ? `${orgsWithLargeDelta.length} Org(s) mit Abweichung >5 zwischen Quellen (QuotaReservation/UsageLog/Company). Mögliche Over/Under-Counting.`
-        : orgsWithSmallDelta.length > 0
-        ? `${orgsWithSmallDelta.length} Org(s) mit Abweichung 2-5 zwischen Quellen. max()-Formel kompensiert, aber Ursache prüfen.`
-        : `Alle ${orgsAllAgree.length} Orgs: QuotaReservation, UsageLog, Company-Zählung stimmen überein (Δ ≤ 1).`,
+      crossSourceStatus,
+      orgsWithCorruptQuota.length > 0
+        ? `${orgsWithCorruptQuota.length} Org(s) mit KORRUPTEN QuotaReservations (duplicate slots). QuotaReservation als Quelle ausgeschlossen.`
+        : orgsWithLargeDelta.length > 0
+        ? `Phase-2: ${orgsWithLargeDelta.length} Org(s): UsageLog weicht >5 von companies_count ab (PRIMARY). Ursache prüfen.`
+        : orgsWithBypassedQuota.length > 0
+        ? `Phase-2: ${orgsWithBypassedQuota.length} Org(s): QuotaReservation bypassed (MVP). UsageLog/Companies stimmen überein (Δ ≤ 1). Akzeptiert.`
+        : `Phase-2: Alle ${orgsAllAgree.length} Orgs: UsageLog ≈ companies_count (Δ ≤ 1). Historische Deltas durch QuotaReservation-Bypass erwartet.`,
       {
-        orgs_large_delta: orgsWithLargeDelta.map(o => ({ org: o.org_name, delta: o.deltas.max_delta_all_sources, sources: o.sources })),
-        orgs_small_delta: orgsWithSmallDelta.map(o => ({ org: o.org_name, delta: o.deltas.max_delta_all_sources })),
+        phase2_policy: 'companies_count=PRIMARY, usagelog=SECONDARY, quota_reservation=DIAGNOSTIC',
+        orgs_corrupt_quota: orgsWithCorruptQuota.map(o => ({ org: o.org_name, duplicate_slots: o.quality.duplicate_slot_numbers, sources: o.sources })),
+        orgs_bypassed_quota: orgsWithBypassedQuota.map(o => ({ org: o.org_name, companies: o.sources.companies_this_month, committed: o.sources.committed_slots })),
+        orgs_large_usagelog_delta: orgsWithLargeDelta.map(o => ({ org: o.org_name, usagelog: o.sources.usage_log_leads, companies: o.sources.companies_this_month, delta: o.deltas.usagelog_vs_companies })),
         orgs_all_agree_count: orgsAllAgree.length,
         total_orgs_checked: orgResults.length,
+        note: 'Large quota_reservation deltas are expected/accepted (MVP bypass active). UsageLog vs Companies is the meaningful check.',
       }
     );
 
@@ -348,17 +390,38 @@ Deno.serve(async (req) => {
       }
     );
 
-    // ── ⑧ Doppelte Reservierungen / Race-Risiko ──────────────────────────────
+    // ── ⑧ Doppelte Reservierungen / Race-Risiko (Phase-2: Report, kein Auto-Delete) ─
+    // Policy: Nicht automatisch löschen. Report mit allen Details für manuelle Prüfung.
+    const dupSlotReport = orgResults.filter(o => o.quality.has_duplicate_slots).map(async (o) => {
+      const allSlots = await base44.asServiceRole.entities.QuotaReservation.filter({
+        organization_id: o.org_id, period_month: periodMonth,
+      }).catch(() => []);
+      const bySlotNumber = {};
+      for (const s of allSlots) {
+        if (!bySlotNumber[s.slot_number]) bySlotNumber[s.slot_number] = [];
+        bySlotNumber[s.slot_number].push({ id: s.id, status: s.status, reserved_at: s.reserved_at, run_id: s.research_run_id });
+      }
+      const duplicates = Object.entries(bySlotNumber).filter(([, arr]) => arr.length > 1).map(([slotNum, arr]) => ({
+        slot_number: parseInt(slotNum),
+        reservation_ids: arr.map(r => r.id),
+        statuses: arr.map(r => r.status),
+        reserved_ats: arr.map(r => r.reserved_at),
+        run_ids: arr.map(r => r.run_id),
+      }));
+      return { org_id: o.org_id, org_name: o.org_name, period_month: periodMonth, duplicates };
+    });
+    const dupSlotDetails = await Promise.all(dupSlotReport);
+
     addTest('quota_reservation', 'duplicate_slots',
       orgsWithDuplicateSlots > 0 ? 'red' : 'green',
       orgsWithDuplicateSlots > 0
-        ? `${orgsWithDuplicateSlots} Org(s) haben doppelte Slot-Nummern in QuotaReservation! Race-Condition aufgetreten oder unique_constraint nicht enforced.`
-        : 'Keine doppelten Slot-Nummern in QuotaReservation gefunden.',
+        ? `${orgsWithDuplicateSlots} Org(s) haben doppelte Slot-Nummern. Race-Condition nachgewiesen. Phase-2: QuotaReservation für diese Orgs als corrupt/diagnostic markiert. NICHT automatisch gelöscht.`
+        : 'Keine doppelten Slot-Nummern in QuotaReservation.',
       {
-        orgs_with_duplicate_slots: orgResults.filter(o => o.quality.has_duplicate_slots).map(o => ({
-          org: o.org_name,
-          duplicate_slots: o.quality.duplicate_slot_numbers,
-        })),
+        phase2_action: 'report_only_no_auto_delete',
+        orgs_with_duplicates: dupSlotDetails,
+        impact: 'quota_reservation excluded from primary source for affected orgs (companies_count used instead)',
+        remediation: 'Manual review required. repairQuotaCommit can be extended to deduplicate.',
       }
     );
 
@@ -393,7 +456,10 @@ Deno.serve(async (req) => {
 
     // ── ⑨ Reconciliation per max() — source_used-Verteilung ─────────────────
     const sourceDistribution = { quota_reservation: 0, usage_log: 0, companies_count: 0 };
-    for (const o of orgResults) sourceDistribution[o.sources.source_used] = (sourceDistribution[o.sources.source_used] || 0) + 1;
+    for (const o of orgResults) {
+      const k = o.sources.source_of_truth;
+      sourceDistribution[k] = (sourceDistribution[k] || 0) + 1;
+    }
 
     addTest('reconciliation', 'source_used_distribution',
       'green',

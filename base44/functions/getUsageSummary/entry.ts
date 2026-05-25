@@ -1,4 +1,69 @@
+/**
+ * getUsageSummary
+ * ===============
+ * USAGE TRUTH POLICY (2026-05-25):
+ *
+ * leads_used       → PRIMARY: companies_this_month (echte DB-Zählung, nicht manipulierbar)
+ *                    SECONDARY: usage_log_leads (write-time-Tracking, kann drift haben)
+ *                    TERTIARY: committed_slots (QuotaReservation, MVP-Bypass aktiv → oft 0)
+ *                    RECONCILIATION: max() aller drei (nie eine Quelle ignorieren)
+ *
+ * research_runs    → PRIMARY: ResearchRun-Zählung (completed+partial diesen Monat)
+ *                    SECONDARY: UsageLog.lead_generations_used (trust-based)
+ *
+ * ai_actions       → PRIMARY: UsageLog.ai_actions_used (server-side enforced in enrichCompany)
+ *                    RISK: kein direkter Audit-Rückkanal, trust-based
+ *
+ * emails_used      → PRIMARY: UsageLog.emails_sent
+ *                    RISK: trust-based, kein Brevo-Rückkanal, explizit markiert
+ *
+ * quota_reservation → DIAGNOSTIC only: QuotaReservation-Bypass aktiv (MVP).
+ *                     Nicht als primäre Quelle verwenden solange orgs_without_quota > 0.
+ *
+ * periodMonth      → Europe/Berlin via formatToParts (kanonisch, identisch zu processResearchRun)
+ * periodBounds     → getBerlinPeriodBounds() für Company-Zählung (UTC-Annäherung mit bekanntem Drift)
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+
+// ── PHASE 3: Kanonische Berlin-Period-Hilfsfunktionen ──────────────────────────
+// Zentralisiert in allen Funktionen die periodMonth/periodBounds verwenden.
+// Identische Logik in: getUsageSummary, startResearchRun, processResearchRun, auditUsageQuotaConsistency.
+// Tech-Debt: Base44 erlaubt keine Imports → hier als inline-Kopie, aber explizit versioniert.
+// Version: period-utils v1.0 (2026-05-25)
+
+function getBerlinPeriodMonth(date = new Date()) {
+  // Robuste Implementierung via formatToParts (vermeidet Invalid Date / Split-Fehler)
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Berlin',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(date);
+  const y = parts.find(p => p.type === 'year')?.value;
+  const m = parts.find(p => p.type === 'month')?.value;
+  return { periodMonth: `${y}-${m}`, py: parseInt(y), pm: parseInt(m) };
+}
+
+function getBerlinPeriodBounds(py, pm) {
+  // ⚠️ UTC-Annäherung: periodStart/End als UTC-Mitternacht des Kalendermonats.
+  // Berlin ist UTC+1 (Winter) / UTC+2 (Sommer) → bis zu 2h Drift am Monatswechsel.
+  // Bekanntes Tech-Debt — max()-Reconciliation kompensiert diesen Drift.
+  const periodStart = new Date(Date.UTC(py, pm - 1, 1));
+  const periodEnd   = new Date(Date.UTC(py, pm, 1));
+  return { periodStart, periodEnd };
+}
+
+// ── NON_QUOTA_RUN_IDS: Research-only Filterung (kanonisch) ───────────────────
+// Identisch in getUsageSummary, startResearchRun, processResearchRun.
+// Version: non-quota-ids v1.0 (2026-05-25)
+const NON_QUOTA_RUN_IDS = new Set(['manual_setup', 'csv_import', 'manual', 'import']);
+
+function isResearchLead(c) {
+  if (!c.research_run_id) return false;
+  if (NON_QUOTA_RUN_IDS.has(c.research_run_id)) return false;
+  if (c.quelle === 'Manuell' || c.quelle === 'CSV Import') return false;
+  if (c.source_provider === 'manual' || c.source_provider === 'csv_import') return false;
+  return true;
+}
 
 Deno.serve(async (req) => {
   try {
@@ -16,17 +81,13 @@ Deno.serve(async (req) => {
       requestedOrgId = body?.org_id || null;
     } catch {}
 
-    // ── MVP: 1 Paket = 1 Account = 1 Organisation ─────────────────────────
-    // Keine OrganizationMember-Lookups. Zugriff nur über owner_email oder PlatformAdmin.
     const isPlatformAdmin = ["admin", "platform_owner", "platform_admin", "support_agent", "readonly_support"].includes(user.role);
 
     let org = null;
     if (requestedOrgId) {
       const targetOrgs = await base44.asServiceRole.entities.Organization.filter({ id: requestedOrgId });
       const targetOrg = targetOrgs?.[0] || null;
-      if (!targetOrg) {
-        return Response.json({ error: 'no_organization_found' }, { status: 404 });
-      }
+      if (!targetOrg) return Response.json({ error: 'no_organization_found' }, { status: 404 });
       if (targetOrg.owner_email === user.email || isPlatformAdmin) {
         org = targetOrg;
       } else {
@@ -41,191 +102,182 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!org) {
-      return Response.json({ error: 'no_organization_found' }, { status: 404 });
-    }
-
+    if (!org) return Response.json({ error: 'no_organization_found' }, { status: 404 });
     const orgId = org.id;
 
-    // ── KANONISCHE PERIOD_MONTH-BERECHNUNG (Europe/Berlin) ─────────────────
-    // Robuste Implementierung via formatToParts (vermeidet Invalid Date / Split-Fehler)
-    const now = new Date();
-    const periodParts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Europe/Berlin',
-      year: 'numeric',
-      month: '2-digit',
-    }).formatToParts(now);
-    const yearPart = periodParts.find(p => p.type === 'year');
-    const monthPart = periodParts.find(p => p.type === 'month');
-    const periodMonth = `${yearPart?.value}-${monthPart?.value}`; // z.B. "2026-05"
+    // ── PERIOD (kanonisch, phase-3-zentralisiert) ─────────────────────────────
+    const { periodMonth, py, pm } = getBerlinPeriodMonth();
+    const { periodStart, periodEnd } = getBerlinPeriodBounds(py, pm);
 
-    // ── RESET-DATUM (erster Tag nächster Kalendermonat Berlin) ─────────────
-    const py = parseInt(yearPart?.value || new Date().getFullYear());
-    const pm = parseInt(monthPart?.value || 1);
-    const resetDate = new Date(Date.UTC(py, pm, 1)); // pm ist 1-basiert → nächster Monat
-    const resetDateFormatted = resetDate.toLocaleDateString('de-DE', { 
-      day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Berlin' 
+    // Reset-Datum (erster Tag nächster Kalendermonat, Berlin-Anzeige)
+    const resetDate = new Date(Date.UTC(py, pm, 1));
+    const resetDateFormatted = resetDate.toLocaleDateString('de-DE', {
+      day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Berlin'
     });
 
-    // ── ALLE QUELLEN PARALLEL LADEN ────────────────────────────────────────
-    const [quotaSlots, usageLogs, allCompaniesRaw] = await Promise.all([
-      base44.asServiceRole.entities.QuotaReservation.filter({
-        organization_id: orgId,
-        period_month: periodMonth,
-      }),
-      base44.asServiceRole.entities.UsageLog.filter({ 
-        organization_id: orgId, 
-        period_month: periodMonth 
-      }),
+    // ── ALLE QUELLEN PARALLEL LADEN ───────────────────────────────────────────
+    const [quotaSlots, usageLogs, allCompaniesRaw, researchRunsRaw] = await Promise.all([
+      base44.asServiceRole.entities.QuotaReservation.filter({ organization_id: orgId, period_month: periodMonth }),
+      base44.asServiceRole.entities.UsageLog.filter({ organization_id: orgId, period_month: periodMonth }),
       base44.asServiceRole.entities.Company.filter({ organization_id: orgId }, '-created_date', 2000),
+      base44.asServiceRole.entities.ResearchRun.filter({ organization_id: orgId }, '-created_date', 50),
     ]);
 
+    // ── LEADS: alle 3 Quellen auswerten ──────────────────────────────────────
     const committedSlots = quotaSlots.filter(s => s.status === 'committed').length;
-    const reservedSlots = quotaSlots.filter(s => s.status === 'reserved').length;
+    const reservedSlots  = quotaSlots.filter(s => s.status === 'reserved').length;
 
-    // ── RECONCILIATION: Tatsächliche Research-Leads diesen Monat ──────────
-    // SSOT-Formel (§E Merkliste): monthly_used = Math.max(committedSlots, usageLogValue, companiesThisMonth)
-    // Alle drei Quellen werden reconciliert — niemals nur eine Quelle allein verwenden.
-    //
-    // ⚠️ MVP-RISIKO: periodStart/periodEnd als UTC-Mitternacht des Kalendermonats.
-    // Berlin-Mitternacht ≠ UTC-Mitternacht: Differenz je nach Sommer-/Winterzeit +1h oder +2h.
-    // Am Monatswechsel können Companies in den letzten 1-2h des Berlin-Monats noch in
-    // period_month des Vormonats fallen (Berlin sagt "1. Juni", UTC sagt noch "31. Mai").
-    // → companiesThisMonth kann am Monatswechsel um bis zu 2h Drift haben.
-    // → max()-Formel kompensiert via usageLogValue (korrekte Berlin-Quelle).
-    // Langfristig: Berlin-Grenzen exakt berechnen oder UsageEvent als SSOT verwenden.
-    const periodStart = new Date(Date.UTC(py, pm - 1, 1));
-    const periodEnd   = new Date(Date.UTC(py, pm, 1));
+    const usageLogValue = usageLogs?.[0]?.leads_created || 0;
+    const usageLog = usageLogs?.[0] || null;
 
-    // NON_QUOTA_RUN_IDS: research_run_id-Werte die KEIN echtes Monatskontingent verbrauchen.
-    // Erweitern wenn neue Sonderwerte hinzukommen (§I Merkliste: Manuelle/Import-Leads nicht mischen).
-    const NON_QUOTA_RUN_IDS = new Set(['manual_setup', 'csv_import', 'manual', 'import']);
-
+    // PRIMARY: Company-Zählung (echte DB-Zählung)
     const companiesThisMonth = allCompaniesRaw.filter(c => {
-      if (!c.research_run_id) return false;
-      if (NON_QUOTA_RUN_IDS.has(c.research_run_id)) return false;
-      // Doppelabsicherung via quelle/source_provider
-      if (c.quelle === 'Manuell' || c.quelle === 'CSV Import') return false;
-      if (c.source_provider === 'manual' || c.source_provider === 'csv_import') return false;
+      if (!isResearchLead(c)) return false;
       const created = new Date(c.created_date);
       return created >= periodStart && created < periodEnd;
     }).length;
 
-    // Höchsten Wert aus allen Quellen nehmen (nie eine valide Quelle ignorieren)
-    const usageLogValue = usageLogs?.[0]?.leads_created || 0;
+    // QuotaReservation Health: Duplicate-Slot-Check
+    const slotNumbers = quotaSlots.map(s => s.slot_number);
+    const hasDuplicateSlots = slotNumbers.length !== new Set(slotNumbers).size;
+    const duplicateSlots = slotNumbers.filter((n, i) => slotNumbers.indexOf(n) !== i);
+
+    // QuotaReservation Reliability Flag
+    // "degraded" wenn: keine committed Slots aber Companies existieren, ODER duplicate slots
+    const quotaReservationReliable = committedSlots > 0 && !hasDuplicateSlots;
+    const quotaReservationStatus = hasDuplicateSlots
+      ? 'corrupt'
+      : committedSlots === 0 && companiesThisMonth > 0
+        ? 'bypassed'
+        : committedSlots > 0
+          ? 'active'
+          : 'empty';
+
+    // RECONCILIATION per max() — führende Quelle je nach Reliability
+    // Policy: Companies ist primär, außer wenn QuotaReservation höher ist (over-count guard)
     const monthlyUsed = Math.max(committedSlots, usageLogValue, companiesThisMonth);
 
-    const usageLog = usageLogs?.[0] || null;
-    const usageLogDiff = usageLogValue - committedSlots;
+    // source_of_truth je Counter (explizit, nicht stilles max())
+    let leadsSourceOfTruth;
+    let leadsSourceWarning = null;
 
-    // ── PLAN LADEN ─────────────────────────────────────────────────────────
-    // Robuster Lookup: ungültige plan_id-Werte (z.B. "plan_starter" statt echter Entity-ID) werden abgefangen.
+    if (quotaReservationStatus === 'corrupt') {
+      // Duplicate slots → QuotaReservation nicht vertrauenswürdig
+      leadsSourceOfTruth = monthlyUsed === usageLogValue && usageLogValue >= companiesThisMonth
+        ? 'usage_log'
+        : 'companies_count';
+      leadsSourceWarning = 'quota_reservation_corrupt: duplicate slots detected, excluded from primary source';
+    } else if (quotaReservationStatus === 'bypassed') {
+      // MVP-Bypass: QuotaReservation leer, obwohl Companies existieren
+      leadsSourceOfTruth = usageLogValue >= companiesThisMonth ? 'usage_log' : 'companies_count';
+      leadsSourceWarning = 'quota_reservation_bypassed: no committed slots despite existing companies';
+    } else if (monthlyUsed === committedSlots && committedSlots >= usageLogValue && committedSlots >= companiesThisMonth) {
+      leadsSourceOfTruth = 'quota_reservation';
+    } else if (monthlyUsed === usageLogValue && usageLogValue >= companiesThisMonth) {
+      leadsSourceOfTruth = 'usage_log';
+    } else {
+      leadsSourceOfTruth = 'companies_count';
+    }
+
+    // Reconciliation-Delta: Abweichungen zwischen allen Quellen
+    const reconciliationDelta = {
+      committed_vs_usagelog: committedSlots - usageLogValue,
+      committed_vs_companies: committedSlots - companiesThisMonth,
+      usagelog_vs_companies: usageLogValue - companiesThisMonth,
+      max_delta: Math.max(
+        Math.abs(committedSlots - usageLogValue),
+        Math.abs(committedSlots - companiesThisMonth),
+        Math.abs(usageLogValue - companiesThisMonth)
+      ),
+    };
+
+    const sourcesAgree = reconciliationDelta.max_delta <= 1;
+
+    // ── RESEARCH RUNS: primär aus ResearchRun, sekundär UsageLog ─────────────
+    const completedRunsThisMonth = researchRunsRaw.filter(r => {
+      if (!['completed', 'partial'].includes(r.status)) return false;
+      const created = new Date(r.created_date);
+      return created >= periodStart && created < periodEnd;
+    });
+    const researchRunsCount = completedRunsThisMonth.length;
+    const researchRunsLogValue = usageLog?.lead_generations_used || 0;
+    const researchRunsUsed = Math.max(researchRunsCount, researchRunsLogValue);
+    const researchRunsSourceWarning = Math.abs(researchRunsCount - researchRunsLogValue) > 2
+      ? `research_runs_drift: DB-count=${researchRunsCount} vs usagelog=${researchRunsLogValue}`
+      : null;
+
+    // ── PLAN LADEN ────────────────────────────────────────────────────────────
     let plan = null;
-    let planLoadError = null; // "missing" | "invalid" | null
+    let planLoadError = null;
     if (org.plan_id) {
       try {
         const planResult = await base44.asServiceRole.entities.Plan.filter({ id: org.plan_id });
         plan = planResult?.[0] || null;
-        if (!plan) planLoadError = 'missing'; // plan_id gesetzt aber Plan nicht in DB gefunden
+        if (!plan) planLoadError = 'missing';
       } catch {
-        planLoadError = 'invalid'; // plan_id ist kein gültiger Entity-ID
-        plan = null;
+        planLoadError = 'invalid';
       }
     }
 
-    // ── LIMIT-AUFLÖSUNG (PRODUKTREGEL) ─────────────────────────────────────
-    // PRIORITÄT: custom_monthly_lead_limit (Admin-Override) > Plan-Wert
-    // custom_monthly_lead_limit: nur PlatformAdmin kann setzen (enforced in platformAdmin.js)
-    // -1 = Unlimited (bewusst durch Admin, nicht durch Plan-Default)
-    // null/nicht gesetzt = Plan-Wert gilt
+    // ── LIMIT-AUFLÖSUNG ───────────────────────────────────────────────────────
     const hasCustomLimit = org.custom_monthly_lead_limit != null;
-
-    // unlimited gilt AUSSCHLIESSLICH wenn:
-    // (a) custom_monthly_lead_limit === -1 (Admin-Override), ODER
-    // (b) Plan existiert UND max_leads_per_month === -1
-    // NIEMALS wenn plan === null, plan_id fehlt, oder Plan ungültig ist.
-    //
-    // Fallback-Hierarchie (identisch zu startResearchRun):
-    //   plan vorhanden + max_leads_per_month === -1 → unlimited (-1)
-    //   plan vorhanden + max_leads_per_month > 0   → festes Limit
-    //   plan vorhanden + max_leads_per_month null  → Trial/Fehler → 50 (defensiv)
-    //   plan_id fehlt + free_preview/verified_trial → Trial-Limits (getrennt vom Recherche-Block)
-    //   plan_id fehlt + paid/active                → billing_plan_missing (Anzeige-Flag)
-    //   plan_id gesetzt, Plan nicht gefunden        → billing_plan_missing
-    //   plan_id gesetzt, Plan ungültig              → billing_plan_invalid
     const trialStage = org.trial_stage || 'free_preview';
     const isPaidCustomer = ['paid'].includes(trialStage) || ['active', 'trialing'].includes(org.billing_status || '');
 
     let monthlyLimit;
-    let planStatus = 'ok'; // "ok" | "billing_plan_missing" | "billing_plan_invalid" | "trial_limit" | "no_plan_preview" | "custom_limit"
+    let planStatus = 'ok';
     if (hasCustomLimit) {
-      // Admin-Override: custom_monthly_lead_limit hat höchste Priorität
       monthlyLimit = org.custom_monthly_lead_limit;
       planStatus = 'custom_limit';
-      console.info(`[getUsageSummary] custom_monthly_lead_limit=${monthlyLimit} (Admin-Override) org=${orgId}`);
     } else if (plan) {
-      // Plan geladen — max_leads_per_month auslesen
-      // null wird NICHT als unlimited behandelt: defensiv auf 50 setzen (Admin-Fehler sichtbar machen)
       monthlyLimit = (plan.max_leads_per_month != null) ? plan.max_leads_per_month : 50;
-      if (plan.max_leads_per_month == null) planStatus = 'plan_limit_null'; // Warnung: Admin sollte -1 setzen
+      if (plan.max_leads_per_month == null) planStatus = 'plan_limit_null';
     } else if (planLoadError === 'missing') {
-      // plan_id gesetzt aber nicht gefunden
       planStatus = 'billing_plan_missing';
-      monthlyLimit = isPaidCustomer ? 0 : 50; // paid → 0 (geblockt anzeigen), trial → 50
+      monthlyLimit = isPaidCustomer ? 0 : 50;
     } else if (planLoadError === 'invalid') {
       planStatus = 'billing_plan_invalid';
       monthlyLimit = isPaidCustomer ? 0 : 50;
     } else {
-      // plan_id nicht gesetzt
       if (isPaidCustomer) {
         planStatus = 'billing_plan_missing';
-        monthlyLimit = 0; // Zeige "Limit erreicht" an — Admin-Konfigurationsfehler
+        monthlyLimit = 0;
       } else if (trialStage === 'verified_trial') {
         planStatus = 'trial_limit';
         monthlyLimit = 50;
       } else {
-        // free_preview
         planStatus = 'no_plan_preview';
-        monthlyLimit = 10; // Preview-Limit
+        monthlyLimit = 10;
       }
     }
 
-    // Unlimited: custom -1 ODER Plan mit -1 (beide explizit durch Admin)
     const isUnlimited = monthlyLimit === -1;
     const monthlyRemaining = isUnlimited ? null : Math.max(0, monthlyLimit - monthlyUsed);
-    // IDENTISCH zu startResearchRun Zeile 255: >= (nicht >)
-    // Bei used===limit: startResearchRun blockt (>=), getUsageSummary muss is_over_limit=true anzeigen.
-    // Sonst: UI zeigt "Limit nicht erreicht", aber Recherche wird blockiert → Nutzerverwirrung.
     const isOverLimit = !isUnlimited && monthlyUsed >= monthlyLimit;
 
-    // ── CRM-BESTAND (aktuell gespeicherte Companies, ohne Blacklist) ───────
-    // allCompaniesRaw wird wiederverwendet — kein zweiter DB-Call
+    // ── CRM-BESTAND ───────────────────────────────────────────────────────────
     const blacklist = await base44.entities.Blacklist.filter({ organization_id: orgId });
     const blacklistNames = blacklist.map(b => b.firmenname?.toLowerCase().trim());
-    const isBlacklisted = (name) => {
-      if (!name) return false;
-      const normalized = name.toLowerCase().trim();
-      return blacklistNames.some(bl => normalized.includes(bl) || bl.includes(normalized));
-    };
-    const crmTotal = allCompaniesRaw.filter(c => !isBlacklisted(c.name)).length;
+    const crmTotal = allCompaniesRaw.filter(c => {
+      if (!c.name) return true;
+      const n = c.name.toLowerCase().trim();
+      return !blacklistNames.some(bl => n.includes(bl) || bl.includes(n));
+    }).length;
 
-    // ── ZENTRALE USAGE_SUMMARY ─────────────────────────────────────────────
-    // SSOT-Formel (§E Merkliste): monthly_used = Math.max(committedSlots, usageLogValue, companiesThisMonth)
-    const sourceUsed = monthlyUsed === committedSlots && committedSlots >= usageLogValue && committedSlots >= companiesThisMonth
-      ? 'quota_reservation'
-      : monthlyUsed === usageLogValue && usageLogValue >= companiesThisMonth
-      ? 'usage_log'
-      : 'companies_count';
+    // ── LIMIT-WARNUNG bei Company-Filter-Grenze ───────────────────────────────
+    const companyFilterAtLimit = allCompaniesRaw.length >= 2000;
 
-    // ⚠️ MVP-Risiko: Company.filter limit=2000 — bei > 2000 Companies/Monat kann companiesThisMonth unvollständig sein
-    const limitWarning = allCompaniesRaw.length >= 2000
-      ? "ACHTUNG: Company-Filter hat Limit 2000 erreicht — companiesThisMonth könnte unvollständig sein."
-      : null;
+    // ── ALLE WARNINGS SAMMELN ──────────────────────────────────────────────────
+    const diagnosticWarnings = [];
+    if (leadsSourceWarning) diagnosticWarnings.push(leadsSourceWarning);
+    if (researchRunsSourceWarning) diagnosticWarnings.push(researchRunsSourceWarning);
+    if (!sourcesAgree) diagnosticWarnings.push(`sources_diverge: max_delta=${reconciliationDelta.max_delta} (quota_reservation vs usagelog vs companies)`);
+    if (companyFilterAtLimit) diagnosticWarnings.push('company_filter_at_2000_limit: companiesThisMonth may be incomplete');
 
     const usage_summary = {
       period_month: periodMonth,
       plan_name: plan?.name || null,
-      plan_status: planStatus, // "ok" | "billing_plan_missing" | "billing_plan_invalid" | "trial_limit" | "no_plan_preview" | "plan_limit_null"
+      plan_status: planStatus,
       monthly_limit: monthlyLimit,
       monthly_used: monthlyUsed,
       monthly_remaining: monthlyRemaining,
@@ -233,32 +285,93 @@ Deno.serve(async (req) => {
       is_unlimited: isUnlimited,
       reset_date: resetDateFormatted,
       crm_total: crmTotal,
-      explanation: {
-        monthly_used_description: "Automatisch recherchierte Leads in diesem Kalendermonat (max aus QuotaReservation, UsageLog und Company-Zählung)",
-        crm_total_description: "Aktuell gespeicherte Firmenkontakte (inkl. manuell angelegte)",
-        why_different: monthlyUsed !== crmTotal
-          ? "Monatsverbrauch = nur automatisch recherchierte Leads. CRM-Bestand enthält auch manuell angelegte Kontakte." 
+
+      // ── USAGE TRUTH POLICY (Phase 1) ─────────────────────────────────────
+      usage_source_policy: {
+        leads: {
+          primary: 'companies_this_month',
+          secondary: 'usage_log_leads',
+          tertiary: 'committed_slots (diagnostic only)',
+          reconciliation: 'max(committed_slots, usage_log_leads, companies_this_month)',
+          active_source: leadsSourceOfTruth,
+          reliability: quotaReservationStatus === 'corrupt' ? 'degraded_quota_corrupt'
+            : quotaReservationStatus === 'bypassed' ? 'degraded_quota_bypassed'
+            : sourcesAgree ? 'high' : 'medium_sources_diverge',
+        },
+        research_runs: {
+          primary: 'researchrun_db_count',
+          secondary: 'usage_log_lead_generations',
+          active_source: researchRunsCount >= researchRunsLogValue ? 'researchrun_db_count' : 'usage_log_lead_generations',
+        },
+        ai_actions: {
+          primary: 'usage_log_ai_actions',
+          risk: 'trust_based_no_audit_channel',
+        },
+        emails: {
+          primary: 'usage_log_emails_sent',
+          risk: 'trust_based_no_brevo_reconciliation',
+        },
+        quota_reservation: {
+          role: 'diagnostic_only',
+          status: quotaReservationStatus,
+          note: quotaReservationStatus !== 'active'
+            ? 'QuotaReservation not used as primary source: ' + quotaReservationStatus
+            : 'QuotaReservation active and consistent',
+        },
+      },
+
+      // ── RECONCILIATION DIAGNOSTICS (Phase 1) ─────────────────────────────
+      reconciliation_diagnostics: {
+        source_counts: {
+          committed_slots: committedSlots,
+          reserved_slots: reservedSlots,
+          usage_log_leads: usageLogValue,
+          companies_this_month: companiesThisMonth,
+          monthly_used_reconciled: monthlyUsed,
+          research_runs_db_count: researchRunsCount,
+          research_runs_usagelog: researchRunsLogValue,
+          research_runs_reconciled: researchRunsUsed,
+          ai_actions: usageLog?.ai_actions_used || 0,
+          emails_sent: usageLog?.emails_sent || 0,
+        },
+        source_deltas: reconciliationDelta,
+        sources_agree: sourcesAgree,
+        quota_reservation_status: quotaReservationStatus,
+        quota_reservation_reliable: quotaReservationReliable,
+        duplicate_slots: duplicateSlots.length > 0 ? duplicateSlots : null,
+        period_bounds: {
+          period_month: periodMonth,
+          period_start_utc: periodStart.toISOString(),
+          period_end_utc: periodEnd.toISOString(),
+          boundary_note: 'UTC approximation: up to 2h drift at month boundary (known tech-debt)',
+          period_utils_version: 'v1.0',
+        },
+        company_filter_note: companyFilterAtLimit
+          ? 'WARN: Company filter at 2000 limit — companiesThisMonth may be incomplete'
           : null,
       },
-      reconciliation: {
-        committed_slots: committedSlots,
-        reserved_slots: reservedSlots,
-        usage_log_value: usageLogValue,
-        companies_this_month: companiesThisMonth,
-        source_used: sourceUsed,
-        usage_log_diff: usageLogDiff,
-        note: usageLogDiff !== 0 ? "UsageLog weicht von QuotaReservation ab — max()-Formel kompensiert." : null,
-        limit_warning: limitWarning,
-      },
-      // Weitere Usage-Metriken (aus UsageLog)
-      research_runs_used: usageLog?.lead_generations_used || 0,
+
+      // ── DIAGNOSTIC WARNINGS ───────────────────────────────────────────────
+      diagnostic_warnings: diagnosticWarnings,
+
+      // ── WEITERE METRIKEN (aus UsageLog) ──────────────────────────────────
+      research_runs_used: researchRunsUsed,
       ai_actions_used: usageLog?.ai_actions_used || 0,
       manual_emails_logged: usageLog?.manual_emails_logged || 0,
-      // REGEL: null/undefined wird NICHT als -1 (unlimited) behandelt.
-      // Nur explizit -1 im Plan-Feld darf unlimited anzeigen.
       max_research_runs: plan != null ? (plan.max_lead_generations_per_month ?? null) : null,
       max_ai_actions: plan != null ? (plan.max_ai_scorings_per_month ?? null) : null,
       max_emails_per_month: plan != null ? (plan.max_emails_per_month ?? null) : null,
+
+      // Legacy-Feld für Abwärtskompatibilität (wird durch usage_source_policy ersetzt)
+      explanation: {
+        monthly_used_description: `Automatisch recherchierte Leads (Quelle: ${leadsSourceOfTruth})`,
+        crm_total_description: 'Aktuell gespeicherte Firmenkontakte (inkl. manuell angelegte)',
+        why_different: monthlyUsed !== crmTotal
+          ? 'Monatsverbrauch = nur automatisch recherchierte Leads. CRM-Bestand enthält auch manuell angelegte Kontakte.'
+          : null,
+        active_source: leadsSourceOfTruth,
+        source_warning: leadsSourceWarning,
+      },
     };
 
     return Response.json({

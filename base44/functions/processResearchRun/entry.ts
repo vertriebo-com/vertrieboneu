@@ -518,18 +518,17 @@ function extractAddress(components = []) {
 }
 
 // KANONISCH: Kalendermonat Europe/Berlin (YYYY-MM)
-// Alle UsageLog-Schreibungen und Reads müssen dieselbe Logik nutzen.
-// Robuste Implementierung via formatToParts (vermeidet Invalid Date / Split-Fehler)
-function getPeriodMonth() {
-  const now = new Date();
-  const periodParts = new Intl.DateTimeFormat('en-CA', {
+// Phase-3: Vereinheitlicht mit getUsageSummary + startResearchRun (period-utils v1.0).
+// Tech-Debt: Base44 kein Import → inline-Kopie. Version: period-utils v1.0 (2026-05-25)
+function getPeriodMonth(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Berlin',
     year: 'numeric',
     month: '2-digit',
-  }).formatToParts(now);
-  const yearPart = periodParts.find(p => p.type === 'year');
-  const monthPart = periodParts.find(p => p.type === 'month');
-  return `${yearPart?.value}-${monthPart?.value}`; // z.B. "2026-05"
+  }).formatToParts(date);
+  const y = parts.find(p => p.type === 'year')?.value;
+  const m = parts.find(p => p.type === 'month')?.value;
+  return `${y}-${m}`; // z.B. "2026-05"
 }
 
 // QUOTA-RESERVIERUNG MIT CODE-BASEIERTER UNIQUE-PRÜFUNG

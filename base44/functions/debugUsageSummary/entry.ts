@@ -23,13 +23,13 @@ Deno.serve(async (req) => {
     if (!org) return Response.json({ error: 'No org' }, { status: 404 });
 
     const orgId = org.id;
+    // Phase-3: kanonische Berlin-Period-Berechnung (period-utils v1.0, identisch zu getUsageSummary)
     const now = new Date();
-
-    const periodParts = new Intl.DateTimeFormat('en-CA', {
+    const _parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit',
     }).formatToParts(now);
-    const pyU = parseInt(periodParts.find(p => p.type === 'year')?.value || now.getFullYear());
-    const pmU = parseInt(periodParts.find(p => p.type === 'month')?.value || 1);
+    const pyU = parseInt(_parts.find(p => p.type === 'year')?.value || now.getFullYear());
+    const pmU = parseInt(_parts.find(p => p.type === 'month')?.value || 1);
     const periodMonthU = `${pyU}-${String(pmU).padStart(2, '0')}`;
 
     const [quotaSlots, usageLogsU, planData, allCompaniesRaw] = await Promise.all([

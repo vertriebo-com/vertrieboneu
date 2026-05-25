@@ -36,13 +36,15 @@ const LEGACY_INDUSTRY_MAP = {
 };
 
 // KANONISCH: Kalendermonat Europe/Berlin (YYYY-MM)
-// Identisch zu processResearchRun – alle UsageLog-Reads/Writes müssen dieselbe Logik nutzen.
-function getPeriodMonth() {
-  return new Intl.DateTimeFormat('de-DE', {
-    timeZone: 'Europe/Berlin',
-    year: 'numeric',
-    month: '2-digit',
-  }).format(new Date()).split('.').reverse().join('-');
+// Phase-3: Vereinheitlicht mit getUsageSummary (formatToParts, period-utils v1.0).
+// Tech-Debt: Base44 kein Import → inline-Kopie. Version: period-utils v1.0 (2026-05-25)
+function getPeriodMonth(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit',
+  }).formatToParts(date);
+  const y = parts.find(p => p.type === 'year')?.value;
+  const m = parts.find(p => p.type === 'month')?.value;
+  return `${y}-${m}`;
 }
 
 function haversineKm(lat1, lng1, lat2, lng2) {
