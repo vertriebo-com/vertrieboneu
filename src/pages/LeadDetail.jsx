@@ -613,6 +613,7 @@ export default function LeadDetail() {
             contactLogs={contactLogs}
             tasks={tasks}
             orgId={orgId}
+            onEnrich={handleEnrich}
             onAddTask={(nextBestAction) => {
               const TYPE_MAP = { call: "Rückruf", research: "Nachfassen", enrich: "Nachfassen", task: "Rückruf" };
               setTaskDraft({

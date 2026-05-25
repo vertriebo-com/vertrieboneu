@@ -86,6 +86,15 @@ function getEffectiveNextBestAction(company, nba) {
   const hasTelefon = !!company?.telefon;
   const hasEmail = !!company?.email;
 
+  // Wenn beide Kontaktdaten fehlen → primäre Aktion ist immer Enrichment
+  if (!hasTelefon && !hasEmail) {
+    return {
+      type: "enrich",
+      title: "Kontaktdaten suchen",
+      reason: "Für diesen Lead fehlen noch Telefonnummer und E-Mail. Suchen Sie zuerst Kontaktdaten, bevor Sie kontaktieren.",
+      due: nba?.due,
+    };
+  }
   // Wenn NBA "Anrufen" vorschlägt, aber kein Telefon da → Daten anreichern
   if (nba?.type === 'call' && !hasTelefon) {
     return {
@@ -208,7 +217,7 @@ function ResearchDiagnosticsBox({ engineJson, onReanalyze, analyzing }) {
   );
 }
 
-export default function EngineBox({ company, contactLogs = [], tasks = [], orgId, onAddTask, onReanalyze }) {
+export default function EngineBox({ company, contactLogs = [], tasks = [], orgId, onAddTask, onReanalyze, onEnrich }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -379,34 +388,13 @@ export default function EngineBox({ company, contactLogs = [], tasks = [], orgId
           )}
           {analysis.nextBestAction.type === 'enrich' ? (
             <div className="space-y-1.5">
-              <p className="text-[10px] text-blue-700 font-semibold flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> Nutzen Sie „Daten ergänzen" oben auf der Seite
-              </p>
-              {/* Fehlende Infos als Aktionen */}
-              {analysis.missingData && analysis.missingData.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {analysis.missingData.slice(0, 3).map((item, i) => {
-                    const ACTION_MAP = {
-                      contact_person: { label: "Ansprechpartner ergänzen", icon: "👤" },
-                      concrete_need: { label: "Bedarf notieren", icon: "📝" },
-                      phone: { label: "Telefonnummer suchen", icon: "📞" },
-                      email: { label: "E-Mail-Adresse suchen", icon: "✉️" },
-                      website: { label: "Website prüfen", icon: "🌐" },
-                    };
-                    const action = ACTION_MAP[item.field || item] || { label: item.field || item, icon: "📋" };
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => handleAddTask()}
-                        className="text-[10px] font-semibold bg-white border border-blue-200 text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors flex items-center gap-1"
-                      >
-                        <span>{action.icon}</span>
-                        {action.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <Button
+                size="sm"
+                onClick={() => onEnrich && onEnrich()}
+                className="w-full gap-1.5 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Kontaktdaten suchen
+              </Button>
             </div>
           ) : analysis.nextBestAction.type === 'call' || analysis.nextBestAction.type === 'email' ? (
             <div className="space-y-2">
