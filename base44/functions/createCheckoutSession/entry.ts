@@ -87,13 +87,13 @@ Deno.serve(async (req) => {
     if (!plan.stripe_price_id) return Response.json({ error: `Plan hat keine Stripe Price ID – bitte zuerst Stripe Products anlegen` }, { status: 400 });
     if (!plan.is_active) return Response.json({ error: `Plan ist nicht buchbar` }, { status: 400 });
 
-    // ── 3a. HARD-BLOCK: Agency ist nur auf Anfrage verfügbar ─────────────────
-    const planName = (plan.name || '').toLowerCase();
-    const planSlug = (plan.slug || '').toLowerCase();
-    const isAgencyPlan = planName.includes('agency') || planSlug.includes('agency');
-    if (isAgencyPlan) {
-      console.warn(`[createCheckoutSession] Access denied: Agency plan checkout attempt for org ${organization_id}`);
-      return Response.json({ error: 'Agency ist nur auf Anfrage verfügbar', reason: 'agency_contact_required' }, { status: 400 });
+    // ── 3a. HARD-BLOCK: Pläne die nicht self-service buchbar sind ────────────
+    // Technisch: plan.plan_type === 'agency' ODER plan.allow_self_service === false
+    // Kein plan.name.includes() / plan.slug — technische Felder sind source of truth
+    const isNotSelfService = plan.plan_type === 'agency' || plan.allow_self_service === false;
+    if (isNotSelfService) {
+      console.warn(`[createCheckoutSession] Access denied: Non-self-service plan checkout attempt for org ${organization_id} plan=${plan.name} plan_type=${plan.plan_type} allow_self_service=${plan.allow_self_service}`);
+      return Response.json({ error: 'Dieser Plan ist nur auf Anfrage verfügbar', reason: 'agency_contact_required' }, { status: 400 });
     }
 
     // ── 4. Organisation laden (platform_admin: access.organization ist null) ─
@@ -128,10 +128,10 @@ Deno.serve(async (req) => {
       }, { status: 409 });
     }
 
-    const isStarterPlan = planName.includes('starter') || planSlug.includes('starter');
-    const trialDays = isStarterPlan ? 14 : 0;
+    // Trial-Dauer aus Plan-Entity (plan.trial_days) — kein name.includes() mehr
+    const trialDays = plan.trial_days ?? 0;
 
-    console.info(`[createCheckoutSession] org=${organization_id} plan=${plan.name} trial=${trialDays}d (starter-only policy)`);
+    console.info(`[createCheckoutSession] org=${organization_id} plan=${plan.name} plan_code=${plan.plan_code || 'n/a'} trial=${trialDays}d (from plan.trial_days)`);
 
     // ── 6. Stripe Customer: bestehende ID nutzen oder neu anlegen ───────────
     let stripeCustomerId = org.stripe_customer_id || null;

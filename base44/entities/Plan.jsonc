@@ -6,6 +6,10 @@
       "type": "string",
       "title": "Planname"
     },
+    "plan_code": {
+      "type": "string",
+      "title": "Plan-Code (maschinenlesbar, z.B. starter, professional, gold, agency)"
+    },
     "plan_type": {
       "type": "string",
       "title": "Plan-Typ",
@@ -14,6 +18,27 @@
         "agency"
       ],
       "default": "standard"
+    },
+    "billing_mode": {
+      "type": "string",
+      "title": "Billing-Modus",
+      "enum": [
+        "self_service",
+        "sales_assisted",
+        "internal",
+        "legacy"
+      ],
+      "default": "self_service"
+    },
+    "trial_days": {
+      "type": "number",
+      "title": "Trial-Tage (0 = kein Trial)",
+      "default": 0
+    },
+    "allow_self_service": {
+      "type": "boolean",
+      "title": "Self-Service buchbar (false = nur auf Anfrage)",
+      "default": true
     },
     "stripe_price_id": {
       "type": "string",
