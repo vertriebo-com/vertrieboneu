@@ -321,14 +321,10 @@ Deno.serve(async (req) => {
       'negative_keywords aus Taxonomie werden NICHT als Vorschläge angeboten'
     );
 
-    // Prüfe: industryId aus settings.industry_id vs. org.industry (korrekte Priorisierung)
-    // Code zeigt: industryId = settings.industry_id || org.industry
-    // Risiko: org.industry ist ein Label-String (z.B. "Gebäudereinigung"), nicht eine kanonische ID
-    // → ohne Normalisierung würde TaxonomyEntry.filter({ industry_id: "Gebäudereinigung" }) leer zurückkommen
-    warn('generateKeywordSuggestions', 'industry_id_not_normalized_from_org_industry',
-      'industryId = settings.industry_id || org.industry — org.industry ist ein Label-String, nicht normalisiert. ' +
-      'Wenn settings.industry_id fehlt, liefert TaxonomyEntry.filter({ industry_id: "Gebäudereinigung" }) null.',
-      'industryId durch LEGACY_INDUSTRY_MAP normalisieren (wie in startResearchRun)'
+    // Fix umgesetzt (2026-05-25): org.industry wird jetzt über LEGACY_INDUSTRY_MAP normalisiert
+    // rawIndustry = settings.industry_id || org.industry → industryId = LEGACY_INDUSTRY_MAP[rawIndustry] || rawIndustry
+    pass('generateKeywordSuggestions', 'industry_id_normalized_from_org_industry',
+      'org.industry wird über LEGACY_INDUSTRY_MAP auf kanonische industry_id normalisiert (wie in startResearchRun)'
     );
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -539,7 +535,7 @@ Deno.serve(async (req) => {
         frontend_adapter: "industryTargetPresets.js — nur Alias-Mapping + API-Cache",
         backend_loader: "startResearchRun — direkt TaxonomyEntry.filter(), LEGACY_MAP als reiner Adapter",
         keyword_system: "generateKeywordSuggestions — Taxonomie-first, dedupliziert gegen Onboarding + bestehende Profile",
-        known_gap: "generateKeywordSuggestions: industryId aus org.industry nicht normalisiert → kann zu Taxonomie-Miss führen",
+        known_gap: "keine — generateKeywordSuggestions normalisiert org.industry über LEGACY_INDUSTRY_MAP (Fix 2026-05-25)",
         processResearchRun: "liest taxonomyProfile aus search_plan_json (eingebettet von startResearchRun) — kein eigener DB-Call",
       },
       risks,
