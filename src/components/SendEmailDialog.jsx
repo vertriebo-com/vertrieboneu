@@ -55,14 +55,19 @@ function EmailEditor({ tpl, company, orgId, fromName, orgSettings, onBack, onDon
   };
 
   const handleDocument = async () => {
+    if (!orgId) {
+      toast.error("Kein Org-Kontext – bitte Seite neu laden");
+      return;
+    }
+    // Guard: Company muss zur selben Org gehören
+    if (company?.organization_id && company.organization_id !== orgId) {
+      toast.error("Org-Kontext stimmt nicht überein – Aktion abgebrochen");
+      return;
+    }
     setDocumenting(true);
     try {
       const me = await base44.auth.me();
-      let orgIdForLog = orgId;
-      if (!orgIdForLog) {
-        const orgs = await base44.entities.Organization.filter({ owner_email: me.email });
-        orgIdForLog = orgs?.[0]?.id || null;
-      }
+      const orgIdForLog = orgId;
       await base44.entities.ContactLog.create({
         organization_id: orgIdForLog,
         company_id: company.id,
@@ -282,7 +287,7 @@ function EmailEditor({ tpl, company, orgId, fromName, orgSettings, onBack, onDon
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function SendEmailDialog({ company }) {
+export default function SendEmailDialog({ company, organizationId }) {
   const [open, setOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [fromName, setFromName] = useState(null);
@@ -293,30 +298,19 @@ export default function SendEmailDialog({ company }) {
   const hasEmail = !!company?.email;
 
   useEffect(() => {
-    if (open && !orgLoaded) {
+    if (open && !orgLoaded && organizationId) {
       (async () => {
         const user = await base44.auth.me();
-        let org = null;
-        const orgs = await base44.entities.Organization.filter({ owner_email: user.email });
-        org = orgs?.[0] || null;
-        if (!org) {
-          const memberships = await base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" });
-          if (memberships?.[0]?.organization_id) {
-            const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-            org = memberOrgs?.[0] || null;
-          }
-        }
-        if (!org) return;
-        setOrgId(org.id);
+        setOrgId(organizationId);
 
         const [settings, dbTemplates] = await Promise.all([
-          base44.entities.OrganizationSettings.filter({ organization_id: org.id }),
-          base44.entities.EmailTemplate.filter({ organization_id: org.id }),
+          base44.entities.OrganizationSettings.filter({ organization_id: organizationId }),
+          base44.entities.EmailTemplate.filter({ organization_id: organizationId }),
         ]);
 
         const map = {};
         settings.forEach(s => { map[s.key] = s.value; });
-        setFromName(map.email_from_name || map.company_name || org.name || null);
+        setFromName(map.email_from_name || map.company_name || null);
         setOrgSettings({
           services: map.services || map.dienstleistungen || '',
           targetCustomerTypes: map.target_customer_types || map.zielkunden || '',
@@ -326,7 +320,7 @@ export default function SendEmailDialog({ company }) {
 
         // Canonical Keys bevorzugen, Legacy-Fallbacks für Rückwärtskompatibilität
         const sig = map.organization_email_signature || buildSignature({
-          firmenname: map.company_name || org.name,
+          firmenname: map.company_name || null,
           absendername: map.email_from_name,
           telefon: map.email_telefon || map.phone,
           email: map.email_reply_to || map.email_sender_email || user.email,

@@ -12,7 +12,7 @@ const EMPTY_FORM = {
   notizen: "", status: "Neu", quelle: "Manuell",
 };
 
-export default function AddCompanyDialog({ open, onClose, onCreated }) {
+export default function AddCompanyDialog({ open, onClose, onCreated, organizationId }) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [duplicateWarning, setDuplicateWarning] = useState("");
@@ -20,7 +20,11 @@ export default function AddCompanyDialog({ open, onClose, onCreated }) {
   const handleChange = async (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
     if (field === "name" && value.trim().length >= 3) {
-      const existing = await base44.entities.Company.filter({ name: value.trim() });
+      // Duplicate check ist immer org-scoped
+      const filter = organizationId
+        ? { organization_id: organizationId, name: value.trim() }
+        : { name: value.trim() };
+      const existing = await base44.entities.Company.filter(filter);
       setDuplicateWarning(existing.length > 0 ? `⚠️ "${value.trim()}" existiert bereits!` : "");
     } else if (field === "name") {
       setDuplicateWarning("");
@@ -35,19 +39,7 @@ export default function AddCompanyDialog({ open, onClose, onCreated }) {
     setLoading(true);
 
     const me = await base44.auth.me();
-
-    // Org-ID ermitteln
-    let orgId = null;
-    const orgs = await base44.entities.Organization.filter({ owner_email: me.email });
-    let org = orgs?.[0] || null;
-    if (!org) {
-      const memberships = await base44.entities.OrganizationMember.filter({ user_email: me.email, status: "active" });
-      if (memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        org = memberOrgs?.[0] || null;
-      }
-    }
-    orgId = org?.id || null;
+    const orgId = organizationId;
     if (!orgId) { toast.error("Keine Organisation gefunden."); setLoading(false); return; }
 
     // Dublettencheck (nur innerhalb der Org)

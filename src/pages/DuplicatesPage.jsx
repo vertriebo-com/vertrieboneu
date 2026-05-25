@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 import { GitMerge, Trash2, Building2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useOrganization } from "@/hooks/useOrganization";
 
 function similarity(a, b) {
   a = a.toLowerCase().replace(/gmbh|kg|ag|ug|e\.v\.|gbr|\s+/g, " ").trim();
@@ -30,26 +31,18 @@ function similarity(a, b) {
 }
 
 export default function DuplicatesPage() {
+  const { org, loading: orgLoading } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState([]);
   const [merging, setMerging] = useState(null);
 
-  useEffect(() => { findDuplicates(); }, []);
+  useEffect(() => {
+    if (!orgLoading && org?.id) findDuplicates();
+    else if (!orgLoading) setLoading(false);
+  }, [org?.id, orgLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const findDuplicates = async () => {
     setLoading(true);
-    const user = await base44.auth.me();
-    let org = null;
-    const orgs = await base44.entities.Organization.filter({ owner_email: user.email });
-    org = orgs?.[0] || null;
-    if (!org) {
-      const memberships = await base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" });
-      if (memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        org = memberOrgs?.[0] || null;
-      }
-    }
-    if (!org) { setLoading(false); return; }
     const companies = await base44.entities.Company.filter({ organization_id: org.id }, "-created_date", 1000);
     const found = [];
     const used = new Set();
@@ -74,8 +67,20 @@ export default function DuplicatesPage() {
     setLoading(false);
   };
 
+  const assertOrgMatch = (company) => {
+    if (company?.organization_id && company.organization_id !== org?.id) {
+      toast.error("Org-Kontext stimmt nicht überein – Aktion abgebrochen");
+      return false;
+    }
+    return true;
+  };
+
   const handleMerge = async (group) => {
-    // Keep the one with most data, delete the rest
+    // Guard: alle Companies müssen zur aktiven Org gehören
+    for (const c of group) {
+      if (!assertOrgMatch(c)) return;
+    }
+
     const primary = group.reduce((best, c) => {
       const score = [c.telefon, c.email, c.website, c.ansprechpartner, c.adresse].filter(Boolean).length;
       const bestScore = [best.telefon, best.email, best.website, best.ansprechpartner, best.adresse].filter(Boolean).length;
@@ -84,7 +89,6 @@ export default function DuplicatesPage() {
 
     setMerging(primary.id);
 
-    // Merge missing fields from duplicates into primary
     const merged = { ...primary };
     for (const dup of group) {
       if (dup.id === primary.id) continue;
@@ -106,14 +110,15 @@ export default function DuplicatesPage() {
     findDuplicates();
   };
 
-  const handleDelete = async (id, name) => {
+  const handleDelete = async (id, name, company) => {
+    if (!assertOrgMatch(company)) return;
     if (!window.confirm(`"${name}" wirklich löschen?`)) return;
     await base44.entities.Company.delete(id);
     toast.success("Gelöscht");
     findDuplicates();
   };
 
-  if (loading) return (
+  if (orgLoading || loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
     </div>
@@ -166,7 +171,7 @@ export default function DuplicatesPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => handleDelete(c.id, c.name)}
+                  onClick={() => handleDelete(c.id, c.name, c)}
                   className="p-1.5 rounded text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors shrink-0"
                   title="Löschen"
                 >

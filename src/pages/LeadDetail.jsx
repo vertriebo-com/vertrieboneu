@@ -308,7 +308,7 @@ export default function LeadDetail() {
                 </span>
               )}
               <CallScriptDialog company={company} />
-              <SendEmailDialog company={company} />
+              <SendEmailDialog company={company} organizationId={orgId} />
             </div>
           </div>
 
@@ -682,8 +682,8 @@ export default function LeadDetail() {
         </DialogContent>
       </Dialog>
 
-      <AddContactLogDialog open={showAddLog} onClose={() => setShowAddLog(false)} companyId={id} companyName={company.name} onCreated={loadData} />
-      <AddTaskDialog open={showAddTask} onClose={() => { setShowAddTask(false); setTaskDraft(null); }} companyId={id} companyName={company.name} onCreated={loadData} initialData={taskDraft} />
+      <AddContactLogDialog open={showAddLog} onClose={() => setShowAddLog(false)} companyId={id} companyName={company.name} onCreated={loadData} organizationId={orgId} />
+      <AddTaskDialog open={showAddTask} onClose={() => { setShowAddTask(false); setTaskDraft(null); }} companyId={id} companyName={company.name} onCreated={loadData} initialData={taskDraft} organizationId={orgId} />
 
       <Dialog open={showBlacklistConfirm} onOpenChange={setShowBlacklistConfirm}>
         <DialogContent className="max-w-sm">

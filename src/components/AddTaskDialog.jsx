@@ -8,7 +8,7 @@ import { toast } from "sonner";
 const TYPES = ["Rückruf", "Termin", "Angebot erstellen", "Nachfassen", "Sonstiges"];
 const PRIORITIES = ["Hoch", "Mittel", "Niedrig"];
 
-export default function AddTaskDialog({ open, onClose, companyId, companyName, onCreated, initialData }) {
+export default function AddTaskDialog({ open, onClose, companyId, companyName, onCreated, initialData, organizationId }) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     titel: "",
@@ -39,19 +39,13 @@ export default function AddTaskDialog({ open, onClose, companyId, companyName, o
     if (!form.titel.trim()) { toast.error("Bitte Titel eingeben"); return; }
     setLoading(true);
     const me = await base44.auth.me();
+    const orgId = organizationId;
 
-    // Org-ID ermitteln
-    let orgId = null;
-    const orgs = await base44.entities.Organization.filter({ owner_email: me.email });
-    let org = orgs?.[0] || null;
-    if (!org) {
-      const memberships = await base44.entities.OrganizationMember.filter({ user_email: me.email, status: "active" });
-      if (memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        org = memberOrgs?.[0] || null;
-      }
+    if (!orgId) {
+      toast.error("Kein Org-Kontext – bitte Seite neu laden");
+      setLoading(false);
+      return;
     }
-    orgId = org?.id || null;
 
     await base44.entities.Task.create({
       ...form,

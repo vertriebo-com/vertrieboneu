@@ -474,7 +474,7 @@ export default function Leads() {
         </div>
       )}
 
-      <AddCompanyDialog open={showAdd} onClose={() => setShowAdd(false)} onCreated={loadData} />
+      <AddCompanyDialog open={showAdd} onClose={() => setShowAdd(false)} onCreated={loadData} organizationId={orgId} />
       <ResearchDialog
         open={showResearch}
         orgId={orgId}

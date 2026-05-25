@@ -14,7 +14,7 @@ const REQUIRES_CALLBACK = ["Erreicht", "Nicht erreicht", "Rückruf vereinbart"];
 // These mark the lead as "done" - no callback needed
 const CLOSED_OUTCOMES = ["Abgeschlossen", "Kein Interesse"];
 
-export default function AddContactLogDialog({ open, onClose, companyId, companyName, onCreated }) {
+export default function AddContactLogDialog({ open, onClose, companyId, companyName, onCreated, organizationId }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [form, setForm] = useState({
@@ -47,19 +47,13 @@ export default function AddContactLogDialog({ open, onClose, companyId, companyN
 
     setLoading(true);
     const me = await base44.auth.me();
+    const orgId = organizationId;
 
-    // Org-ID ermitteln
-    let orgId = null;
-    const orgs = await base44.entities.Organization.filter({ owner_email: me.email });
-    let org = orgs?.[0] || null;
-    if (!org) {
-      const memberships = await base44.entities.OrganizationMember.filter({ user_email: me.email, status: "active" });
-      if (memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        org = memberOrgs?.[0] || null;
-      }
+    if (!orgId) {
+      toast.error("Kein Org-Kontext – bitte Seite neu laden");
+      setLoading(false);
+      return;
     }
-    orgId = org?.id || null;
 
     await base44.entities.ContactLog.create({
       ...form,

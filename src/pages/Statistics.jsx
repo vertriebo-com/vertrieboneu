@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { BarChart3, TrendingUp } from "lucide-react";
 import StatCard from "../components/StatCard";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { useOrganization } from "@/hooks/useOrganization";
 
 const STATUS_COLORS = {
   "Neu": "#3b82f6",
@@ -15,25 +16,16 @@ const STATUS_COLORS = {
 };
 
 export default function Statistics() {
+  const { org, loading: orgLoading } = useOrganization();
   const [companies, setCompanies] = useState([]);
   const [contactLogs, setContactLogs] = useState([]);
   const [outcomes, setOutcomes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (orgLoading) return;
+    if (!org?.id) { setLoading(false); return; }
     (async () => {
-      const user = await base44.auth.me();
-      let org = null;
-      const orgs = await base44.entities.Organization.filter({ owner_email: user.email });
-      org = orgs?.[0] || null;
-      if (!org) {
-        const memberships = await base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" });
-        if (memberships?.[0]?.organization_id) {
-          const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-          org = memberOrgs?.[0] || null;
-        }
-      }
-      if (!org) { setLoading(false); return; }
       const [comps, logs, outs] = await Promise.all([
         base44.entities.Company.filter({ organization_id: org.id }, "-created_date", 500),
         base44.entities.ContactLog.filter({ organization_id: org.id }, "-created_date", 500),
@@ -44,9 +36,9 @@ export default function Statistics() {
       setOutcomes(outs);
       setLoading(false);
     })();
-  }, []);
+  }, [org?.id, orgLoading]);
 
-  if (loading) {
+  if (orgLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />

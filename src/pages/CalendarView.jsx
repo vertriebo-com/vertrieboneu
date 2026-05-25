@@ -186,11 +186,11 @@ function DayDetailSheet({ day, tasks, onClose, onToggle, onAddTask, isMobile }) 
 }
 
 export default function CalendarView() {
-  const { user, filterCompanies, loading: filterLoading } = useLeadsFilter();
+  const { user, filterCompanies, loading: filterLoading, org } = useLeadsFilter();
+  const orgId = org?.id || null;
   const [companies, setCompanies]   = useState([]);
   const [tasks, setTasks]           = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [orgId, setOrgId]           = useState(null);
 
   const [view, setView]             = useState("week");
   const [weekOffset, setWeekOffset] = useState(0);
@@ -209,31 +209,24 @@ export default function CalendarView() {
   }, []);
 
   const loadData = useCallback(async () => {
-    if (!user) return;
-    let org = null;
-    const orgs = await base44.entities.Organization.filter({ owner_email: user.email });
-    org = orgs?.[0] || null;
-    if (!org) {
-      const memberships = await base44.entities.OrganizationMember.filter({ user_email: user.email, status: "active" });
-      if (memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        org = memberOrgs?.[0] || null;
-      }
-    }
-    if (!org) { setLoading(false); return; }
-    setOrgId(org.id);
+    if (!orgId) { setLoading(false); return; }
     const [comps, t] = await Promise.all([
-      base44.entities.Company.filter({ organization_id: org.id }, "-created_date", 500),
-      base44.entities.Task.filter({ organization_id: org.id }, "-faellig_am", 300),
+      base44.entities.Company.filter({ organization_id: orgId }, "-created_date", 500),
+      base44.entities.Task.filter({ organization_id: orgId }, "-faellig_am", 300),
     ]);
     setCompanies(comps);
     setTasks(t);
     setLoading(false);
-  }, [user]);
+  }, [orgId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleToggleTask = async (task) => {
+    // Guard: Task muss zur aktiven Org gehören
+    if (task.organization_id && task.organization_id !== orgId) {
+      toast.error("Org-Kontext stimmt nicht überein – Aktion abgebrochen");
+      return;
+    }
     const updated = { erledigt: !task.erledigt };
     await base44.entities.Task.update(task.id, updated);
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...updated } : t));
@@ -501,6 +494,7 @@ export default function CalendarView() {
         open={showAddTask}
         onClose={() => setShowAddTask(false)}
         onCreated={loadData}
+        organizationId={orgId}
         initialData={addTaskDate ? { faellig_am: addTaskDate } : undefined}
       />
     </div>
