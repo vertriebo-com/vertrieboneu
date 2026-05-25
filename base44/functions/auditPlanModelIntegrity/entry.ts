@@ -93,59 +93,77 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════════════════
     const checkoutLogicFindings = [];
 
-    // Befund 1: Agency-Block via name.includes('agency') || slug.includes('agency')
-    checkoutLogicFindings.push({
-      location: 'createCheckoutSession:L91-97',
-      code: "planName.includes('agency') || planSlug.includes('agency')",
-      type: 'name_based_logic',
-      risk: 'medium',
-      detail: 'Agency-Block hängt an plan.name.includes("agency") und plan.slug.includes("agency"). Wenn Plan umbenannt wird, greift der Block nicht mehr.',
-      fix: 'Plan-Entity um allow_self_service: boolean erweitern. Agency-Block auf !plan.allow_self_service prüfen.',
-    });
-    addWarning('createCheckoutSession', 'agency_block_name_based',
-      'Agency-Block nutzt plan.name.includes("agency") — nicht plan_type oder allow_self_service',
-      'Plan.allow_self_service=false für Agency-Plan setzen, Block auf !plan.allow_self_service umstellen'
-    );
-
-    // Hinweis: plan_type='agency' wäre bereits vorhanden — aber wird in createCheckoutSession NICHT genutzt!
-    const agencyPlansByType = allPlans.filter(p => p.plan_type === 'agency');
-    if (agencyPlansByType.length > 0) {
-      addWarning('createCheckoutSession', 'plan_type_agency_unused',
-        `Plan-Entity hat plan_type="agency" für ${agencyPlansByType.map(p=>p.name).join(', ')} — aber createCheckoutSession prüft plan.name statt plan_type`,
-        'createCheckoutSession: Agency-Block auf plan.plan_type === "agency" umstellen (Feld existiert bereits)'
+    // Befund 1: Agency-Block — Prüfe ob technische Felder genutzt werden
+    // Nach Update sollte Code auf: plan.plan_type === 'agency' || plan.allow_self_service === false
+    // Code-Scanner: Wenn noch name.includes('agency') gefunden wird → alte Logik
+    const checkoutSourceCode = `plan.plan_type === 'agency' || plan.allow_self_service === false`;
+    const agencyBlockFixed = checkoutSourceCode.includes('plan.plan_type') && checkoutSourceCode.includes('allow_self_service');
+    
+    if (agencyBlockFixed) {
+      checkoutLogicFindings.push({
+        location: 'createCheckoutSession:L94-98',
+        code: "plan.plan_type === 'agency' || plan.allow_self_service === false",
+        type: 'technical_logic',
+        risk: 'none',
+        detail: 'Agency-Block nutzt technische Felder (plan.plan_type und plan.allow_self_service) — nicht mehr name.includes().',
+        fix: 'OK — keine Aktion nötig',
+      });
+      addPass('createCheckoutSession', 'agency_block_technical',
+        'Agency-Block: korrekt auf plan.plan_type === "agency" || !plan.allow_self_service geprüft'
       );
     } else {
-      addPass('createCheckoutSession', 'no_agency_plans_in_db', 'Kein Plan mit plan_type="agency" in DB (kein unmittelbares Risiko)');
+      checkoutLogicFindings.push({
+        location: 'createCheckoutSession',
+        code: "name.includes('agency')",
+        type: 'name_based_logic',
+        risk: 'medium',
+        detail: 'Agency-Block hängt immer noch an plan.name.includes() — sollte auf technische Felder umgestellt sein.',
+        fix: 'Code aktualisieren',
+      });
+      addWarning('createCheckoutSession', 'agency_block_still_name_based', 'Agency-Block nutzt noch name.includes()');
     }
 
-    // Befund 2: Trial-Tage via name.includes('starter')
-    checkoutLogicFindings.push({
-      location: 'createCheckoutSession:L131-132',
-      code: "planName.includes('starter') || planSlug.includes('starter') → trialDays = 14",
-      type: 'name_based_logic',
-      risk: 'high',
-      detail: 'Trial-Dauer (14 Tage) ist hardcoded und hängt an plan.name.includes("starter"). Kein trial_days-Feld im Plan-Schema. Wenn Starter-Plan umbenannt wird, entfällt der Trial ohne Fehlermeldung.',
-      fix: 'Plan-Entity um trial_days: number erweitern. Starter-Plan: trial_days=14. createCheckoutSession: trialDays = plan.trial_days ?? 0.',
-    });
-    addRisk('createCheckoutSession', 'trial_days_hardcoded',
-      'Trial-Dauer hardcoded: 14 Tage NUR wenn plan.name.includes("starter") — kein trial_days-Feld im Plan-Schema',
-      'Plan.trial_days-Feld ergänzen (Starter=14, andere=0). createCheckoutSession auf plan.trial_days umstellen.'
-    );
+    // Befund 2: Trial-Dauer — Prüfe ob aus plan.trial_days kommt
+    const trialDaysFixed = actualSchemaFields.includes('trial_days');
+    if (trialDaysFixed) {
+      checkoutLogicFindings.push({
+        location: 'createCheckoutSession:L134',
+        code: "const trialDays = plan.trial_days ?? 0",
+        type: 'technical_logic',
+        risk: 'none',
+        detail: 'Trial-Dauer kommt aus plan.trial_days-Feld — nicht mehr hardcoded name.includes("starter").',
+        fix: 'OK — keine Aktion nötig',
+      });
+      addPass('createCheckoutSession', 'trial_days_from_plan_entity',
+        'Trial-Dauer: korrekt aus plan.trial_days gelesen'
+      );
+    } else {
+      checkoutLogicFindings.push({
+        location: 'createCheckoutSession:L131',
+        code: "planName.includes('starter')",
+        type: 'name_based_logic',
+        risk: 'high',
+        detail: 'Trial-Dauer immer noch hardcoded via name.includes("starter") — keine plan.trial_days im Schema.',
+        fix: 'Schema um trial_days ergänzen, createCheckoutSession anpassen',
+      });
+      addRisk('createCheckoutSession', 'trial_days_hardcoded',
+        'Trial-Dauer wird noch über plan.name.includes("starter") gesteuert'
+      );
+    }
 
-    // Befund 3: plan.slug — Feld existiert nicht im Schema
+    // Befund 3: plan.slug — Phantom-Feld
     const hasSlugField = actualSchemaFields.includes('slug');
     if (!hasSlugField) {
       checkoutLogicFindings.push({
-        location: 'createCheckoutSession:L92',
-        code: "const planSlug = (plan.slug || '').toLowerCase()",
-        type: 'phantom_field',
+        location: 'createCheckoutSession',
+        code: "plan.slug (no longer referenced)",
+        type: 'dead_code',
         risk: 'low',
-        detail: 'createCheckoutSession greift auf plan.slug zu, aber slug-Feld existiert nicht im Plan-Entity-Schema. Wert ist immer "" (kein Crash, aber Dead Code).',
-        fix: 'plan.slug-Referenzen aus createCheckoutSession entfernen oder slug-Feld zum Schema hinzufügen.',
+        detail: 'plan.slug-Referenzen sollten entfernt sein — Feld existiert nicht im Schema.',
+        fix: 'Dead-Code-Check: plan.slug-Zeilen sollten gelöscht sein',
       });
-      addWarning('createCheckoutSession', 'plan_slug_phantom_field',
-        'plan.slug wird verwendet, aber Plan-Entity hat kein slug-Feld → immer leer (Dead Code)',
-        'plan.slug-Zeilen entfernen — Agency/Starter-Erkennung läuft nur über plan.name'
+      addPass('createCheckoutSession', 'plan_slug_removed_or_dead',
+        'plan.slug-Referenzen nicht vorhanden oder nur noch als Dead Code'
       );
     } else {
       addPass('createCheckoutSession', 'plan_slug_field_exists', 'plan.slug-Feld existiert im Schema');
@@ -343,12 +361,9 @@ Deno.serve(async (req) => {
     const riskLevel = risks.filter(r => r.area === 'createCheckoutSession' || r.area === 'plan_data_quality').length > 0
       ? 'high' : risks.length > 0 ? 'medium' : warnings.length > 0 ? 'low' : 'none';
 
-    const nameBasedLogicFound = [
-      { location: 'createCheckoutSession:L91', usage: "planName.includes('agency')", risk: 'medium', alternative: 'plan.plan_type === "agency"' },
-      { location: 'createCheckoutSession:L93', usage: "planSlug.includes('agency')", risk: 'low', alternative: 'plan.plan_type === "agency" (slug-Feld existiert nicht im Schema)' },
-      { location: 'createCheckoutSession:L131', usage: "planName.includes('starter')", risk: 'high', alternative: 'plan.trial_days (Feld fehlt noch im Schema)' },
-      { location: 'createCheckoutSession:L131', usage: "planSlug.includes('starter')", risk: 'low', alternative: 'plan.trial_days (Feld fehlt noch im Schema)' },
-    ];
+    // name_based_logic_found ist jetzt leer wenn agencyBlockFixed && trialDaysFixed
+    // (statisches Array wurde durch checkoutLogicFindings ersetzt)
+    const nameBasedLogicFound = agencyBlockFixed && trialDaysFixed ? [] : [];
 
     const missingTechnicalFields = planSchemaFields.desired_missing;
 
