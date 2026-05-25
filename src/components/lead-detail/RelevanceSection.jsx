@@ -1,4 +1,4 @@
-import { Search, Tag, Zap, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, Tag, Zap, TrendingUp, TrendingDown, Award, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 function safeParseArray(v) {
   if (!v) return [];
@@ -22,6 +22,16 @@ function extractKeyword(item) {
   if (item?.label) return item.label;
   if (item?.keyword) return item.keyword;
   return String(item);
+}
+
+// ── Quality-Tier aus relevance_score ableiten ──────────────────────────────
+function getQualityTier(score) {
+  if (!score || score <= 0) return null;
+  if (score >= 85) return { tier: "premium",  label: "Premium Lead",          color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: Award };
+  if (score >= 75) return { tier: "strong",   label: "Sehr guter Lead",       color: "bg-blue-50 text-blue-700 border-blue-200", icon: CheckCircle2 };
+  if (score >= 65) return { tier: "good",     label: "Guter Lead",            color: "bg-sky-50 text-sky-700 border-sky-200", icon: CheckCircle2 };
+  if (score >= 55) return { tier: "weak",     label: "Prüfen",                color: "bg-amber-50 text-amber-700 border-amber-200", icon: AlertTriangle };
+  return null;
 }
 
 function getLearningHints(company, learnedSignals) {
@@ -68,6 +78,7 @@ export default function RelevanceSection({ company, learnedSignals }) {
   if (!hasContext) return null;
 
   const learningHints = getLearningHints(company, learnedSignals);
+  const qualityTier = getQualityTier(company.relevance_score);
 
   // engine_version: direkt oder aus engine_analysis_json
   let engineVersion = company.engine_version || null;
@@ -127,26 +138,33 @@ export default function RelevanceSection({ company, learnedSignals }) {
           </div>
         )}
 
-        {/* Score + engine_version in einer Zeile */}
+        {/* Quality-Tier + Score */}
         {(company.relevance_score > 0 || engineVersion) && (
           <div className="flex items-center gap-2 pt-1 border-t border-slate-100 mt-2 flex-wrap">
-            {company.relevance_score > 0 && (
-              <>
-                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Relevanz-Score</span>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
-                  company.relevance_score >= 75
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : company.relevance_score >= 50
-                    ? "bg-amber-50 text-amber-700 border-amber-200"
-                    : "bg-slate-100 text-slate-600 border-slate-200"
-                }`}>
-                  {company.relevance_score}
+            {qualityTier && (() => {
+              const TierIcon = qualityTier.icon;
+              return (
+                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${qualityTier.color}`}>
+                  <TierIcon className="w-3 h-3" />
+                  {qualityTier.label}
                 </span>
-              </>
+              );
+            })()}
+            {company.relevance_score > 0 && (
+              <span className="text-[10px] font-semibold text-slate-500">
+                Score: <span className="font-bold text-slate-700">{company.relevance_score}</span>
+              </span>
             )}
             {engineVersion && (
               <span className="ml-auto text-[10px] text-slate-400 font-mono">{engineVersion}</span>
             )}
+          </div>
+        )}
+        {/* Hinweis bei "Prüfen"-Qualität */}
+        {qualityTier?.tier === "weak" && (
+          <div className="flex items-start gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 mt-1">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-800 font-medium">Niedrige Sicherheit – Kontaktdaten prüfen und ergänzen bevor Kontaktaufnahme.</p>
           </div>
         )}
 
