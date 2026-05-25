@@ -54,14 +54,53 @@ Deno.serve(async (req) => {
     const settings = {};
     settingsRecords.forEach(s => { settings[s.key] = s.value; });
 
-    const industryId = settings.industry_id || org.industry || null;
-    if (!industryId) {
+    // ── Industry-ID normalisieren (identisch zu startResearchRun) ───────────
+    // settings.industry_id ist kanonisch (z.B. "gebaeudereinigung")
+    // org.industry ist ein Label-String (z.B. "Gebäudereinigung") → muss gemappt werden
+    const LEGACY_INDUSTRY_MAP = {
+      "Gebäudereinigung":"gebaeudereinigung","Gartenbau / Gartenpflege":"gartenbau","Gartenbau":"gartenbau",
+      "Hausmeisterdienst / Facility Service":"facility_service","Facility Service":"facility_service","Hausmeisterdienst":"facility_service",
+      "Entrümpelung / Entsorgung":"entruempelung","Entrümpelung":"entruempelung",
+      "Buchhaltung / Büroservice":"buchhaltung_steuernahe_dienste","Buchhaltung":"buchhaltung_steuernahe_dienste",
+      "Maschinenwartung / Industrieservice":"industrieservice","Industrieservice":"industrieservice",
+      "Sicherheitsdienst":"sicherheitsdienst","IT-Service":"it_service","Catering":"catering","Handwerk":"handwerk",
+      "Spedition / Logistik":"spedition_logistik","Spedition":"spedition_logistik","Logistik":"spedition_logistik",
+      "Gesundheit / Medizin":"gesundheit_medizin","Gesundheit":"gesundheit_medizin","Medizin":"gesundheit_medizin",
+      "Immobilien":"immobilien","Lager / Fulfillment":"lager_fulfillment","Fulfillment":"lager_fulfillment",
+      "Maler / Renovierung":"maler_renovierung","Maler":"maler_renovierung","Renovierung":"maler_renovierung",
+      "Elektro / Gebäudetechnik":"elektro_gebaeudetechnik","Elektro":"elektro_gebaeudetechnik",
+      "SHK / Sanitär / Heizung / Klima":"shk","SHK":"shk","Sanitär":"shk","Heizung":"shk",
+      "Eventservice":"eventservice","Marketing / Webdesign / Werbung":"marketing_webdesign_werbung",
+      "Marketing":"marketing_webdesign_werbung","Webdesign":"marketing_webdesign_werbung",
+      "Personal / Zeitarbeit":"personal_zeitarbeit","Zeitarbeit":"personal_zeitarbeit",
+      "Fuhrparkservice / Fahrzeugpflege":"fuhrparkservice_fahrzeugpflege","Fuhrparkservice":"fuhrparkservice_fahrzeugpflege",
+      "Pflege / Betreuung":"pflege_betreuung","Pflege":"pflege_betreuung",
+      "Schulungen / Weiterbildung":"schulungen_weiterbildung","Schulungen":"schulungen_weiterbildung",
+      "Dachdecker":"dachdecker","Gerüstbau":"geruestbau","Trockenbau / Innenausbau":"trockenbau_innenausbau",
+      "Fliesenleger":"fliesenleger","Bodenleger":"bodenleger",
+      "Schlüsseldienst / Schließanlagen":"schluesseldienst_schliesanlagen","Schlüsseldienst":"schluesseldienst_schliesanlagen",
+      "Schädlingsbekämpfung":"schaedlingsbekaempfung","Brandschutzservice":"brandschutzservice",
+      "Aufzugservice":"aufzugservice","Tor- und Türtechnik":"tor_tuertechnik",
+      "Photovoltaik-Service":"photovoltaik_service","Photovoltaik":"photovoltaik_service","Solar":"photovoltaik_service",
+      "Umzugsunternehmen":"umzugsunternehmen","Druckerei / Werbetechnik":"druckerei_werbetechnik",
+      "Aktenvernichtung / Dokumentenmanagement":"aktenvernichtung_dokumentenmanagement",
+      "Energieberatung":"energieberatung","Arbeitsschutz / Arbeitssicherheit":"arbeitsschutz_arbeitssicherheit",
+      "Arbeitsschutz":"arbeitsschutz_arbeitssicherheit","Datenschutz / Compliance":"datenschutz_compliance",
+      "Datenschutz":"datenschutz_compliance","Messebau":"messebau",
+      "Andere Branche / Sonstiges":"fallback_lokaler_dienstleister","Andere Branche":"fallback_lokaler_dienstleister",
+      "Sonstiges":"fallback_lokaler_dienstleister","Druckerei / Werbetechnik":"druckerei_werbetechnik",
+    };
+
+    const rawIndustry = settings.industry_id || org.industry || null;
+    if (!rawIndustry) {
       return Response.json({ 
         error: 'Keine Branche definiert',
         message: 'Bitte wählen Sie zuerst eine Branche im Onboarding oder in den Einstellungen.',
         suggestions: []
       }, { status: 400 });
     }
+    // Normalisieren: wenn rawIndustry ein Label-String ist → kanonische ID ermitteln
+    const industryId = LEGACY_INDUSTRY_MAP[rawIndustry] || rawIndustry;
 
     // ── 3. TaxonomyEntry laden ───────────────────────────────────────────────
     let taxonomyProfile = null;
