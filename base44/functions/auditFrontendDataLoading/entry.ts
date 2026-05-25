@@ -439,8 +439,9 @@ Deno.serve(async (req) => {
           id: 'server_side_search_filter',
           effort: 'large',
           impact: 'required for 1000+ lead orgs to have usable UX',
-          fix: 'Build listCompanies({ org_id, filters, sort, page, limit }) backend function. Leads.jsx passes active filters to backend instead of client-side filtering.',
-          files_affected: 'functions/listCompanies (new), pages/Leads.jsx, hooks/useLeadsFilter.js',
+          fix: 'DONE (2026-05-25): listCompanies backend function implemented. Leads.jsx now uses server-side pagination (50/page), server-side filtering (status, temperature, search), server-side sorting. Client-side only: focus filters, showArchived. MAX_FETCH=1000 cap prevents unbounded loads.',
+          files_affected: 'functions/listCompanies (done), pages/Leads.jsx (done)',
+          status: 'completed',
         },
         {
           priority: 'medium',

@@ -67,37 +67,58 @@ export default function Leads() {
   
 
   const orgId = org?.id || null;
-  const { data: companies = [], isLoading: loading, refetch } = useQuery({
-    queryKey: ["companies", orgId, leadLimit],
-    queryFn: () => {
-      console.time("[Leads] Company query");
-      const result = orgId
-        ? base44.entities.Company.filter({ organization_id: orgId }, "-created_date", leadLimit)
-        : Promise.resolve([]);
-      console.timeEnd("[Leads] Company query");
-      return result;
+  
+  // ═══ NEU: listCompanies Backend-API mit Pagination ═══
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
+  
+  const { data: listCompaniesResult, isLoading: loading, refetch } = useQuery({
+    queryKey: ["companies-list", orgId, page, PAGE_SIZE, statusFilter, priorityFilter, search, sortBy],
+    queryFn: async () => {
+      console.time("[Leads] listCompanies query");
+      // Filter für Backend vorbereiten
+      const backendFilters = {};
+      if (statusFilter) backendFilters.status = statusFilter;
+      if (priorityFilter !== "Alle") {
+        backendFilters.temperature = priorityFilter === "Hoch" ? "hot" : priorityFilter === "Mittel" ? "warm" : "cold";
+      }
+      if (search) backendFilters.search = search;
+      
+      // Sortierung mappen
+      const sortMap = {
+        "priority": { field: "priority_score", direction: "desc" },
+        "score": { field: "relevance_score", direction: "desc" },
+        "name": { field: "name", direction: "asc" },
+        "created": { field: "created_date", direction: "desc" },
+        "last_contact": { field: "last_contact_date", direction: "desc" },
+      };
+      const sort = sortMap[sortBy] || { field: "created_date", direction: "desc" };
+      
+      const result = await base44.functions.invoke("listCompanies", {
+        org_id: orgId,
+        page,
+        page_size: PAGE_SIZE,
+        filters: backendFilters,
+        sort,
+      });
+      console.timeEnd("[Leads] listCompanies query");
+      return result?.data || { companies: [], total: 0, page: 1, has_more: false };
     },
     enabled: !!orgId,
     staleTime: 60_000,
   });
 
-  const { data: outcomes = [] } = useQuery({
-    queryKey: ["leadOutcomes", orgId],
-    queryFn: () => {
-      console.time("[Leads] Outcome query");
-      const result = orgId
-        ? base44.entities.LeadOutcome.filter({ organization_id: orgId }, "-created_date", 200)
-        : Promise.resolve([]);
-      console.timeEnd("[Leads] Outcome query");
-      return result;
-    },
-    enabled: !!orgId,
-    staleTime: 60_000,
-  });
-
+  // Abwärtskompatibilität: companies als Flat-Liste (für bestehende Logik)
+  const companies = listCompaniesResult?.companies || [];
+  const totalCompanies = listCompaniesResult?.total || 0;
+  const hasMorePages = listCompaniesResult?.has_more || false;
+  
+  // Legacy: outcomeByCompany aus _latest_outcome (von listCompanies mitgeliefert)
   const outcomeByCompany = {};
-  for (const o of [...outcomes].sort((a, b) => new Date(b.created_date) - new Date(a.created_date))) {
-    if (!outcomeByCompany[o.company_id]) outcomeByCompany[o.company_id] = o.outcome_type;
+  for (const c of companies) {
+    if (c._latest_outcome) {
+      outcomeByCompany[c.id] = c._latest_outcome.outcome_type;
+    }
   }
 
   // ═ handleAnalyzeLatest definiert vor Effects
@@ -201,13 +222,14 @@ export default function Leads() {
     return result;
   }, [companies, filterCompanies, showArchived, statusFilter, priorityFilter, newRunFilter, focusFilter, search]);
 
-  // Pagination: Nur erste 50 initial, danach alle
+  // Pagination: Backend-basiert (showAllLeads wird ignoriert, da Backend paginiert)
   const visibleLeads = useMemo(() => {
     console.time("[Leads] visibleLeads slice");
-    const result = showAllLeads ? filtered : filtered.slice(0, 50);
+    // Backend liefert bereits paginierte Daten → direkt verwenden
+    const result = filtered;
     console.timeEnd("[Leads] visibleLeads slice");
     return result;
-  }, [filtered, showAllLeads]);
+  }, [filtered]);
 
   const handleCsvExport = () => {
     const headers = ["Name","Branche","Telefon","E-Mail","Status","Priorität"];
@@ -446,29 +468,19 @@ export default function Leads() {
             <LeadRow key={company.id} company={company} isAdmin={isAdmin} onLogged={loadData} />
           ))}
 
-          {/* Seitenweise anzeigen (innerhalb geladener Kontakte) */}
-          {!showAllLeads && filtered.length > 50 && (
-            <div className="flex justify-center pt-4">
-              <button
-                onClick={() => setShowAllLeads(true)}
-                className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50"
-              >
-                {filtered.length - 50} weitere angezeigte Kontakte einblenden
-              </button>
-            </div>
-          )}
-
-          {/* Weitere Kontakte vom Server nachladen */}
-          {companies.length >= leadLimit && (
+          {/* Backend-Pagination: Nächste Seite laden */}
+          {hasMorePages && (
             <div className="flex flex-col items-center pt-6 gap-2">
               <button
-                onClick={() => { setLeadLimit(l => l + 100); setShowAllLeads(false); }}
+                onClick={() => setPage(p => p + 1)}
                 disabled={loadingMore}
                 className="px-5 py-2.5 text-sm font-semibold text-blue-600 hover:text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 disabled:opacity-50"
               >
-                {loadingMore ? "Wird geladen…" : "Weitere 100 Kontakte laden"}
+                {loadingMore ? "Wird geladen…" : "Weitere 50 Kontakte laden"}
               </button>
-              <p className="text-xs text-slate-500">Aktuell {companies.length} Kontakte geladen</p>
+              <p className="text-xs text-slate-500">
+                Seite {page} von {Math.ceil(totalCompanies / PAGE_SIZE)} · {totalCompanies} Kontakte gesamt
+              </p>
             </div>
           )}
         </div>
