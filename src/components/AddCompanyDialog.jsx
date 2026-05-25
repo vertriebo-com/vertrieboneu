@@ -20,12 +20,12 @@ export default function AddCompanyDialog({ open, onClose, onCreated, organizatio
   const handleChange = async (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
     if (field === "name" && value.trim().length >= 3) {
-      // Duplicate check ist immer org-scoped
-      const filter = organizationId
-        ? { organization_id: organizationId, name: value.trim() }
-        : { name: value.trim() };
-      const existing = await base44.entities.Company.filter(filter);
-      setDuplicateWarning(existing.length > 0 ? `⚠️ "${value.trim()}" existiert bereits!` : "");
+      if (!organizationId) {
+        setDuplicateWarning("Org-Kontext fehlt");
+      } else {
+        const existing = await base44.entities.Company.filter({ organization_id: organizationId, name: value.trim() });
+        setDuplicateWarning(existing.length > 0 ? `⚠️ "${value.trim()}" existiert bereits!` : "");
+      }
     } else if (field === "name") {
       setDuplicateWarning("");
     }

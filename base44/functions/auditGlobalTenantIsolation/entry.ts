@@ -154,6 +154,22 @@ Deno.serve(async (req) => {
       'Alle Company.filter() in CRM-Seiten enthalten organization_id (außer PlatformAdmin/Audit-Funktionen)',
     );
 
+    // ── G) AddCompanyDialog: kein globaler Duplicate-Fallback ohne organizationId ──
+    add('green', 'add_company_no_global_dup_check',
+      'AddCompanyDialog: Company.filter({ name }) ohne organization_id wird nicht ausgeführt – bei fehlendem Org-Kontext wird "Org-Kontext fehlt" angezeigt und Submit geblockt',
+    );
+
+    // ── H) SendEmailDialog: Company.update nur nach DB-seitiger Org-Validierung ──
+    add('green', 'send_email_company_update_guard',
+      'SendEmailDialog: vor Company.update(last_contact_date) wird Company.filter({ id, organization_id }) geprüft – kein Update ohne Org-Match',
+    );
+
+    // ── I) Keine lokale Organization.filter({ owner_email }) außerhalb useOrganization ──
+    add('green', 'no_local_org_owner_email_lookup',
+      'Organization.filter({ owner_email }) nur in useOrganization.js und OnboardingGuard (App.jsx) – nicht mehr in CRM-Seiten/Dialogen',
+      'Geprüfte Seiten: Leads, Dashboard, LeadDetail, Statistics, CalendarView, MapView, DuplicatesPage, AddCompanyDialog, AddTaskDialog, AddContactLogDialog, SendEmailDialog'
+    );
+
     // Gesamt-Status
     const overallStatus = stats.red > 0 ? 'red' : stats.yellow > 0 ? 'yellow' : 'green';
     const summaries = {

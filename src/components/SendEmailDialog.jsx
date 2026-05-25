@@ -107,7 +107,12 @@ function EmailEditor({ tpl, company, orgId, fromName, orgSettings, onBack, onDon
         });
       }
 
-      // Update last_contact_date on company
+      // Update last_contact_date on company – erst DB-seitig validieren
+      const allowed = await base44.entities.Company.filter({ id: company.id, organization_id: orgIdForLog });
+      if (!allowed?.[0]) {
+        toast.error("Org-Kontext stimmt nicht überein – Company-Update abgebrochen");
+        return;
+      }
       await base44.entities.Company.update(company.id, {
         last_contact_date: new Date().toISOString(),
       });
