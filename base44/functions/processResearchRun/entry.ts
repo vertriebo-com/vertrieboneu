@@ -1187,6 +1187,7 @@ Deno.serve(async (req) => {
               search_radius_km: radiusKm,
               research_run_id,
               matched_target_customer_type: scoring.matched_target_customer_type || matched_target_customer || null,
+              matched_search_category: scoring.matched_search_category || category || null,
               matched_service_context: matchedServiceContext || null,
               google_place_id: place.place_id || null,
               source_provider: 'google_places',
