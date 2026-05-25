@@ -1,80 +1,40 @@
+/**
+ * enrichCompany
+ * =============
+ * AuthZ via kanonischer authorizeOrganizationAction (sharedAuthz v1.0.0)
+ * Billing-Status-Prüfung bleibt inline (plan-limit-spezifisch).
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// ─── Inline checkAccess ───────────────────────────────────────────────────────
-const ACTION_ROLES = {
-  view_leads: ['organization_admin','sales_rep'], create_lead: ['organization_admin','sales_rep'],
-  update_assigned_lead: ['organization_admin','sales_rep'], delete_lead: ['organization_admin'],
-  generate_leads: ['organization_admin'], create_contact_log: ['organization_admin','sales_rep'],
-  view_tasks: ['organization_admin','sales_rep'], complete_task: ['organization_admin','sales_rep'],
-  manage_users: ['organization_admin'], manage_settings: ['organization_admin'],
-  manage_billing: ['organization_admin'], data_export: ['organization_admin'],
-  view_reports: ['organization_admin','sales_rep'], use_ai_scoring: ['organization_admin','sales_rep'],
-  send_bulk_email: ['organization_admin','sales_rep'], manage_blacklist: ['organization_admin'],
-  platform_admin_access: [],
+// ── authorizeOrganizationAction (kanonisch, sharedAuthz v1.0.0) ──────────────
+const _PLATFORM_ADMIN_ROLES = new Set(['admin', 'platform_owner', 'platform_admin']);
+const _ACTION_ROLES = {
+  manage_billing: ['organization_admin'],
+  manage_blacklist: ['organization_admin'],
+  delete_company: ['organization_admin'],
+  use_ai_scoring: ['organization_admin', 'sales_rep'],
 };
-const BILLING_ACCESS = { preview:'full', active:'full', trialing:'full', past_due:'degraded', incomplete:'degraded', unpaid:'blocked', canceled:'blocked', incomplete_expired:'blocked' };
-const DEGRADED_BLOCKED = new Set(['create_lead','generate_leads','use_ai_scoring','send_bulk_email']);
-const BLOCKED_ADMIN_OK = new Set(['manage_billing','data_export']);
-const DEGRADED_SALES_OK = new Set(['view_leads','view_tasks','create_contact_log','update_assigned_lead','complete_task']);
-
-function _allow(r) { return { allowed:true, ...r }; }
-function _deny(reason, message, ctx={}) { return { allowed:false, reason, message, user:ctx.user||null, organization:ctx.organization||null, member:ctx.member||null, role:ctx.role||null, plan:ctx.plan||null, subscription:ctx.subscription||null, limits:ctx.limits||null }; }
-
-async function checkAccess(req, { organization_id, action, check_limit=null, current_usage=0 }={}) {
-  const b44 = createClientFromRequest(req);
-  let user; try { user = await b44.auth.me(); } catch { return _deny('not_authenticated','Nicht eingeloggt.'); }
-  if (!user) return _deny('not_authenticated','Nicht eingeloggt.');
-  if (user.role === 'admin') return _allow({ reason:'platform_admin', user, organization:null, member:null, role:'platform_admin', plan:null, subscription:null, limits:null });
-  if (!organization_id) return _deny('missing_organization_id','Keine organization_id angegeben.');
+function _allow(r) { return { allowed: true, status: 200, error: null, ...r }; }
+function _deny(reason, message, ctx = {}) { return { allowed: false, status: reason === 'not_authenticated' ? 401 : 403, error: message, reason, user: ctx.user || null, organization: ctx.organization || null, member: ctx.member || null, access_role: ctx.access_role || null }; }
+async function authorizeOrganizationAction(base44, { organizationId, action = null, requiredRoles = [], requireActiveOrg = true, allowPlatformAdmin = true } = {}) {
+  let user; try { user = await base44.auth.me(); } catch { return _deny('not_authenticated', 'Nicht eingeloggt.'); }
+  if (!user) return _deny('not_authenticated', 'Nicht eingeloggt.');
+  if (allowPlatformAdmin && _PLATFORM_ADMIN_ROLES.has(user.role)) return _allow({ user, organization: null, member: null, access_role: 'platform_admin' });
+  if (!organizationId) return _deny('missing_organization_id', 'Keine organization_id angegeben.');
   let orgs, members;
-  try { [orgs, members] = await Promise.all([b44.asServiceRole.entities.Organization.filter({id:organization_id}), b44.asServiceRole.entities.OrganizationMember.filter({organization_id, user_email:user.email})]); }
-  catch { return _deny('organization_not_found',`Organisation nicht gefunden.`); }
-  const organization = orgs[0]||null;
-  if (!organization) return _deny('organization_not_found','Organisation nicht gefunden.');
-  if (organization.platform_status==='suspended') return _deny('organization_suspended',`Organisation gesperrt: ${organization.suspended_reason||'kein Grund'}.`, {user,organization,member:null,role:null});
-
-  // Owner der Organisation darf immer alles
-  if (organization.owner_email === user.email) {
-    const [subs, plans] = await Promise.all([b44.asServiceRole.entities.Subscription.filter({organization_id}), organization.plan_id ? b44.asServiceRole.entities.Plan.filter({id:organization.plan_id}) : Promise.resolve([])]);
-    const subscription=subs[0]||null, plan=plans[0]||null;
-    const limits = plan ? { max_users:plan.max_users, max_leads_per_month:plan.max_leads_per_month, max_ai_scorings_per_month:plan.max_ai_scorings_per_month, max_emails_per_month:plan.max_emails_per_month, max_lead_generations_per_month:plan.max_lead_generations_per_month } : null;
-    return _allow({ reason:'org_owner', user, organization, member:null, role:'organization_admin', plan, subscription, limits });
-  }
-
-  const member = members[0]||null;
-  if (!member) return _deny('not_a_member','Kein Mitglied dieser Organisation.');
-  if (member.status!=='active') return _deny('member_inactive',`Mitglied-Status: "${member.status}".`);
-  const role = member.role;
-  if (action) {
-    const ar = ACTION_ROLES[action];
-    if (ar===undefined) return _deny('unknown_action',`Unbekannte Aktion: "${action}".`);
-    if (!ar.includes(role)) return _deny('insufficient_role',`Rolle "${role}" darf "${action}" nicht.`);
-  }
-  const [subs, plans] = await Promise.all([b44.asServiceRole.entities.Subscription.filter({organization_id}), organization.plan_id ? b44.asServiceRole.entities.Plan.filter({id:organization.plan_id}) : Promise.resolve([])]);
-  const subscription=subs[0]||null, plan=plans[0]||null;
-  const billingStatus = subscription?.status || organization.billing_status || 'trialing';
-  const billingAccess = BILLING_ACCESS[billingStatus]||'blocked';
-  if (action && billingAccess!=='full') {
-    const ctx={user,organization,member,role,plan,subscription,limits:null};
-    if (billingAccess==='blocked') {
-      if (role==='organization_admin' && BLOCKED_ADMIN_OK.has(action)) { /* ok */ }
-      else if (role==='sales_rep') return _deny('billing_blocked_sales_rep',`Abo "${billingStatus}": Kein Zugriff für Sales Rep.`,ctx);
-      else return _deny('billing_blocked',`Abo "${billingStatus}": Zugriff gesperrt.`,ctx);
-    }
-    if (billingAccess==='degraded') {
-      if (DEGRADED_BLOCKED.has(action)) return _deny('billing_degraded_action_blocked',`Abo "${billingStatus}": "${action}" nicht verfügbar.`,ctx);
-      if (role==='sales_rep' && !DEGRADED_SALES_OK.has(action)) return _deny('billing_degraded_sales_rep',`Abo "${billingStatus}": Sales Rep darf "${action}" nicht.`,ctx);
-    }
-  }
-  let limits = null;
-  if (plan) {
-    limits = { max_users:plan.max_users, max_leads_per_month:plan.max_leads_per_month, max_ai_scorings_per_month:plan.max_ai_scorings_per_month, max_emails_per_month:plan.max_emails_per_month, max_lead_generations_per_month:plan.max_lead_generations_per_month };
-    if (check_limit && limits[check_limit]!==undefined) {
-      const maxVal=limits[check_limit];
-      if (maxVal!==-1 && current_usage>=maxVal) return _deny('plan_limit_exceeded',`Limit "${check_limit}": ${current_usage}/${maxVal}.`,{user,organization,member,role,plan,subscription,limits});
-    }
-  }
-  return _allow({ reason:'ok', user, organization, member, role, plan, subscription, limits });
+  try { [orgs, members] = await Promise.all([base44.asServiceRole.entities.Organization.filter({ id: organizationId }), base44.asServiceRole.entities.OrganizationMember.filter({ organization_id: organizationId, user_email: user.email })]); }
+  catch (e) { return _deny('organization_not_found', 'Organisation nicht gefunden.'); }
+  const organization = orgs[0] || null;
+  if (!organization) return _deny('organization_not_found', 'Organisation nicht gefunden.');
+  if (requireActiveOrg && organization.platform_status === 'suspended') return _deny('organization_suspended', `Organisation gesperrt: ${organization.suspended_reason || 'kein Grund'}.`, { user, organization });
+  if (organization.owner_email === user.email) return _allow({ user, organization, member: members[0] || null, access_role: 'organization_admin' });
+  const member = members[0] || null;
+  if (!member) return _deny('not_a_member', 'Kein Mitglied dieser Organisation.', { user, organization });
+  if (member.status !== 'active') return _deny('member_inactive', `Mitglied-Status: "${member.status}".`, { user, organization, member });
+  const memberRole = member.role;
+  const effectiveRequired = requiredRoles.length > 0 ? requiredRoles : (action && _ACTION_ROLES[action] ? _ACTION_ROLES[action] : null);
+  if (effectiveRequired && !effectiveRequired.includes(memberRole)) return _deny('insufficient_role', `Rolle "${memberRole}" darf "${action || requiredRoles.join(',')}" nicht.`, { user, organization, member, access_role: memberRole });
+  return _allow({ user, organization, member, access_role: memberRole });
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -86,11 +46,10 @@ Deno.serve(async (req) => {
 
     // ── 1. checkAccess ──────────────────────────────────────────────────────
     if (!organization_id) return Response.json({ error: 'organization_id ist Pflichtparameter' }, { status: 400 });
-    const access = await checkAccess(req, { organization_id, action: 'use_ai_scoring' });
+    const access = await authorizeOrganizationAction(base44, { organizationId: organization_id, action: 'use_ai_scoring' });
     if (!access.allowed) {
-      console.warn(`[enrichCompany] Access denied: ${access.reason} – ${access.message}`);
-      const statusCode = access.reason === 'organization_suspended' ? 403 : 403;
-      return Response.json({ error: access.message, reason: access.reason }, { status: statusCode });
+      console.warn(`[enrichCompany] Access denied: ${access.reason} – ${access.error}`);
+      return Response.json({ error: access.error, reason: access.reason }, { status: access.status });
     }
 
     // ── 2. Company laden – nur innerhalb der Organisation ───────────────────
@@ -103,12 +62,12 @@ Deno.serve(async (req) => {
     if (!company) return Response.json({ error: 'Firma nicht gefunden oder falsche Organisation' }, { status: 404 });
 
     // ── 3. Sales Rep nur eigene Leads ───────────────────────────────────────
-    if (access.role === 'sales_rep' && company.assigned_to !== access.user.email) {
+    if (access.access_role === 'sales_rep' && company.assigned_to !== access.user.email) {
       return Response.json({ error: 'Sales Rep darf nur zugewiesene Leads anreichern' }, { status: 403 });
     }
 
     // ── 4. KI-Limit prüfen vor LLM ──────────────────────────────────────────
-    // KANONISCH: Europe/Berlin-Kalendermonat – identisch zu processResearchRun/getDashboardData
+    // KANONISCH: Europe/Berlin-Kalendermonat
     const now = new Date();
     const periodMonth = new Intl.DateTimeFormat('de-DE', {
       timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit',
@@ -121,11 +80,11 @@ Deno.serve(async (req) => {
 
     const aiUsed = (currentUsageLog?.ai_actions_used || 0);
 
-    // Plan-Limit direkt aus DB laden (access.limits ist null bei platform_admin-Pfad)
-    let maxAi = 50; // Fallback
+    // Plan-Limit aus DB (access.organization verfügbar außer bei platform_admin)
+    let maxAi = 50;
     try {
-      const orgsForPlan = await base44.asServiceRole.entities.Organization.filter({ id: organization_id });
-      const planId = orgsForPlan[0]?.plan_id;
+      const orgForPlan = access.organization || (await base44.asServiceRole.entities.Organization.filter({ id: organization_id }))[0];
+      const planId = orgForPlan?.plan_id;
       if (planId) {
         const plans = await base44.asServiceRole.entities.Plan.filter({ id: planId });
         if (plans[0]?.max_ai_scorings_per_month !== undefined) {
@@ -135,7 +94,10 @@ Deno.serve(async (req) => {
     } catch (_) {}
     if (maxAi !== -1 && aiUsed >= maxAi) {
       console.warn(`[enrichCompany] KI-Limit erreicht: ${aiUsed}/${maxAi} für org=${organization_id}`);
-      return Response.json({ error: `KI-Aktionslimit erreicht: ${aiUsed}/${maxAi} diesen Monat. Bitte warten Sie bis zum nächsten Monat oder upgraden Sie Ihren Plan.`, limitReached: true }, { status: 403 });
+      return Response.json({
+        error: `KI-Aktionslimit erreicht: ${aiUsed}/${maxAi} diesen Monat. Bitte warten Sie bis zum nächsten Monat oder upgraden Sie Ihren Plan.`,
+        limitReached: true
+      }, { status: 403 });
     }
 
     // ── 5. LLM-Recherche ────────────────────────────────────────────────────
@@ -164,7 +126,7 @@ WICHTIG: Gib nur Felder zurück, die du mit Sicherheit gefunden hast. Wenn du ei
     ]);
 
     const isValid = (v) => v && typeof v === "string" && v.trim().length > 0 &&
-      !["null","n/a","unbekannt","keine","nicht gefunden"].includes(v.trim().toLowerCase());
+      !["null", "n/a", "unbekannt", "keine", "nicht gefunden"].includes(v.trim().toLowerCase());
 
     const updates = {};
     if (!company.website && isValid(result.website)) updates.website = result.website.trim();
@@ -177,7 +139,7 @@ WICHTIG: Gib nur Felder zurück, die du mit Sicherheit gefunden hast. Wenn du ei
       await base44.asServiceRole.entities.Company.update(companyId, updates);
     }
 
-    // ── 6. UsageLog: ai_actions_used (period_month) ──────────────────────────
+    // ── 6. UsageLog: ai_actions_used ─────────────────────────────────────────
     try {
       if (currentUsageLog) {
         await base44.asServiceRole.entities.UsageLog.update(currentUsageLog.id, {

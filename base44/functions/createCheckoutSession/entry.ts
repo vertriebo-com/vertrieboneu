@@ -1,101 +1,53 @@
+/**
+ * createCheckoutSession
+ * =====================
+ * AuthZ via kanonischer authorizeOrganizationAction (sharedAuthz v1.0.0)
+ *
+ * SOURCE OF TRUTH ARCHITEKTUR:
+ *  Stripe  = Zahlungsquelle (Geld, Rechnungen, Zahlungsmethoden)
+ *  unsere DB = App-Zugriffsquelle (Rollen, Features, Limits)
+ *
+ *  Trial-Schutz: nur Starter-Plan, nur wenn noch keine Subscription vorhanden.
+ *  Parallel-Checkout-Schutz: aktive/trialing Sub → 409, außer allow_upgrade=true.
+ *  Agency-Block: Agency-Plan nur auf Anfrage, kein Self-Service-Checkout.
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 import Stripe from 'npm:stripe@14.21.0';
 
-// ─── SOURCE OF TRUTH ARCHITEKTUR ─────────────────────────────────────────────
-//
-//  Stripe  = Zahlungsquelle (Geld, Rechnungen, Zahlungsmethoden)
-//  unsere DB = App-Zugriffsquelle (Rollen, Features, Limits)
-//
-//  REGEL: Die App fragt NIEMALS Stripe live ab, um Zugriffsrechte zu entscheiden.
-//         plan_id kommt immer aus unserer DB → Price-ID niemals vom Frontend.
-//
-//  Trial-Schutz:
-//    Trial nur wenn:
-//      - Org hat NOCH NIE eine Subscription gehabt (existingSubs.length === 0)
-//      - Org hat kein stripe_customer_id (noch nicht in Stripe registriert)
-//    → verhindert Trial-Missbrauch durch mehrfaches Starten
-//
-//  Parallel-Checkout-Schutz:
-//    - Aktive/trialing Subscription → 409, außer allow_upgrade=true
-//    - Verhindert mehrere parallele aktive Checkouts
-//
-//  Stripe Metadata (für Debugging):
-//    checkout.session.metadata + subscription_data.metadata enthalten:
-//      - organization_id, plan_id, plan_name
-//      - initiated_by_user (E-Mail des auslösenden Users)
-//      - initiated_by_role (Rolle des auslösenden Users)
-//      - app_environment (production/sandbox)
-//      - base44_app_id
-//
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─── Inline checkAccess ───────────────────────────────────────────────────────
-const ACTION_ROLES = {
-  view_leads: ['organization_admin','sales_rep'], create_lead: ['organization_admin','sales_rep'],
-  update_assigned_lead: ['organization_admin','sales_rep'], delete_lead: ['organization_admin'],
-  generate_leads: ['organization_admin'], create_contact_log: ['organization_admin','sales_rep'],
-  view_tasks: ['organization_admin','sales_rep'], complete_task: ['organization_admin','sales_rep'],
-  manage_users: ['organization_admin'], manage_settings: ['organization_admin'],
-  manage_billing: ['organization_admin'], data_export: ['organization_admin'],
-  view_reports: ['organization_admin','sales_rep'], use_ai_scoring: ['organization_admin','sales_rep'],
-  send_bulk_email: ['organization_admin','sales_rep'], manage_blacklist: ['organization_admin'],
-  platform_admin_access: [],
+// ── authorizeOrganizationAction (kanonisch, sharedAuthz v1.0.0) ──────────────
+const _PLATFORM_ADMIN_ROLES = new Set(['admin', 'platform_owner', 'platform_admin']);
+const _ACTION_ROLES = {
+  manage_billing: ['organization_admin'],
+  manage_blacklist: ['organization_admin'],
+  delete_company: ['organization_admin'],
+  use_ai_scoring: ['organization_admin', 'sales_rep'],
 };
-
-function _allow(r) { return { allowed:true, ...r }; }
-function _deny(reason, message) { return { allowed:false, reason, message, user:null }; }
-
-async function checkAccess(req, { organization_id, action }={}) {
-  const b44 = createClientFromRequest(req);
-  let user; 
-  try { 
-    user = await b44.auth.me(); 
-  } catch (e) { 
-    console.error('[checkAccess] Auth error:', e.message);
-    return _deny('not_authenticated','Nicht eingeloggt.'); 
-  }
-  if (!user) return _deny('not_authenticated','Nicht eingeloggt.');
-  if (user.role === 'admin') return _allow({ reason:'platform_admin', user, organization:null, member:null, role:'platform_admin' });
-  if (!organization_id) return _deny('missing_organization_id','Keine organization_id angegeben.');
+function _allow(r) { return { allowed: true, status: 200, error: null, ...r }; }
+function _deny(reason, message, ctx = {}) { return { allowed: false, status: reason === 'not_authenticated' ? 401 : 403, error: message, reason, user: ctx.user || null, organization: ctx.organization || null, member: ctx.member || null, access_role: ctx.access_role || null }; }
+async function authorizeOrganizationAction(base44, { organizationId, action = null, requiredRoles = [], requireActiveOrg = true, allowPlatformAdmin = true } = {}) {
+  let user; try { user = await base44.auth.me(); } catch { return _deny('not_authenticated', 'Nicht eingeloggt.'); }
+  if (!user) return _deny('not_authenticated', 'Nicht eingeloggt.');
+  if (allowPlatformAdmin && _PLATFORM_ADMIN_ROLES.has(user.role)) return _allow({ user, organization: null, member: null, access_role: 'platform_admin' });
+  if (!organizationId) return _deny('missing_organization_id', 'Keine organization_id angegeben.');
   let orgs, members;
-  try { 
-    [orgs, members] = await Promise.all([
-      b44.asServiceRole.entities.Organization.filter({id:organization_id}), 
-      b44.asServiceRole.entities.OrganizationMember.filter({organization_id, user_email:user.email})
-    ]); 
-  } catch (e) { 
-    console.error('[checkAccess] DB query error:', e.message);
-    return _deny('organization_not_found','Organisation nicht gefunden.'); 
-  }
-  const organization = orgs[0]||null;
-  if (!organization) {
-    console.warn(`[checkAccess] Organization ${organization_id} not found for user ${user.email}`);
-    return _deny('organization_not_found','Organisation nicht gefunden.');
-  }
-
-  // Suspension-Check (vor owner/member, außer platform_admin)
-  if (organization.platform_status === 'suspended') return _deny('organization_suspended', `Organisation gesperrt: ${organization.suspended_reason||'kein Grund'}.`);
-
-  // Owner der Organisation darf immer billing machen (z.B. direkt nach Onboarding)
-  if (organization.owner_email === user.email) {
-    return _allow({ reason:'org_owner', user, organization, member: members[0]||null, role:'organization_admin' });
-  }
-
-  const member = members[0]||null;
-  if (!member) return _deny('not_a_member','Kein Mitglied dieser Organisation.');
-  if (member.status!=='active') return _deny('member_inactive',`Mitglied-Status: "${member.status}".`);
-  const role = member.role;
-  if (action) {
-    const ar = ACTION_ROLES[action];
-    if (!ar || !ar.includes(role)) return _deny('insufficient_role',`Rolle "${role}" darf "${action}" nicht.`);
-  }
-  return _allow({ reason:'ok', user, organization, member, role });
+  try { [orgs, members] = await Promise.all([base44.asServiceRole.entities.Organization.filter({ id: organizationId }), base44.asServiceRole.entities.OrganizationMember.filter({ organization_id: organizationId, user_email: user.email })]); }
+  catch (e) { return _deny('organization_not_found', 'Organisation nicht gefunden.'); }
+  const organization = orgs[0] || null;
+  if (!organization) return _deny('organization_not_found', 'Organisation nicht gefunden.');
+  if (requireActiveOrg && organization.platform_status === 'suspended') return _deny('organization_suspended', `Organisation gesperrt: ${organization.suspended_reason || 'kein Grund'}.`, { user, organization });
+  if (organization.owner_email === user.email) return _allow({ user, organization, member: members[0] || null, access_role: 'organization_admin' });
+  const member = members[0] || null;
+  if (!member) return _deny('not_a_member', 'Kein Mitglied dieser Organisation.', { user, organization });
+  if (member.status !== 'active') return _deny('member_inactive', `Mitglied-Status: "${member.status}".`, { user, organization, member });
+  const memberRole = member.role;
+  const effectiveRequired = requiredRoles.length > 0 ? requiredRoles : (action && _ACTION_ROLES[action] ? _ACTION_ROLES[action] : null);
+  if (effectiveRequired && !effectiveRequired.includes(memberRole)) return _deny('insufficient_role', `Rolle "${memberRole}" darf "${action || requiredRoles.join(',')}" nicht.`, { user, organization, member, access_role: memberRole });
+  return _allow({ user, organization, member, access_role: memberRole });
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'));
 
-// app_environment: sandbox wenn kein echter Stripe live key
 function getAppEnvironment() {
   const key = Deno.env.get('STRIPE_SECRET_KEY') || '';
   return key.startsWith('sk_live_') ? 'production' : 'sandbox';
@@ -111,14 +63,19 @@ Deno.serve(async (req) => {
     if (!organization_id) return Response.json({ error: 'organization_id ist Pflichtparameter' }, { status: 400 });
     if (!plan_id) return Response.json({ error: 'plan_id ist Pflichtparameter' }, { status: 400 });
 
-    // ── 2. Nur organization_admin darf Billing starten ──────────────────────
-    const access = await checkAccess(req, { organization_id, action: 'manage_billing' });
+    // ── 2. HARD-BLOCK: Suspended Org kann keinen neuen Checkout starten ─────
+    // requireActiveOrg=true blockiert suspended BEVOR owner-bypass greift
+    const access = await authorizeOrganizationAction(base44, {
+      organizationId: organization_id,
+      action: 'manage_billing',
+      requireActiveOrg: true,
+    });
     if (!access.allowed) {
       console.warn(`[createCheckoutSession] Access denied: ${access.reason}`);
-      return Response.json({ error: access.message, reason: access.reason }, { status: 403 });
+      return Response.json({ error: access.error, reason: access.reason }, { status: access.status });
     }
     const user = access.user;
-    const userRole = access.role;
+    const userRole = access.access_role;
 
     // ── 3. Plan aus DB laden (Price-ID NIEMALS vom Frontend übernehmen) ─────
     let plan = null;
@@ -136,25 +93,21 @@ Deno.serve(async (req) => {
     const isAgencyPlan = planName.includes('agency') || planSlug.includes('agency');
     if (isAgencyPlan) {
       console.warn(`[createCheckoutSession] Access denied: Agency plan checkout attempt for org ${organization_id}`);
-      return Response.json({
-        error: 'Agency ist nur auf Anfrage verfügbar',
-        reason: 'agency_contact_required'
-      }, { status: 400 });
+      return Response.json({ error: 'Agency ist nur auf Anfrage verfügbar', reason: 'agency_contact_required' }, { status: 400 });
     }
 
-    // ── 4. Organisation laden ───────────────────────────────────────────────
-    let org = null;
-    try {
-      const orgs = await base44.asServiceRole.entities.Organization.filter({ id: organization_id });
-      org = orgs[0] || null;
-    } catch (e) {
-      console.error(`[createCheckoutSession] Failed to load org ${organization_id}:`, e.message);
-      return Response.json({ error: 'Organisation nicht laden konnte', reason: 'org_load_failed' }, { status: 404 });
-    }
+    // ── 4. Organisation laden (platform_admin: access.organization ist null) ─
+    let org = access.organization;
     if (!org) {
-      console.warn(`[createCheckoutSession] Organization ${organization_id} not found`);
-      return Response.json({ error: 'Organisation nicht gefunden' }, { status: 404 });
+      try {
+        const orgs = await base44.asServiceRole.entities.Organization.filter({ id: organization_id });
+        org = orgs[0] || null;
+      } catch (e) {
+        console.error(`[createCheckoutSession] Failed to load org ${organization_id}:`, e.message);
+        return Response.json({ error: 'Organisation konnte nicht geladen werden', reason: 'org_load_failed' }, { status: 404 });
+      }
     }
+    if (!org) return Response.json({ error: 'Organisation nicht gefunden' }, { status: 404 });
 
     // ── 5. Existierende Subscriptions prüfen ───────────────────────────────
     let existingSubs = [];
@@ -162,11 +115,10 @@ Deno.serve(async (req) => {
       existingSubs = await base44.asServiceRole.entities.Subscription.filter({ organization_id });
     } catch (e) {
       console.error(`[createCheckoutSession] Failed to load subscriptions for org ${organization_id}:`, e.message);
-      // Nicht kritisch – wenn Subs nicht geladen werden können, nehmen wir an dass es keine gibt
     }
     const activeSub = existingSubs.find(s => ['active', 'trialing'].includes(s.status));
 
-    // ── 5a. Doppel-Checkout-Schutz (aktive oder laufende Trial-Sub) ─────────
+    // ── 5a. Doppel-Checkout-Schutz ───────────────────────────────────────────
     if (activeSub && !allow_upgrade) {
       console.warn(`[createCheckoutSession] Active subscription already exists for org ${organization_id}`);
       return Response.json({
@@ -176,7 +128,6 @@ Deno.serve(async (req) => {
       }, { status: 409 });
     }
 
-    // Trial nur für Starter – Professional und Gold starten direkt ohne Testphase
     const isStarterPlan = planName.includes('starter') || planSlug.includes('starter');
     const trialDays = isStarterPlan ? 14 : 0;
 
@@ -197,8 +148,6 @@ Deno.serve(async (req) => {
           },
         });
         stripeCustomerId = customer.id;
-
-        // Update org mit Stripe Customer ID
         await base44.asServiceRole.entities.Organization.update(organization_id, { stripe_customer_id: stripeCustomerId });
         console.info(`[createCheckoutSession] Stripe Customer erstellt: ${stripeCustomerId} für org ${organization_id}`);
       } catch (e) {
@@ -213,7 +162,6 @@ Deno.serve(async (req) => {
     const appEnv = getAppEnvironment();
 
     // ── 7. Checkout Session erstellen ───────────────────────────────────────
-    // Metadata enthält vollständige Debugging-Infos (initiated_by_user, initiated_by_role, app_environment)
     const sessionParams = {
       mode: 'subscription',
       customer: stripeCustomerId,

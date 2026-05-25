@@ -1,56 +1,76 @@
+/**
+ * deleteCompany
+ * =============
+ * AuthZ via kanonischer authorizeOrganizationAction (sharedAuthz v1.0.0)
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+
+// ── authorizeOrganizationAction (kanonisch, sharedAuthz v1.0.0) ──────────────
+const _PLATFORM_ADMIN_ROLES = new Set(['admin', 'platform_owner', 'platform_admin']);
+const _ACTION_ROLES = {
+  manage_billing: ['organization_admin'],
+  manage_blacklist: ['organization_admin'],
+  delete_company: ['organization_admin'],
+  use_ai_scoring: ['organization_admin', 'sales_rep'],
+};
+function _allow(r) { return { allowed: true, status: 200, error: null, ...r }; }
+function _deny(reason, message, ctx = {}) { return { allowed: false, status: reason === 'not_authenticated' ? 401 : 403, error: message, reason, user: ctx.user || null, organization: ctx.organization || null, member: ctx.member || null, access_role: ctx.access_role || null }; }
+async function authorizeOrganizationAction(base44, { organizationId, action = null, requiredRoles = [], requireActiveOrg = true, allowPlatformAdmin = true } = {}) {
+  let user; try { user = await base44.auth.me(); } catch { return _deny('not_authenticated', 'Nicht eingeloggt.'); }
+  if (!user) return _deny('not_authenticated', 'Nicht eingeloggt.');
+  if (allowPlatformAdmin && _PLATFORM_ADMIN_ROLES.has(user.role)) return _allow({ user, organization: null, member: null, access_role: 'platform_admin' });
+  if (!organizationId) return _deny('missing_organization_id', 'Keine organization_id angegeben.');
+  let orgs, members;
+  try { [orgs, members] = await Promise.all([base44.asServiceRole.entities.Organization.filter({ id: organizationId }), base44.asServiceRole.entities.OrganizationMember.filter({ organization_id: organizationId, user_email: user.email })]); }
+  catch (e) { return _deny('organization_not_found', 'Organisation nicht gefunden.'); }
+  const organization = orgs[0] || null;
+  if (!organization) return _deny('organization_not_found', 'Organisation nicht gefunden.');
+  if (requireActiveOrg && organization.platform_status === 'suspended') return _deny('organization_suspended', `Organisation gesperrt: ${organization.suspended_reason || 'kein Grund'}.`, { user, organization });
+  if (organization.owner_email === user.email) return _allow({ user, organization, member: members[0] || null, access_role: 'organization_admin' });
+  const member = members[0] || null;
+  if (!member) return _deny('not_a_member', 'Kein Mitglied dieser Organisation.', { user, organization });
+  if (member.status !== 'active') return _deny('member_inactive', `Mitglied-Status: "${member.status}".`, { user, organization, member });
+  const memberRole = member.role;
+  const effectiveRequired = requiredRoles.length > 0 ? requiredRoles : (action && _ACTION_ROLES[action] ? _ACTION_ROLES[action] : null);
+  if (effectiveRequired && !effectiveRequired.includes(memberRole)) return _deny('insufficient_role', `Rolle "${memberRole}" darf "${action || requiredRoles.join(',')}" nicht.`, { user, organization, member, access_role: memberRole });
+  return _allow({ user, organization, member, access_role: memberRole });
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: 'unauthorized' }, { status: 401 });
-    }
-
     const { company_id, organization_id } = await req.json();
+
     if (!company_id || !organization_id) {
       return Response.json({ error: 'missing_params' }, { status: 400 });
     }
 
-    // Org laden für owner_email-Check und suspension-Check
-    const [orgs, members] = await Promise.all([
-      base44.asServiceRole.entities.Organization.filter({ id: organization_id }),
-      base44.asServiceRole.entities.OrganizationMember.filter({ organization_id, user_email: user.email, status: 'active' }),
-    ]);
-    const org = orgs[0] || null;
-    if (!org) return Response.json({ error: 'organisation_not_found' }, { status: 404 });
-
-    // Suspension-Check (nicht für platform admins)
-    if (user.role !== 'admin' && org.platform_status === 'suspended') {
-      console.warn(`[deleteCompany] Access denied: org suspended`);
-      return Response.json({ error: 'Organisation ist gesperrt', organization_suspended: true }, { status: 403 });
+    // ── AuthZ: nur organization_admin darf löschen ──────────────────────────
+    const access = await authorizeOrganizationAction(base44, { organizationId: organization_id, action: 'delete_company' });
+    if (!access.allowed) {
+      console.warn(`[deleteCompany] Access denied: ${access.reason} user=${access.user?.email}`);
+      return Response.json({ error: access.error, reason: access.reason }, { status: access.status });
     }
 
-    const isAdmin =
-      user.role === 'admin' ||
-      org.owner_email === user.email ||
-      members.some(m => ['admin', 'organization_admin'].includes(m.role));
-
-    if (!isAdmin) {
-      return Response.json({ error: 'forbidden' }, { status: 403 });
+    // Org für AuditLog (platform_admin hat access.organization=null → extra laden)
+    let org = access.organization;
+    if (!org) {
+      const orgs = await base44.asServiceRole.entities.Organization.filter({ id: organization_id });
+      org = orgs[0] || null;
     }
 
-    // Prüfen: Firma gehört zur Organisation
-    const companies = await base44.asServiceRole.entities.Company.filter({
-      id: company_id,
-      organization_id,
-    });
-
+    // ── Prüfen: Firma gehört zur Organisation ───────────────────────────────
+    const companies = await base44.asServiceRole.entities.Company.filter({ id: company_id, organization_id });
     if (!companies.length) {
       return Response.json({ error: 'not_found' }, { status: 404 });
     }
 
-    // AuditLog vor dem Löschen schreiben
+    // ── AuditLog vor dem Löschen ────────────────────────────────────────────
     try {
       await base44.asServiceRole.entities.PlatformAuditLog.create({
-        actor_email: user.email,
-        actor_role: user.role === 'admin' ? 'platform_admin' : (org.owner_email === user.email ? 'org_owner' : 'org_admin'),
+        actor_email: access.user.email,
+        actor_role: access.access_role,
         action: 'company_deleted',
         target_type: 'organization',
         target_id: company_id,
@@ -61,10 +81,10 @@ Deno.serve(async (req) => {
       console.warn(`[deleteCompany] AuditLog failed (non-blocking): ${auditErr.message}`);
     }
 
-    // Löschen mit Service Role
+    // ── Löschen ─────────────────────────────────────────────────────────────
     await base44.asServiceRole.entities.Company.delete(company_id);
 
-    console.log(`[deleteCompany] OK: user=${user.email} company=${company_id} org=${organization_id}`);
+    console.log(`[deleteCompany] OK: user=${access.user.email} role=${access.access_role} company=${company_id} org=${organization_id}`);
     return Response.json({ success: true });
 
   } catch (error) {
