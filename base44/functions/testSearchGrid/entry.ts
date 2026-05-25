@@ -10,7 +10,7 @@
  * - Ob alle Punkte über Batches abgedeckt werden
  * - Ob Punkte tatsächlich innerhalb des Radius liegen
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;

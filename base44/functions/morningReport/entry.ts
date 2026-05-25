@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ─── ARCHITEKTUR-HINWEIS ──────────────────────────────────────────────────────
 // TODO (Skalierung): Bei 100+ Organisationen muss morningReport über eine

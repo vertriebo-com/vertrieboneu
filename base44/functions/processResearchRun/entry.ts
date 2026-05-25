@@ -27,7 +27,7 @@
  * IDEMPOTENZ-GARANTIEN (v5, unverändert):
  * 1. Processing-Lock + 2. Pre-Create-Dedupe + 3. Intra-Batch-Dedupe
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
 const SEARCH_ENGINE_VERSION = "v6-weighted-scoring";

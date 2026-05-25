@@ -17,7 +17,7 @@
  *
  * Admin-only. Schreibt nichts. Setzt keinen Plan automatisch.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 function maskEmail(email) {
   if (!email) return null;

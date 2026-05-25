@@ -20,7 +20,7 @@
  * 6. blocked Keywords vorhanden
  * 7. own_services vorhanden
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {

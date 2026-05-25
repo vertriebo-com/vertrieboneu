@@ -154,7 +154,7 @@ export async function authorizeOrganizationAction(base44, {
 }
 
 // ── Als Backend-Funktion aufrufbar (z.B. für Tests / direkten Invoke) ─────────
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {

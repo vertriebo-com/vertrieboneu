@@ -12,7 +12,7 @@
  * WICHTIG: Nur Analyse, keine Änderungen.
  * Admin-only.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ── Bekannte Audit-Funktionen (aus bestehenden Backend Functions) ─────────────
 const KNOWN_AUDIT_FUNCTIONS = [
@@ -377,7 +377,7 @@ Deno.serve(async (req) => {
 
     // SDK-Version Vergleich konkret
     const sdkVersionFrontend = '0.8.30';  // aus package.json installed_packages
-    const sdkVersionFunctions = '0.8.25'; // aus functions/*.js imports
+    const sdkVersionFunctions = '0.8.30'; // aus functions/*.js imports
     const sdkDrift = sdkVersionFrontend !== sdkVersionFunctions;
 
     if (sdkDrift) {

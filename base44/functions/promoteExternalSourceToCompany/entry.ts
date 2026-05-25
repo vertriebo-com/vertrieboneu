@@ -15,7 +15,7 @@
  *   → UsageLog.leads_created +1
  */
 
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ── SUPABASE SHADOW MODE ──────────────────────────────────────────────────────
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");

@@ -17,7 +17,7 @@
  *
  * Admin-only. Schreibt nichts.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // Kanonisch: Berlin-Period (period-utils v1.0)
 function getBerlinPeriodMonth(date = new Date()) {

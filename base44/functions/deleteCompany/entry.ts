@@ -3,7 +3,7 @@
  * =============
  * AuthZ via kanonischer authorizeOrganizationAction (sharedAuthz v1.0.0)
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ── authorizeOrganizationAction (kanonisch, sharedAuthz v1.0.0) ──────────────
 const _PLATFORM_ADMIN_ROLES = new Set(['admin', 'platform_owner', 'platform_admin']);

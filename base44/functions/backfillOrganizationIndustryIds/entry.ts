@@ -14,7 +14,7 @@
  *  4. Eindeutige Treffer: industry_id schreiben (oder dry_run melden)
  *  5. Unklare Fälle: needs_review melden
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // Gleiche Map wie in startResearchRun – Single Source of Truth wäre besser, aber
 // no local imports erlaubt, daher hier dupliziert.

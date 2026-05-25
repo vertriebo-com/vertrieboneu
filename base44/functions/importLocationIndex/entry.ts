@@ -11,7 +11,7 @@
  * - special_postal_recipient niemals importieren (bereits in active-Datei gefiltert, aber Doppelschutz)
  * - Admin-only
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 const FILE_URL = 'https://media.base44.com/files/public/69d8fb5b8dde510755b29a7e/cb1709b1c_location_index_de_cleaned.zip';
 

@@ -16,7 +16,7 @@
  *
  * Admin-only. Schreibt nichts.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // SEED-IDs aus getTaxonomy (muss synchron gehalten werden)
 const EXPECTED_SEED_IDS = [

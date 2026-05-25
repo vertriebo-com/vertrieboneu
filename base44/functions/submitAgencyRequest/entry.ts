@@ -8,7 +8,7 @@
  * - Distinct handling for logged-in vs. public submissions
  */
 
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 const HONEYPOT_FIELD = "website_url";
 const RATE_LIMIT_WINDOW_MS = 3600000; // 1 hour

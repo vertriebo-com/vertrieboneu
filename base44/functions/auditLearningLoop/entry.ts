@@ -16,7 +16,7 @@
  * 7. Keine Cross-Org-Leaks
  * 8. PlatformAdmin darf alles, normaler Nutzer nur eigene Org
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {

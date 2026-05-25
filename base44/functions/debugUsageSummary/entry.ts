@@ -1,6 +1,6 @@
 // DEBUG-ONLY: Gibt usage_summary aus getDashboardData-Logik zurück (kein functions.invoke)
 // Nach Debugging löschen oder deaktivieren.
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {

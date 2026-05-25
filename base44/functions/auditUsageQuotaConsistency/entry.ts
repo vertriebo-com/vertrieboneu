@@ -29,7 +29,7 @@
  *
  * Admin-only. Schreibt nichts.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ── PHASE 3: Kanonische Berlin-Period-Hilfsfunktionen (period-utils v1.0) ──────
 // Identische Kopie aus getUsageSummary — Tech-Debt: Base44 kein Import.

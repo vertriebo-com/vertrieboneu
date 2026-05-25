@@ -23,7 +23,7 @@
  * periodMonth      → Europe/Berlin via formatToParts (kanonisch, identisch zu processResearchRun)
  * periodBounds     → getBerlinPeriodBounds() für Company-Zählung (UTC-Annäherung mit bekanntem Drift)
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ── PHASE 3: Kanonische Berlin-Period-Hilfsfunktionen ──────────────────────────
 // Zentralisiert in allen Funktionen die periodMonth/periodBounds verwenden.

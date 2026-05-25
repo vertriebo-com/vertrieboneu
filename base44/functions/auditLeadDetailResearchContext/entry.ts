@@ -15,7 +15,7 @@
  * 9. Kein Cross-Org-Datenleck (Company gehört zur richtigen Org)
  * 10. engine_analysis_json enthält score_breakdown für Phase-1-Leads
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 function safeParseJSON(v) {
   if (!v) return null;

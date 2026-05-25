@@ -20,7 +20,7 @@
  *
  * Admin-only. Schreibt nichts. Repariert nichts.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 const TEST_INDUSTRY_IDS = [
   'gebaeudereinigung', 'spedition_logistik', 'it_service',

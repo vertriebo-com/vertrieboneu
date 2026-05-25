@@ -6,7 +6,7 @@
  *
  * Admin-only
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 function haversineKm(lat1, lng1, lat2, lng2) {
   const R = 6371;

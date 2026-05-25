@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ─── Action → Role Matrix ─────────────────────────────────────────────────────
 // Defines which roles are allowed to perform which actions.

@@ -11,7 +11,7 @@
  *  Parallel-Checkout-Schutz: aktive/trialing Sub → 409, außer allow_upgrade=true.
  *  Agency-Block: Agency-Plan nur auf Anfrage, kein Self-Service-Checkout.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 import Stripe from 'npm:stripe@14.21.0';
 
 // ── authorizeOrganizationAction (kanonisch, sharedAuthz v1.0.0) ──────────────

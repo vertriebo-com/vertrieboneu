@@ -9,7 +9,7 @@
  *
  * Output: Keyword-Vorschläge mit source, reason, priority_score
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {

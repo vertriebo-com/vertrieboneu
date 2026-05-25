@@ -20,7 +20,7 @@
  * AUFRUF: POST { organization_id, scenario: "1"|"2"|"3"|"4"|"all"|"info" }
  * WICHTIG: organization_id muss eine Org mit plan_id und service_area_city sein.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 function getPeriodMonth() {
   const parts = new Intl.DateTimeFormat('en-CA', {

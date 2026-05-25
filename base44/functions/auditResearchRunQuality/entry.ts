@@ -6,7 +6,7 @@
  *
  * Parameter: { research_run_id?: string } — wenn nicht angegeben, neuester Run
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {

@@ -4,7 +4,7 @@
  * Prüft ob Learning-Loop-Daten korrekt vorhanden sind und im Dashboard angezeigt werden können.
  * Keine ML-Logik, nur Daten-Sichtbarkeits-Checks.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {

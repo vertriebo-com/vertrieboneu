@@ -13,7 +13,7 @@
  * - Via Backend Function oder direkt im Console
  */
 
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 const TEST_ORG_OWNER = "test+quota@example.com";
 const PERIOD_MONTH = "2026-05";

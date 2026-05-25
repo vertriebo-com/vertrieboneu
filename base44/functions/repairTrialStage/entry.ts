@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ─── Reparatur-Funktion für kaputte trial_stage ─────────────────────────────
 // Nur für Platform-Admins: Setzt trial_stage + billing_status auf bezahlter Status

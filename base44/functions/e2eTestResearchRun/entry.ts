@@ -17,7 +17,7 @@
  *
  * NUR FÜR PLATFORM ADMINS.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");

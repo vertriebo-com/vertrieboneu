@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 import Stripe from 'npm:stripe@14.21.0';
 
 // ─── VOLLSTÄNDIGE LIVE-DIAGNOSE ────────────────────────────────────────────────

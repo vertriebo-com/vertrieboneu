@@ -18,7 +18,7 @@
  * - Dadurch ist die Function beim ersten Aufruf selbst-initialisierend.
  */
 
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ── SEED-Daten: Kanonische Taxonomie (wird beim ersten Aufruf in DB geschrieben) ──
 // Dies ist die EINZIGE inhaltliche Quelle. Frontend + Backend lesen aus der DB.

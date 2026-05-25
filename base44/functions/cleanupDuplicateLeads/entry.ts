@@ -14,7 +14,7 @@
  * Aufruf: { organization_id, dry_run: true/false }
  * dry_run=true → nur Bericht, keine Löschungen
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 function normStr(str) {
   return String(str || "").toLowerCase()

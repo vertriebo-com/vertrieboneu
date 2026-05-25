@@ -17,7 +17,7 @@
  * - Excluded-CustomerTypes werden korrekt gefiltert
  * - Engine-Analytics sind nachvollziehbar
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ── HELPERS (exakt wie in processResearchRun) ────────────────────────────────
 const SEARCH_ENGINE_VERSION = "v6-weighted-scoring";

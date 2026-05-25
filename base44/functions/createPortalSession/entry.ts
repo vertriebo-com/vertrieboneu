@@ -3,7 +3,7 @@
  * ===================
  * AuthZ via kanonischer authorizeOrganizationAction (sharedAuthz v1.0.0)
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 import Stripe from 'npm:stripe@14.21.0';
 
 // ── authorizeOrganizationAction (kanonisch, sharedAuthz v1.0.0) ──────────────

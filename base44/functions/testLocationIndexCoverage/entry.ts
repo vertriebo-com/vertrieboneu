@@ -16,7 +16,7 @@
  * WICHTIG: Führt echte Google Places API Calls durch.
  * Bitte nur im Admin-Kontext verwenden.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {

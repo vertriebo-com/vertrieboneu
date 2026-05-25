@@ -11,7 +11,7 @@
  * dry_run=false → echte Treffer werden gespeichert (kein Fake/Simulation)
  */
 
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 // ── NORMALISIERUNG ────────────────────────────────────────────────────────────
 

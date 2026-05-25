@@ -3,7 +3,7 @@
  * Gibt den aktuellen Status eines ResearchRun zurück.
  * Leichtgewichtig – nur Entity-Lesen, kein Google-API-Call.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {
