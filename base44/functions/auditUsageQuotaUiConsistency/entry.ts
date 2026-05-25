@@ -124,12 +124,38 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // plan_status = 'billing_plan_missing' → Preview-Org ohne Plan, UI zeigt korrekt "kein Plan"
-      if (summary.plan_status === 'billing_plan_missing') {
+      // plan_status = 'billing_plan_missing' oder 'billing_plan_invalid':
+      // Differenziert: warning wenn UI stabil (kein Crash, Fallback-Werte vorhanden)
+      //                fail wenn summary-Felder null/undefined → UI crasht oder zeigt "–"
+      if (['billing_plan_missing', 'billing_plan_invalid'].includes(summary.plan_status)) {
+        const corePresent = summary.monthly_limit != null && summary.period_month != null;
+        const isPaidCustomer = ['paid'].includes(org.trial_stage) || ['active', 'trialing'].includes(org.billing_status || '');
+        const uiStatus = corePresent ? 'warning' : 'fail';
+        const uiOk = uiStatus === 'warning';
+        if (!uiOk) orgsWithNullUsage++;
         orgAuditResults.push({
-          org_id: orgId, org_name: org.name,
-          ui_ok: true, skipped: true, skip_reason: 'billing_plan_missing — kein Limit-Check nötig',
-          checks: [{ check: 'plan_present', status: 'yellow', detail: 'Keine Plan-ID → UI zeigt Fallback-Zustand' }],
+          org_id: orgId,
+          org_name: org.name,
+          trial_stage: org.trial_stage,
+          billing_status: org.billing_status,
+          plan_id: org.plan_id || null,
+          plan_name: null,
+          ui_ok: uiOk,
+          plan_missing: true,
+          plan_missing_severity: uiStatus,
+          checks: [{
+            check: 'plan_present',
+            status: uiStatus === 'warning' ? 'yellow' : 'red',
+            detail: uiStatus === 'warning'
+              ? `plan_status="${summary.plan_status}" — UI zeigt Fallback-Werte (monthly_limit=${summary.monthly_limit}), kein Crash`
+              : `plan_status="${summary.plan_status}" — UI-Kern-Felder null/undefined → UsageBars zeigen "–"`,
+          }, {
+            check: 'paid_customer_without_plan',
+            status: isPaidCustomer ? 'red' : 'yellow',
+            detail: isPaidCustomer
+              ? `PAID-Kunde (billing_status=${org.billing_status}) ohne gültigen Plan → Billing-Sync-Problem`
+              : `Trial/Preview ohne Plan → erwartet, UI-Fallback ausreichend`,
+          }],
         });
         continue;
       }
@@ -267,13 +293,38 @@ Deno.serve(async (req) => {
 
     // ── Globale Tests ─────────────────────────────────────────────────────────
 
-    // Test 1: Keine null-Felder in Core-UI
+    // Test 1a: Keine null-Felder in Core-UI
+    const planMissingFail    = orgAuditResults.filter(o => o.plan_missing && o.plan_missing_severity === 'fail');
+    const planMissingWarning = orgAuditResults.filter(o => o.plan_missing && o.plan_missing_severity === 'warning');
+    const planMissingPaidFail = planMissingFail.filter(o =>
+      ['active', 'trialing'].includes(o.billing_status) || o.trial_stage === 'paid'
+    );
     addTest('ui_values', 'no_null_core_fields',
       orgsWithNullUsage > 0 ? 'red' : 'green',
       orgsWithNullUsage > 0
         ? `${orgsWithNullUsage} Org(s): null/undefined in Kern-UsageSummary-Feldern → UsageBars zeigen "–" statt Zahlen`
         : 'Alle Orgs: Kern-UsageSummary-Felder vollständig befüllt',
       { orgs_with_null: orgAuditResults.filter(o => !o.ui_ok || o.error).map(o => o.org_name) }
+    );
+
+    // Test 1b: Plan-Missing-Orgs — differenziert warning vs fail
+    const planMissingStatus = planMissingFail.length > 0 ? 'red'
+      : planMissingWarning.length > 0 ? 'yellow' : 'green';
+    addTest('plan_integrity', 'plan_missing_orgs',
+      planMissingStatus,
+      planMissingFail.length > 0
+        ? `${planMissingFail.length} Org(s): plan_missing + UI-Kern-Felder null → UsageBars zeigen "–". Weitere ${planMissingWarning.length} mit sauberem Fallback.`
+        : planMissingWarning.length > 0
+          ? `${planMissingWarning.length} Org(s): Plan fehlt, aber UI fällt sauber zurück (Fallback-Werte vorhanden). Kein Crash.`
+          : 'Keine Plan-Missing-Orgs mit UI-Problemen',
+      {
+        fail_orgs:    planMissingFail.map(o => ({ name: o.org_name, plan_id: o.plan_id, billing_status: o.billing_status, trial_stage: o.trial_stage })),
+        warning_orgs: planMissingWarning.map(o => ({ name: o.org_name, plan_id: o.plan_id, billing_status: o.billing_status })),
+        paid_customer_without_plan: planMissingPaidFail.map(o => o.org_name),
+        recommendation: planMissingFail.length > 0 || planMissingWarning.length > 0
+          ? 'auditPlanMissingOrgs ausführen für detaillierte Diagnose und Repair-Empfehlung'
+          : null,
+      }
     );
 
     // Test 2: Kein unerwartetes ∞
