@@ -13,29 +13,27 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'missing_params' }, { status: 400 });
     }
 
-    // Prüfen: User gehört zur Organisation und ist Admin
-    const members = await base44.asServiceRole.entities.OrganizationMember.filter({
-      organization_id,
-      user_email: user.email,
-      status: 'active',
-    });
+    // Org laden für owner_email-Check und suspension-Check
+    const [orgs, members] = await Promise.all([
+      base44.asServiceRole.entities.Organization.filter({ id: organization_id }),
+      base44.asServiceRole.entities.OrganizationMember.filter({ organization_id, user_email: user.email, status: 'active' }),
+    ]);
+    const org = orgs[0] || null;
+    if (!org) return Response.json({ error: 'organisation_not_found' }, { status: 404 });
+
+    // Suspension-Check (nicht für platform admins)
+    if (user.role !== 'admin' && org.platform_status === 'suspended') {
+      console.warn(`[blacklistCompany] Access denied: org suspended`);
+      return Response.json({ error: 'Organisation ist gesperrt', organization_suspended: true }, { status: 403 });
+    }
 
     const isAdmin =
       user.role === 'admin' ||
+      org.owner_email === user.email ||
       members.some(m => ['admin', 'organization_admin'].includes(m.role));
 
     if (!isAdmin) {
       return Response.json({ error: 'forbidden' }, { status: 403 });
-    }
-
-    // Check: Organisation gesperrt? (nicht für platform admins)
-    if (user.role !== 'admin') {
-      const orgs = await base44.asServiceRole.entities.Organization.filter({ id: organization_id });
-      const org = orgs[0];
-      if (org && org.platform_status === 'suspended') {
-        console.warn(`[blacklistCompany] Access denied: org suspended`);
-        return Response.json({ error: 'Organisation ist gesperrt', organization_suspended: true }, { status: 403 });
-      }
     }
 
     // Prüfen: Firma gehört zur Organisation
@@ -82,6 +80,21 @@ Deno.serve(async (req) => {
       is_blacklisted: true,
       status: 'Verloren',
     });
+
+    // AuditLog schreiben
+    try {
+      await base44.asServiceRole.entities.PlatformAuditLog.create({
+        actor_email: user.email,
+        actor_role: user.role === 'admin' ? 'platform_admin' : (org.owner_email === user.email ? 'org_owner' : 'org_admin'),
+        action: 'company_blacklisted',
+        target_type: 'organization',
+        target_id: company_id,
+        organization_id,
+        metadata: JSON.stringify({ company_name: company.name, company_id, blacklisted_at: new Date().toISOString() }),
+      });
+    } catch (auditErr) {
+      console.warn(`[blacklistCompany] AuditLog failed (non-blocking): ${auditErr.message}`);
+    }
 
     console.log(`[blacklistCompany] OK: user=${user.email} company=${company_id} org=${organization_id}`);
     return Response.json({ success: true });

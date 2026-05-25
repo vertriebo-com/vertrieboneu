@@ -73,6 +73,9 @@ async function checkAccess(req, { organization_id, action }={}) {
     return _deny('organization_not_found','Organisation nicht gefunden.');
   }
 
+  // Suspension-Check (vor owner/member, außer platform_admin)
+  if (organization.platform_status === 'suspended') return _deny('organization_suspended', `Organisation gesperrt: ${organization.suspended_reason||'kein Grund'}.`);
+
   // Owner der Organisation darf immer billing machen (z.B. direkt nach Onboarding)
   if (organization.owner_email === user.email) {
     return _allow({ reason:'org_owner', user, organization, member: members[0]||null, role:'organization_admin' });
