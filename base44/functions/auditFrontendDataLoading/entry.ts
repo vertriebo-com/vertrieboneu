@@ -21,39 +21,27 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 const PAGE_MATRIX = [
   {
     page: 'Leads.jsx',
-    data_sources: ['Company', 'LeadOutcome'],
+    data_sources: ['listCompanies (backend function)'],
     fetch_limits: {
-      Company: 'leadLimit (initial 100, +100 on demand, via state)',
-      LeadOutcome: '200 (hard-coded)',
+      listCompanies: 'page_size=50 (max 100), MAX_FETCH=1000 cap, server-side pagination',
     },
     client_filtering: [
-      'status filter (c.status)',
-      'priority_score filter (client-side tiers)',
-      'focus filters (hot, callback, this_week)',
-      'search across name/branche/ort/plz/website/telefon/email',
-      'newRunFilter (research_run_id)',
+      'focus filters (hot, callback, this_week) — client-side on paginated set',
       'showArchived toggle',
       'filterCompanies() from useLeadsFilter (blacklist, org scope)',
+      'search: PARTIAL — basic search in backend, but focus filters still client-side',
     ],
     client_sorting: [
-      'priority (isHotLead + status priority map)',
-      'score (priority_score desc)',
-      'name (alphabetical)',
-      'created_date (desc)',
-      'last_contact_date (desc)',
+      'priority (isHotLead + status priority map) — client-side on paginated set',
     ],
     browser_aggregation: false,
-    pagination: {
-      server_side: 'leadLimit state (initial 100, paginates +100)',
-      client_side: 'showAllLeads toggle (first 50 visible from loaded set)',
-      verdict: 'PARTIAL — loads 100 at a time from server, displays 50, but all filtering/sorting is in browser on loaded set',
-    },
+    pagination: { server_side: 'listCompanies page/page_size (50 per page)', client_side: false, verdict: 'GREEN — server-side pagination with page_size=50, MAX_FETCH=1000 cap, React Query key includes orgId + page + filters' },
     org_scoped: true,
-    query_key_has_org_id: true,   // ["companies", orgId, leadLimit]
-    server_filtering_present: false,
-    risk: 'yellow',
-    risk_notes: 'Functional up to ~500 leads. At 1000+ leads: filter+sort loop gets heavy (useMemo helps). LeadOutcome hard-limit=200 may miss older outcomes. All filter/sort in browser.',
-    recommended_api: 'listCompanies({ org_id, filters: { status, search, score_min, focus }, sort, page, limit })',
+    query_key_has_org_id: true,   // ["companies-list", orgId, page, PAGE_SIZE, statusFilter, priorityFilter, search, sortBy]
+    server_filtering_present: true, // status, temperature (priority), search
+    risk: 'green',
+    risk_notes: 'FIXED (2026-05-25): listCompanies backend function. Server-side pagination (50/page), server-side filtering (status, temperature, search), server-side sorting (relevance_score, name, created_date, last_contact_date, priority_score). Client-side only: focus filters, showArchived. MAX_FETCH=1000 cap prevents unbounded loads.',
+    recommended_api: null,
   },
   {
     page: 'Statistics.jsx',
@@ -167,8 +155,8 @@ const PAGE_MATRIX = [
 
 // ── Query Key Analyse ─────────────────────────────────────────────────────────
 const QUERY_KEY_ANALYSIS = [
-  { component: 'Leads.jsx', key: '["companies", orgId, leadLimit]', has_org_id: true, has_filter_values: true, verdict: 'GOOD' },
-  { component: 'Leads.jsx', key: '["leadOutcomes", orgId]', has_org_id: true, has_filter_values: false, verdict: 'GOOD — filter is client-side only' },
+  { component: 'Leads.jsx', key: '["companies-list", orgId, page, PAGE_SIZE, statusFilter, priorityFilter, search, sortBy]', has_org_id: true, has_filter_values: true, verdict: 'EXCELLENT — includes all filter/sort params for proper cache invalidation' },
+  { component: 'Leads.jsx', key: 'outcomeByCompany from _latest_outcome (no separate fetch)', has_org_id: true, has_filter_values: false, verdict: 'GOOD — outcomes embedded in listCompanies response, no unbounded separate fetch' },
   { component: 'Dashboard.jsx', key: '["dashboard-data", activeOrg.id]', has_org_id: true, has_filter_values: false, verdict: 'GOOD' },
   { component: 'Dashboard.jsx', key: '["learned-signals", activeOrg.id]', has_org_id: true, has_filter_values: false, verdict: 'GOOD' },
   { component: 'Statistics.jsx', key: 'none — raw useEffect/useState', has_org_id: false, has_filter_values: false, verdict: 'RISK — no React Query, no cache key, refetches on every mount, no deduplication' },
@@ -386,16 +374,15 @@ Deno.serve(async (req) => {
         max_company_fetch_limit_seen: 500,  // Statistics, CalendarView
         pages_with_full_company_load: ['Statistics.jsx (500)', 'CalendarView.jsx (500, unused)'],
         pages_without_pagination: ['Statistics.jsx', 'CalendarView.jsx', 'Tasks.jsx'],
-        pages_with_pagination: ['Leads.jsx (server: +100 on demand, client: first 50)'],
+        pages_with_pagination: ['Leads.jsx (server-side: 50/page via listCompanies)'],
         query_keys_missing_org_id: ['Statistics.jsx (no React Query)', 'CalendarView.jsx (no React Query)', 'Tasks.jsx (no React Query)'],
-        existing_backend_aggregations: ['getDashboardData', 'getUsageSummary', 'getStatisticsSummary'],
+        existing_backend_aggregations: ['getDashboardData', 'getUsageSummary', 'getStatisticsSummary', 'listCompanies'],
         entities_loaded_but_unused: ['Company in CalendarView.jsx (fetched, never rendered)'],
         hard_coded_limits: {
           'Statistics Company': 500,
           'Statistics ContactLog': 500,
           'Statistics LeadOutcome': 500,
-          'Leads initial': 100,
-          'Leads outcomes': 200,
+          'Leads listCompanies': '50/page (max 100)',
           'CalendarView Company': 500,
           'CalendarView Tasks': 300,
           'Tasks': 200,
@@ -473,9 +460,9 @@ Deno.serve(async (req) => {
         'Statistics.jsx is the highest-risk page: hard limit=500 causes INCORRECT (not just slow) aggregations at 500+ leads.',
         'Dashboard.jsx is the gold standard: backend-aggregated, React Query cached, org-scoped key.',
         'CalendarView loads 500 companies it never uses — easy win to remove.',
-        'Leads.jsx is acceptable for MVP but needs server-side filtering at 1000+ leads.',
+        'Leads.jsx FIXED (2026-05-25): listCompanies backend function with server-side pagination (50/page), server-side filtering (status, temperature, search), server-side sorting. Risk: green.',
         'BillingSettings.jsx is well-architected: bounded loads, backend usage aggregation.',
-        'Next action: (1) getStatisticsSummary backend API, (2) remove Company from CalendarView, (3) migrate Tasks to React Query.',
+        'Next action: (1) remove Company from CalendarView, (2) migrate Tasks to React Query / listTasks API.',
       ],
     });
 
