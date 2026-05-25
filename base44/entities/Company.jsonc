@@ -280,6 +280,32 @@
         "additional_location"
       ],
       "description": "Welche Suchpunktstrategie diesen Lead gefunden hat"
+    },
+    "quality_tier": {
+      "type": "string",
+      "title": "Qualit\u00e4ts-Tier",
+      "enum": [
+        "premium",
+        "strong",
+        "good",
+        "weak"
+      ],
+      "description": "Evidence-basierte Qualit\u00e4tseinstufung: premium \u226585+3 Evidenzen, strong 75-84+2, good 65-74+2, weak sonst"
+    },
+    "quality_confidence": {
+      "type": "string",
+      "title": "Qualit\u00e4ts-Konfidenz",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "description": "Konfidenz der Qualit\u00e4tseinstufung: high = starke Evidenz, low = nur Basis-Signale"
+    },
+    "save_reason_code": {
+      "type": "string",
+      "title": "Speicher-Begr\u00fcndung",
+      "description": "Kurzer Code warum dieser Lead gespeichert wurde, z.B. tc_match+phone+website"
     }
   },
   "required": [

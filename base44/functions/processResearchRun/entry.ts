@@ -152,6 +152,21 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
   let matched_target_customer_type = null;
   let placeTypeMatchStrength = 'none';
 
+  // ── EVIDENCE-ZÄHLER (starke vs. schwache Evidenzen) ──────────────────────
+  // Distanz-in-Radius zählt NICHT als starke Evidenz (zu trivial).
+  // strong_evidence: kategorie, place_type, scoring_signal, tc_match
+  // weak_evidence:   telefon, website, adresse (kontaktierbar, aber kein semantischer Match)
+  const evidenceFlags = {
+    category_match: false,
+    place_type_match: false,
+    scoring_signal_match: false,
+    target_customer_match: false,
+    phone: !!(candidate.formatted_phone_number || candidate.international_phone_number),
+    website: !!candidate.website,
+    address: !!(candidate.formatted_address || candidate.vicinity),
+  };
+
+
   // ── Kategorie-Match ──
   if (!matched_search_category) {
     for (const cat of (profile?.searchableBusinessCategories || [])) {
@@ -160,7 +175,7 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
       if (matched_search_category) break;
     }
   }
-  if (matched_search_category) { score += 20; reasons.push(`Cat:${matched_search_category}(+20)`); }
+  if (matched_search_category) { score += 20; reasons.push(`Cat:${matched_search_category}(+20)`); evidenceFlags.category_match = true; }
 
   // ── Google Place Types als Boost (confidence-gewichtet) ──
   const confidence = profile?.placeTypeConfidence || 'medium';
@@ -173,6 +188,7 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
     score += placeTypeBoost;
     placeTypeMatchStrength = confidence;
     reasons.push(`PlaceType:${confidence}(+${placeTypeBoost})`);
+    evidenceFlags.place_type_match = true;
   }
 
   // ── GEWICHTETE Scoring-Signale ──
@@ -194,9 +210,10 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
   if (cappedSignalScore > 0) {
     score += cappedSignalScore;
     reasons.push(`Signals:[${matchedWeightedSignals.slice(0,4).join(',')}](+${cappedSignalScore})`);
+    evidenceFlags.scoring_signal_match = true;
   }
 
-  // ── Kontaktdaten ──
+  // ── Kontaktdaten (schwache Evidenz: zählt für Score, nicht für strong_evidence) ──
   if (candidate.formatted_phone_number || candidate.international_phone_number) { score += 8; reasons.push("Tel(+8)"); }
   if (candidate.website) { score += 8; reasons.push("Web(+8)"); }
 
@@ -211,6 +228,7 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
       matched_target_customer_type = tc;
       score += tcBonus;
       reasons.push(`TC:${tc}(+${tcBonus})`);
+      evidenceFlags.target_customer_match = true;
       break;
     }
   }
@@ -233,6 +251,40 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
 
   score = Math.max(0, Math.min(100, score));
 
+  // ── EVIDENCE-AUSWERTUNG ──────────────────────────────────────────────────
+  // strong_evidence: semantische Übereinstimmung (Kategorie, PlaceType, Signal, TC)
+  // weak_evidence:   Kontaktdaten (erreichbar, aber kein semantischer Match)
+  const strongEvidenceKeys = ['category_match', 'place_type_match', 'scoring_signal_match', 'target_customer_match'];
+  const weakEvidenceKeys   = ['phone', 'website', 'address'];
+  const strongEvidenceCount = strongEvidenceKeys.filter(k => evidenceFlags[k]).length;
+  const weakEvidenceCount   = weakEvidenceKeys.filter(k => evidenceFlags[k]).length;
+  const positiveEvidenceCount = strongEvidenceCount + weakEvidenceCount;
+
+  // ── QUALITY-TIER-MAPPING ─────────────────────────────────────────────────
+  // Distanz zählt NICHT als Evidenz. Tier = f(score, strong_evidence_count).
+  let qualityTier, qualityConfidence;
+  if (score >= 85 && strongEvidenceCount >= 3) {
+    qualityTier = 'premium'; qualityConfidence = 'high';
+  } else if (score >= 75 && strongEvidenceCount >= 2) {
+    qualityTier = 'strong'; qualityConfidence = 'high';
+  } else if (score >= 65 && strongEvidenceCount >= 2) {
+    qualityTier = 'good'; qualityConfidence = 'medium';
+  } else {
+    // Alles andere: weak – Score 55-64 ODER zu wenig starke Evidenz
+    qualityTier = 'weak'; qualityConfidence = 'low';
+  }
+
+  // Save-Reason-Code: kurze lesbare Zusammenfassung der positiven Evidenzen
+  const saveReasonParts = [];
+  if (evidenceFlags.target_customer_match) saveReasonParts.push('tc_match');
+  if (evidenceFlags.category_match) saveReasonParts.push('cat_match');
+  if (evidenceFlags.place_type_match) saveReasonParts.push('placetype');
+  if (evidenceFlags.scoring_signal_match) saveReasonParts.push('signal');
+  if (evidenceFlags.phone) saveReasonParts.push('phone');
+  if (evidenceFlags.website) saveReasonParts.push('website');
+  if (evidenceFlags.address) saveReasonParts.push('address');
+  const saveReasonCode = saveReasonParts.join('+') || 'base_only';
+
   // ── Diagnostics-Objekt ──
   const diagnostics = {
     engine_version: SEARCH_ENGINE_VERSION,
@@ -246,6 +298,14 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
     category_matched: matched_search_category,
     score_breakdown: reasons.join(' | '),
     tc_bonus_applied: strategy === 'target_customer_search' ? 10 : strategy === 'mixed' ? 8 : 6,
+    // Evidence-Diagnostics
+    evidence_flags: evidenceFlags,
+    positive_evidence_count: positiveEvidenceCount,
+    strong_evidence_count: strongEvidenceCount,
+    weak_evidence_count: weakEvidenceCount,
+    quality_tier: qualityTier,
+    quality_confidence: qualityConfidence,
+    save_reason_code: saveReasonCode,
   };
 
   return {
@@ -254,6 +314,9 @@ function scoreCandidate(candidate, profile, distanceKm, radiusKm, category, plac
     matched_target_customer_type,
     relevance_reason: reasons.join(' | ') || 'Base',
     shouldSave: score >= 55 && !badFit.bad,
+    qualityTier,
+    qualityConfidence,
+    saveReasonCode,
     diagnostics,
   };
 }
@@ -1195,6 +1258,10 @@ Deno.serve(async (req) => {
               engine_version: SEARCH_ENGINE_VERSION,
               engine_confidence: scoring.score,
               engine_last_analyzed_at: new Date().toISOString(),
+              // Quality-Tier (evidence-basiert, nicht nur score-basiert)
+              quality_tier: scoring.qualityTier,
+              quality_confidence: scoring.qualityConfidence,
+              save_reason_code: scoring.saveReasonCode,
               // LocationIndex Coverage-Diagnostik
               matched_location_city: point.locationCity || null,
               matched_location_postal_code: point.locationPostalCode || null,

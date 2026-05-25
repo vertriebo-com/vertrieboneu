@@ -125,82 +125,121 @@ Deno.serve(async (req) => {
     // C) Simulierte Kandidaten-Tests (shouldSave-Entscheidungen ohne echte API)
     // ─────────────────────────────────────────────────────────────────────────
     // Inline scoreCandidate-Simulation (vereinfacht, testet Kern-Logik)
+    // Spiegelt exakt die Logik aus processResearchRun:scoreCandidate
     function simScore(overrides = {}) {
       const {
         hasCat = false, hasPlaceType = false, placeTypeConf = 'medium',
-        hasPhone = false, hasWebsite = false, distanceOk = false,
+        hasPhone = false, hasWebsite = false, hasAddress = false, distanceOk = false,
         hasTCMatch = false, strategy = 'target_customer_search',
         badFitPenalty = 0, websiteRequired = false,
-        scoringSignals = 0, // Anzahl Signale (je +12 Punkte, max 35)
+        scoringSignals = 0,
       } = overrides;
 
       let score = 50;
+
+      // Evidence-Flags (identisch mit processResearchRun)
+      const evidenceFlags = {
+        category_match: hasCat,
+        place_type_match: hasPlaceType,
+        scoring_signal_match: scoringSignals > 0,
+        target_customer_match: hasTCMatch,
+        phone: hasPhone,
+        website: hasWebsite,
+        address: hasAddress,
+      };
+
       if (hasCat) score += 20;
       if (hasPlaceType) score += placeTypeConf === 'high' ? 15 : placeTypeConf === 'medium' ? 8 : 3;
       const sigScore = Math.min(35, scoringSignals * 12);
       score += sigScore;
       if (hasPhone) score += 8;
       if (hasWebsite) score += 8;
-      if (distanceOk) score += 8;
+      if (distanceOk) score += 8; // Distanz zählt zum Score, aber NICHT als starke Evidenz
       const tcBonus = strategy === 'target_customer_search' ? 10 : strategy === 'mixed' ? 8 : 6;
       if (hasTCMatch) score += tcBonus;
       if (websiteRequired && !hasWebsite) score = Math.min(score, 54);
       score += badFitPenalty;
       score = Math.max(0, Math.min(100, score));
-      return { score, shouldSave: score >= 55 && badFitPenalty > -35 };
+
+      // Quality-Tier-Mapping (identisch mit processResearchRun)
+      const strongEvidenceCount = ['category_match','place_type_match','scoring_signal_match','target_customer_match']
+        .filter(k => evidenceFlags[k]).length;
+      let qualityTier, qualityConfidence;
+      if (score >= 85 && strongEvidenceCount >= 3) { qualityTier = 'premium'; qualityConfidence = 'high'; }
+      else if (score >= 75 && strongEvidenceCount >= 2) { qualityTier = 'strong'; qualityConfidence = 'high'; }
+      else if (score >= 65 && strongEvidenceCount >= 2) { qualityTier = 'good'; qualityConfidence = 'medium'; }
+      else { qualityTier = 'weak'; qualityConfidence = 'low'; }
+
+      return {
+        score,
+        shouldSave: score >= 55 && badFitPenalty > -35,
+        qualityTier,
+        qualityConfidence,
+        strongEvidenceCount,
+      };
     }
 
     const simTests = [
       {
-        name: "Guter B2B-Lead (Kategorie + Website + Telefon + PlaceType)",
+        name: "Guter B2B-Lead (TC + Kategorie + Website + Telefon + PlaceType)",
         params: { hasCat: true, hasPlaceType: true, hasPhone: true, hasWebsite: true, distanceOk: true, hasTCMatch: true },
         expectedSave: true,
+        expectedTier: "premium",
       },
       {
-        name: "Schwacher Lead (nur Basis + Distanz)",
+        name: "Nur Basis + Distanz (Score 58, 0 starke Evidenzen)",
         params: { distanceOk: true },
-        expectedSave: false, // Score = 58 – technisch gespeichert, qualitativ schwach
-        expectedQuality: "weak",
+        expectedSave: true, // wird noch gespeichert (score >= 55)
+        expectedTier: "weak", // ABER als weak klassifiziert → korrekte Einstufung
       },
       {
-        name: "Lead mit Bad-Fit-Penalty (-35)",
+        name: "Lead mit Bad-Fit-Penalty (-35) → hard-fail",
         params: { hasCat: true, hasPlaceType: true, badFitPenalty: -35 },
         expectedSave: false,
       },
       {
-        name: "Lead mit Bad-Fit-Penalty (-20) – sollte NICHT hard-fail sein",
+        name: "Lead mit Bad-Fit-Penalty (-20) → kein hard-fail",
         params: { hasCat: true, hasPlaceType: true, badFitPenalty: -20 },
-        expectedSave: true, // Bad-Fit < -35 ist erst hard-fail
+        expectedSave: true,
+        expectedTier: "good",
       },
       {
-        name: "website_signal_required ohne Website",
+        name: "website_signal_required ohne Website → cap54",
         params: { hasCat: true, hasPlaceType: true, hasPhone: true, websiteRequired: true, hasWebsite: false },
         expectedSave: false,
       },
       {
-        name: "Scoring-Signals dominieren (3 starke Signale)",
+        name: "3 Scoring-Signals + Kategorie + Telefon → strong",
         params: { hasCat: true, scoringSignals: 3, hasPhone: true, distanceOk: true },
         expectedSave: true,
+        expectedTier: "strong",
       },
       {
-        name: "Knapp über Schwelle ohne echten Match (Basis + Distanz = 58)",
-        params: { distanceOk: true },
-        expectedSave: true, // Score 58 – AKTUELL gespeichert, fragliche Qualität
-        note: "Score 58 = nur Basis+Distanz. Wird aktuell gespeichert. Qualitäts-Problem!",
+        name: "TC-Match + PlaceType + Telefon + Website → premium",
+        params: { hasTCMatch: true, hasPlaceType: true, hasPhone: true, hasWebsite: true, hasCat: true, distanceOk: true },
+        expectedSave: true,
+        expectedTier: "premium",
       },
     ];
 
     for (const t of simTests) {
       const result = simScore(t.params);
-      const correct = result.shouldSave === t.expectedSave;
-      const status = correct ? "green" : "red";
+      const saveCorrect = result.shouldSave === t.expectedSave;
+      const tierCorrect = !t.expectedTier || result.qualityTier === t.expectedTier;
+      const allCorrect = saveCorrect && tierCorrect;
+
+      // Kritischer Check: "Basis+Distanz" muss als weak eingestuft werden (kein Quality-Problem mehr)
+      const isBasisDistanzTest = t.name.includes("Basis + Distanz");
+      const basisDistanzHandledCorrectly = isBasisDistanzTest && result.qualityTier === 'weak';
+
       addTest(`sim_${t.name}`,
-        correct ? (t.note ? "yellow" : "green") : "red",
-        `Score: ${result.score} | shouldSave: ${result.shouldSave} | Erwartet: ${t.expectedSave}${t.note ? ` | ⚠️ ${t.note}` : ''}`,
-        { score: result.score, should_save: result.shouldSave, correct }
+        allCorrect ? "green" : (saveCorrect && !tierCorrect ? "yellow" : "red"),
+        `Score: ${result.score} | Tier: ${result.qualityTier} (${result.qualityConfidence}) | strongEvidence: ${result.strongEvidenceCount} | shouldSave: ${result.shouldSave}${t.expectedTier ? ` | TierErwartet: ${t.expectedTier}` : ''}`,
+        { score: result.score, quality_tier: result.qualityTier, quality_confidence: result.qualityConfidence, should_save: result.shouldSave, strong_evidence_count: result.strongEvidenceCount, correct: allCorrect }
       );
-      if (t.note) {
-        warnings.push(`Quality-Gap: "${t.name}" – Score ${result.score}, wird gespeichert. ${t.note}`);
+
+      if (isBasisDistanzTest && !basisDistanzHandledCorrectly) {
+        warnings.push(`Quality-Gap UNGELÖST: "Basis+Distanz"-Lead wird NICHT als weak eingestuft!`);
       }
     }
 

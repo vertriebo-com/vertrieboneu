@@ -283,7 +283,9 @@ Deno.serve(async (req) => {
       }
 
       // Neue Leads mit gutem Score, kontaktierbar, keine Task
-      if (company.status === 'Neu' && hasContact && (company.relevance_score || 0) >= 65 && !companiesWithTasks.has(company.id)) {
+      // quality_tier='weak' oder quality_confidence='low' → nicht als priorisierter Kontakt-Lead anzeigen
+      const isQualityWeak = company.quality_tier === 'weak' || company.quality_confidence === 'low';
+      if (company.status === 'Neu' && hasContact && !isQualityWeak && (company.relevance_score || 0) >= 65 && !companiesWithTasks.has(company.id)) {
         const action = company.telefon ? 'Erstgespräch führen' : 'E-Mail vorbereiten';
         companyActionItems.push({
           type: 'new_contactable',

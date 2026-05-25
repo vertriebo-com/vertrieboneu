@@ -24,13 +24,26 @@ function extractKeyword(item) {
   return String(item);
 }
 
-// ── Quality-Tier aus relevance_score ableiten ──────────────────────────────
-function getQualityTier(score) {
-  if (!score || score <= 0) return null;
-  if (score >= 85) return { tier: "premium",  label: "Premium Lead",          color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: Award };
-  if (score >= 75) return { tier: "strong",   label: "Sehr guter Lead",       color: "bg-blue-50 text-blue-700 border-blue-200", icon: CheckCircle2 };
-  if (score >= 65) return { tier: "good",     label: "Guter Lead",            color: "bg-sky-50 text-sky-700 border-sky-200", icon: CheckCircle2 };
-  if (score >= 55) return { tier: "weak",     label: "Prüfen",                color: "bg-amber-50 text-amber-700 border-amber-200", icon: AlertTriangle };
+// ── Quality-Tier aus company.quality_tier (bevorzugt) oder Score (Fallback) ─
+const TIER_CONFIG = {
+  premium: { label: "Premium Lead",    color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: Award },
+  strong:  { label: "Sehr guter Lead", color: "bg-blue-50 text-blue-700 border-blue-200",          icon: CheckCircle2 },
+  good:    { label: "Guter Lead",      color: "bg-sky-50 text-sky-700 border-sky-200",              icon: CheckCircle2 },
+  weak:    { label: "Prüfen",          color: "bg-amber-50 text-amber-700 border-amber-200",        icon: AlertTriangle },
+};
+
+function getQualityTier(company) {
+  // 1. Bevorzuge gespeichertes quality_tier (evidence-basiert)
+  if (company.quality_tier && TIER_CONFIG[company.quality_tier]) {
+    return { tier: company.quality_tier, ...TIER_CONFIG[company.quality_tier] };
+  }
+  // 2. Fallback: Score-basiert (für ältere Leads ohne quality_tier)
+  const score = company.relevance_score || 0;
+  if (!score) return null;
+  if (score >= 85) return { tier: "premium", ...TIER_CONFIG.premium };
+  if (score >= 75) return { tier: "strong",  ...TIER_CONFIG.strong };
+  if (score >= 65) return { tier: "good",    ...TIER_CONFIG.good };
+  if (score >= 55) return { tier: "weak",    ...TIER_CONFIG.weak };
   return null;
 }
 
@@ -78,7 +91,7 @@ export default function RelevanceSection({ company, learnedSignals }) {
   if (!hasContext) return null;
 
   const learningHints = getLearningHints(company, learnedSignals);
-  const qualityTier = getQualityTier(company.relevance_score);
+  const qualityTier = getQualityTier(company);
 
   // engine_version: direkt oder aus engine_analysis_json
   let engineVersion = company.engine_version || null;
