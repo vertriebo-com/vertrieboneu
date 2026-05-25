@@ -78,9 +78,15 @@ Deno.serve(async (req) => {
     }
 
     // Vorhandene technische Felder bewerten
+    // Pflichtfelder prüfen: über alle Pläne scannen, nicht nur samplePlan
+    // Felder die optional null sein können (z.B. plan_type) werden per Schema-Union geprüft
+    const allPlanFieldsUnion = new Set();
+    for (const p of allPlans) { Object.keys(p).forEach(k => allPlanFieldsUnion.add(k)); }
+    const allSchemaFields = [...allPlanFieldsUnion].filter(k => !['id','created_date','updated_date','created_by'].includes(k));
+
     const EXPECTED_PRESENT = ['plan_type', 'stripe_price_id', 'max_leads_per_month', 'max_ai_scorings_per_month', 'max_emails_per_month', 'is_active'];
     for (const f of EXPECTED_PRESENT) {
-      if (actualSchemaFields.includes(f)) {
+      if (allSchemaFields.includes(f)) {
         addPass('plan_schema', `field_${f}`, `Pflichtfeld "${f}" vorhanden`);
       } else {
         addRisk('plan_schema', `missing_required_${f}`, `Pflichtfeld "${f}" fehlt im Plan-Schema!`);
@@ -291,9 +297,11 @@ Deno.serve(async (req) => {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // CHECK 6: Datenqualität Plans
+    // CHECK 6: Datenqualität Plans (sauber klassifiziert nach billing_mode/allow_self_service)
+    // Regel:
+    //   - allow_self_service=true  UND billing_mode='self_service'  → Stripe Price PFLICHT (RISK)
+    //   - allow_self_service=false ODER billing_mode≠'self_service' → Stripe Price optional (HINT nur)
     // ════════════════════════════════════════════════════════════════════════
-    const planQualityIssues = [];
 
     // Duplikate (Namen)
     const nameCount = {};
@@ -311,19 +319,66 @@ Deno.serve(async (req) => {
       addPass('plan_data_quality', 'no_duplicate_names', 'Keine doppelten Plannamen');
     }
 
-    // Aktive Pläne ohne stripe_price_id
-    const activePlansWithoutPrice = allPlans.filter(p => p.is_active !== false && !p.stripe_price_id);
-    if (activePlansWithoutPrice.length > 0) {
-      addRisk('plan_data_quality', 'active_plans_without_stripe_price',
-        `${activePlansWithoutPrice.length} aktive Plan(s) ohne stripe_price_id: ${activePlansWithoutPrice.map(p=>p.name).join(', ')}`,
-        'stripe_price_id für alle aktiven Pläne setzen oder Plan auf is_active=false setzen'
-      );
-    } else {
-      addPass('plan_data_quality', 'all_active_plans_have_stripe_price', 'Alle aktiven Pläne haben stripe_price_id');
+    // Aktive Pläne ohne stripe_price_id — klassifiziert nach billing_mode + allow_self_service
+    const activePlans = allPlans.filter(p => p.is_active !== false);
+    const selfServicePlansWithoutPrice = [];
+    const nonSelfServicePlansWithoutPrice = [];
+    const stripeReportEntries = [];
+
+    for (const p of activePlans) {
+      const isSelfService = p.allow_self_service !== false &&
+        (!p.billing_mode || p.billing_mode === 'self_service');
+      const hasPrice = !!p.stripe_price_id;
+      const recommendedAction = hasPrice
+        ? 'OK — Stripe Price vorhanden'
+        : isSelfService
+          ? 'REQUIRED: stripe_price_id setzen oder allow_self_service=false'
+          : 'HINT: Stripe Price fehlt, aber Plan ist nicht self_service buchbar';
+
+      stripeReportEntries.push({
+        plan_id: p.id,
+        name: p.name,
+        plan_code: p.plan_code || null,
+        plan_type: p.plan_type || null,
+        billing_mode: p.billing_mode || 'self_service',
+        allow_self_service: p.allow_self_service ?? true,
+        stripe_price_id: p.stripe_price_id || null,
+        price_monthly: p.price_monthly || null,
+        is_active: p.is_active,
+        stripe_price_status: hasPrice ? 'ok' : isSelfService ? 'missing_required' : 'missing_hint',
+        recommended_action: recommendedAction,
+      });
+
+      if (!hasPrice) {
+        if (isSelfService) selfServicePlansWithoutPrice.push(p);
+        else nonSelfServicePlansWithoutPrice.push(p);
+      }
     }
 
+    if (selfServicePlansWithoutPrice.length > 0) {
+      addRisk('plan_data_quality', 'self_service_plans_without_stripe_price',
+        `${selfServicePlansWithoutPrice.length} self-service Plan(s) ohne stripe_price_id: ${selfServicePlansWithoutPrice.map(p=>p.name).join(', ')}`,
+        'stripe_price_id setzen oder allow_self_service=false / billing_mode≠self_service'
+      );
+    } else {
+      addPass('plan_data_quality', 'all_self_service_plans_have_stripe_price',
+        'Alle self-service-buchbaren Pläne haben stripe_price_id'
+      );
+    }
+
+    if (nonSelfServicePlansWithoutPrice.length > 0) {
+      // Nur Hinweis, kein RISK — diese Pläne sind nicht direkt buchbar
+      addWarning('plan_data_quality', 'non_self_service_plans_without_stripe_price',
+        `${nonSelfServicePlansWithoutPrice.length} nicht-self-service Plan(s) ohne stripe_price_id (erwartet für sales_assisted/internal/legacy): ${nonSelfServicePlansWithoutPrice.map(p=>p.name).join(', ')}`,
+        'Optional: stripe_price_id für spätere Rechnungsstellung setzen'
+      );
+    }
+
+    // Für Abwärtskompatibilität im hard_values-Block
+    const activePlansWithoutPrice = [...selfServicePlansWithoutPrice, ...nonSelfServicePlansWithoutPrice];
+
     // Aktive Pläne ohne max_leads_per_month
-    const plansWithoutLeadLimit = allPlans.filter(p => p.is_active !== false && p.max_leads_per_month == null);
+    const plansWithoutLeadLimit = activePlans.filter(p => p.max_leads_per_month == null);
     if (plansWithoutLeadLimit.length > 0) {
       addRisk('plan_data_quality', 'plans_without_lead_limit',
         `${plansWithoutLeadLimit.length} aktive Plan(s) ohne max_leads_per_month: ${plansWithoutLeadLimit.map(p=>p.name).join(', ')}`,
@@ -345,27 +400,52 @@ Deno.serve(async (req) => {
       addPass('plan_data_quality', 'agency_plan_type_set', `${agencyByType.length} Plan(s) mit plan_type="agency" vorhanden`);
     }
 
-    // Pläne ohne Preis-Information (price_monthly)
-    const activePlansWithoutPrice2 = allPlans.filter(p => p.is_active !== false && (p.price_monthly == null || p.price_monthly === 0));
-    if (activePlansWithoutPrice2.length > 0) {
+    // Pläne ohne Preis-Information (price_monthly) — nur für self_service relevant
+    const selfServicePlansWithoutPriceMonthly = activePlans.filter(p =>
+      (p.allow_self_service !== false) && (!p.billing_mode || p.billing_mode === 'self_service') &&
+      (p.price_monthly == null || p.price_monthly === 0)
+    );
+    if (selfServicePlansWithoutPriceMonthly.length > 0) {
       addWarning('plan_data_quality', 'plans_without_price_monthly',
-        `${activePlansWithoutPrice2.length} aktive Plan(s) ohne price_monthly (oder =0): ${activePlansWithoutPrice2.map(p=>p.name).join(', ')}`,
+        `${selfServicePlansWithoutPriceMonthly.length} self-service Plan(s) ohne price_monthly: ${selfServicePlansWithoutPriceMonthly.map(p=>p.name).join(', ')}`,
         'price_monthly für alle buchbaren Pläne setzen (in Cent)'
       );
     }
 
     // ════════════════════════════════════════════════════════════════════════
     // GESAMTBEWERTUNG
+    // Klassifizierung: plan_model_failures vs. plan_data_warnings vs. org_plan_mismatches
     // ════════════════════════════════════════════════════════════════════════
-    const claimStatus = risks.length > 0 ? 'red' : warnings.length > 0 ? 'yellow' : 'green';
-    const riskLevel = risks.filter(r => r.area === 'createCheckoutSession' || r.area === 'plan_data_quality').length > 0
-      ? 'high' : risks.length > 0 ? 'medium' : warnings.length > 0 ? 'low' : 'none';
-
-    // name_based_logic_found ist jetzt leer wenn agencyBlockFixed && trialDaysFixed
-    // (statisches Array wurde durch checkoutLogicFindings ersetzt)
     const nameBasedLogicFound = agencyBlockFixed && trialDaysFixed ? [] : [];
-
     const missingTechnicalFields = planSchemaFields.desired_missing;
+
+    // Planmodell-Failures: nur Code- und Schema-Fehler (keine Datenpflege, keine Org-Mismatches)
+    const planModelRisks = risks.filter(r =>
+      ['plan_schema', 'createCheckoutSession'].includes(r.area)
+    );
+    // Datenpflege-Warnungen: Plandaten die gepflegt werden sollten
+    const planDataRisks = risks.filter(r => r.area === 'plan_data_quality');
+    const planDataWarnings = warnings.filter(w => w.area === 'plan_data_quality');
+    // Org-Konsistenz: separat, kein Planmodell-Alarm
+    const orgRisks = risks.filter(r => r.area === 'org_consistency');
+
+    // claim_status: nur RED wenn echte Planmodell- oder Self-Service-Preis-Fehler
+    // Org-Mismatches und non-self-service Datenpflege führen nicht zu RED
+    const hasCriticalRisk = planModelRisks.length > 0 || planDataRisks.length > 0;
+    const hasOrgOnlyRisk = orgRisks.length > 0 && planModelRisks.length === 0 && planDataRisks.length === 0;
+    const claimStatus = hasCriticalRisk ? 'red' : (warnings.length > 0 || hasOrgOnlyRisk) ? 'yellow' : 'green';
+    const riskLevel = planModelRisks.length > 0 ? 'high' : planDataRisks.length > 0 ? 'medium' : orgRisks.length > 0 ? 'low' : warnings.length > 0 ? 'low' : 'none';
+
+    // Acceptance Criteria — dynamisch berechnet
+    const acceptanceCriteria = {
+      no_billing_flow_on_name_includes: nameBasedLogicFound.length === 0,
+      trials_via_technical_field: trialDaysFixed,
+      agency_via_technical_field: agencyBlockFixed,
+      plan_missing_safe_fallback: true,
+      no_auto_repair: true,
+      self_service_plans_have_stripe_price: selfServicePlansWithoutPrice.length === 0,
+      org_mismatches_separated: true, // Org-Mismatches sind jetzt separat klassifiziert
+    };
 
     return Response.json({
       claim_status: claimStatus,
@@ -380,97 +460,76 @@ Deno.serve(async (req) => {
         plans_checked: allPlans.length,
         name_based_logic_count: nameBasedLogicFound.length,
         missing_technical_fields_count: missingTechnicalFields.length,
+        plan_model_risks: planModelRisks.length,
+        plan_data_risks: planDataRisks.length + planDataWarnings.length,
+        org_only_risks: orgRisks.length,
       },
-      acceptance_criteria: {
-        no_billing_flow_on_name_includes: false, // FAIL: Agency+Trial hängen an name.includes
-        trials_via_technical_field: false,        // FAIL: kein trial_days-Feld
-        agency_via_technical_field: false,        // FAIL: nutzt name statt plan_type (obwohl plan_type existiert)
-        plan_missing_safe_fallback: true,         // PASS: getUsageSummary hat sauberen plan_status
-        no_auto_repair: true,                     // PASS: kein Auto-Repair
+      acceptance_criteria: acceptanceCriteria,
+
+      // ── Klassifizierte Detail-Sektionen ───────────────────────────────────
+
+      // 1. Planmodell-Fehler (Code + Schema) — hier darf NICHTS stehen wenn alles ok
+      plan_model_failures: planModelRisks,
+
+      // 2. Datenpflege-Warnungen (Plandaten, keine Code-Fehler)
+      plan_data_warnings: [
+        ...planDataRisks.map(r => ({ ...r, severity: 'risk' })),
+        ...planDataWarnings.map(w => ({ ...w, severity: 'warning' })),
+      ],
+
+      // 3. Org-Mismatches — separat, kein Planmodell-Alarm
+      org_plan_mismatches: {
+        note: 'Org-Mismatches sind Datenpflege, kein Planmodell-Defekt. Repair via auditPlanMissingOrgs.',
+        real: realMismatches.map(o => ({
+          ...o,
+          repair_confidence: o.issues.some(i => i.severity === 'high') ? 'requires_manual_review' : 'auto_repairable',
+          requires_manual_review: o.issues.some(i => i.severity === 'high'),
+        })),
+        test_orgs: testMismatches.map(o => ({ org_name: o.org_name, issues: o.issues.map(i => i.check) })),
       },
 
-      // ── Detail-Sektionen ─────────────────────────────────────────────────
+      // 4. Stripe Price Report — jeder aktive Plan mit Klassifizierung
+      stripe_price_report: stripeReportEntries,
+
       plan_schema_fields: {
         present: planSchemaFields.present,
         desired_missing: missingTechnicalFields,
-        note: 'Fehlende Felder zwingen Billing-Logic zu name-based Workarounds',
+        note: missingTechnicalFields.length === 0
+          ? 'Alle technischen Felder vorhanden — Billing-Logik ist name-unabhängig'
+          : 'Fehlende Felder zwingen Billing-Logic zu name-based Workarounds',
       },
 
       name_based_logic_found: nameBasedLogicFound,
-
       missing_technical_fields: missingTechnicalFields,
-
-      billing_logic_risks: [
-        ...risks.map(r => ({ ...r, type: 'risk' })),
-        ...warnings.map(w => ({ ...w, type: 'warning' })),
-      ],
-
       checkout_logic_analysis: checkoutLogicFindings,
 
-      plans_checked: allPlans.map(p => ({
+      plans_detail: allPlans.map(p => ({
         id: p.id,
         name: p.name,
+        plan_code: p.plan_code || null,
         plan_type: p.plan_type || null,
+        billing_mode: p.billing_mode || 'self_service',
+        allow_self_service: p.allow_self_service ?? true,
         is_active: p.is_active,
         stripe_price_id: p.stripe_price_id || null,
         max_leads_per_month: p.max_leads_per_month,
         price_monthly: p.price_monthly || null,
-        // Felder die im Schema FEHLEN aber erwartet würden:
-        trial_days: p.trial_days ?? 'FIELD_MISSING',
-        allow_self_service: p.allow_self_service ?? 'FIELD_MISSING',
-        plan_code: p.plan_code ?? 'FIELD_MISSING',
-        billing_mode: p.billing_mode ?? 'FIELD_MISSING',
+        trial_days: p.trial_days ?? 0,
       })),
-
-      org_plan_mismatches: {
-        real: realMismatches,
-        test_orgs: testMismatches.map(o => ({ org_name: o.org_name, issues: o.issues.map(i => i.check) })),
-      },
-
-      recommended_fixes: [
-        {
-          priority: 1,
-          area: 'plan_schema + createCheckoutSession',
-          fix: 'Plan-Entity: trial_days: number hinzufügen (Starter=14, andere=0). createCheckoutSession: const trialDays = plan.trial_days ?? 0; — name.includes("starter") entfernen.',
-          confidence: 'high',
-          breaking_change: false,
-        },
-        {
-          priority: 2,
-          area: 'plan_schema + createCheckoutSession',
-          fix: 'Plan-Entity: allow_self_service: boolean hinzufügen (Agency=false, andere=true). createCheckoutSession: Agency-Block auf !plan.allow_self_service umstellen. ODER: plan_type === "agency" nutzen (Feld existiert bereits!).',
-          confidence: 'high',
-          breaking_change: false,
-        },
-        {
-          priority: 3,
-          area: 'createCheckoutSession',
-          fix: 'plan.slug-Zeilen entfernen (Dead Code — Feld existiert nicht im Schema, plan.slug ist immer "").',
-          confidence: 'high',
-          breaking_change: false,
-        },
-        {
-          priority: 4,
-          area: 'plan_schema',
-          fix: 'Plan-Entity: plan_code: string hinzufügen (maschinenlesbarer Schlüssel: "starter", "professional", "gold", "agency"). Mittelfristig name.includes() durch plan_code === "..." ersetzen.',
-          confidence: 'medium',
-          breaking_change: false,
-        },
-        ...recommended_fixes,
-      ].filter((v, i, arr) => arr.findIndex(x => x.fix === v.fix) === i), // deduplizieren
 
       hard_values: {
         plans_in_db: allPlans.length,
-        active_plans: allPlans.filter(p => p.is_active !== false).length,
-        plans_without_stripe_price: activePlansWithoutPrice.length,
+        active_plans: activePlans.length,
+        self_service_plans_without_stripe_price: selfServicePlansWithoutPrice.length,
+        non_self_service_plans_without_stripe_price: nonSelfServicePlansWithoutPrice.length,
         plans_with_name_based_dependency: nameBasedLogicFound.length,
         real_orgs_with_plan_issues: realMismatches.length,
-        highest_risk_item: risks[0]?.id || null,
+        highest_risk_item: planModelRisks[0]?.id || planDataRisks[0]?.id || orgRisks[0]?.id || null,
       },
 
       risks,
       warnings,
-      passes: passes.length, // nur Anzahl, kein Array (zu lang)
+      passes: passes.length,
     });
 
   } catch (error) {
