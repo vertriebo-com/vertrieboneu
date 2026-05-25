@@ -22,7 +22,7 @@ import { base44 } from '@/api/base44Client';
 import {
   BarChart3, AlertCircle, CheckCircle2, XCircle, Info,
   ChevronDown, ChevronRight, RefreshCw, Filter, Search,
-  TrendingUp, DollarSign, Database, FileText
+  TrendingUp, DollarSign, Database, FileText, ShieldCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -275,6 +275,129 @@ function RunUsageComparison({ run, matchingUsageLogs }) {
             {run.zero_result_cause && <p>Null-Ergebnis: <strong>{run.zero_result_cause}</strong></p>}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── UI Consistency Audit Panel ────────────────────────────────────────────────
+
+function UiConsistencyAuditPanel({ isPlatformAdmin }) {
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const run = async () => {
+    setLoading(true);
+    try {
+      const res = await base44.functions.invoke('auditUsageQuotaUiConsistency', {});
+      setResult(res?.data || null);
+    } catch (e) {
+      setResult({ error: e.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isPlatformAdmin) return null;
+
+  const statusColor = {
+    green: 'bg-emerald-50 border-emerald-200',
+    yellow: 'bg-amber-50 border-amber-200',
+    red: 'bg-red-50 border-red-200',
+  };
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-blue-700" />
+          <h3 className="text-sm font-bold text-slate-900">UI Consistency Audit</h3>
+          <span className="text-[10px] text-slate-500">— BillingSettings vs. echte Daten</span>
+        </div>
+        <button
+          onClick={run}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Prüfe…' : 'Audit starten'}
+        </button>
+      </div>
+
+      {result?.error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800">{result.error}</div>
+      )}
+
+      {result && !result.error && (
+        <>
+          {/* Acceptance Criteria */}
+          <div className={`rounded-lg border p-3 ${statusColor[result.claim_status] || 'bg-slate-50 border-slate-200'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-slate-800">Gesamtstatus: <span className={result.claim_status === 'green' ? 'text-emerald-700' : result.claim_status === 'red' ? 'text-red-700' : 'text-amber-700'}>{result.claim_status?.toUpperCase()}</span></p>
+              <p className="text-[10px] text-slate-500">{result.summary?.orgs_audited} Orgs · {result.summary?.passed}/{result.summary?.total_tests} Tests ok</p>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {result.acceptance_criteria && Object.entries(result.acceptance_criteria).map(([k, v]) => (
+                <div key={k} className="flex items-center gap-1.5 text-[10px]">
+                  {v
+                    ? <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                    : <XCircle className="w-3 h-3 text-red-600 shrink-0" />}
+                  <span className={v ? 'text-emerald-800' : 'text-red-800'}>{k.replace(/_/g, ' ')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Failures */}
+          {result.failures?.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide">Fehler ({result.failures.length})</p>
+              {result.failures.map((f, i) => (
+                <div key={i} className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[11px] text-red-900">
+                  <strong>[{f.scope}/{f.check}]</strong> {f.description}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Per-Org Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-left text-[10px] font-bold text-slate-500 uppercase border-b border-slate-100">
+                  <th className="pb-1.5">Org</th>
+                  <th className="pb-1.5 text-right">Verwendet</th>
+                  <th className="pb-1.5 text-right">Limit</th>
+                  <th className="pb-1.5 text-right">Quelle</th>
+                  <th className="pb-1.5 text-center">UI ok?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(result.org_results || []).map(o => (
+                  <tr key={o.org_id} className="border-b border-slate-50">
+                    <td className="py-1.5 font-medium text-slate-800">{o.org_name}</td>
+                    <td className="py-1.5 text-right text-slate-700">{o.ui_values?.monthly_used ?? '–'}</td>
+                    <td className="py-1.5 text-right text-slate-700">
+                      {o.ui_values?.monthly_limit === -1 ? '∞' : (o.ui_values?.monthly_limit ?? '–')}
+                    </td>
+                    <td className="py-1.5 text-right text-slate-500">{o.ui_values?.active_lead_source || '–'}</td>
+                    <td className="py-1.5 text-center">
+                      {o.error
+                        ? <span className="text-red-600 font-bold">ERR</span>
+                        : o.ui_ok
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mx-auto" />
+                        : <XCircle className="w-3.5 h-3.5 text-red-600 mx-auto" />}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {!result && !loading && (
+        <p className="text-xs text-slate-400 text-center py-4">Noch kein Audit durchgeführt. Klicke "Audit starten".</p>
       )}
     </div>
   );
@@ -550,6 +673,9 @@ export default function UsageBillingDiagnostics({ userRole, userEmail, orgId }) 
           </div>
         )}
       </div>
+
+      {/* UI Consistency Audit — nur Platform Admin */}
+      <UiConsistencyAuditPanel isPlatformAdmin={isPlatformAdmin} />
 
       {/* Run vs Usage Vergleich */}
       {showComparisons && (

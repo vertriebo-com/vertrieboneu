@@ -184,6 +184,95 @@ function UsageBar({ label, icon: Icon, used, max, color = "bg-blue-500", overLim
   );
 }
 
+// ── Admin-only: Drift-Diagnostics aus getUsageSummary ────────────────────────
+function AdminUsageDiagnostics({ usageSummary }) {
+  const [open, setOpen] = useState(false);
+  const diag = usageSummary?.reconciliation_diagnostics;
+  const warnings = usageSummary?.diagnostic_warnings || [];
+  const policy = usageSummary?.usage_source_policy;
+  if (!diag && warnings.length === 0) return null;
+
+  const hasDrift = warnings.length > 0 || (diag?.max_delta > 2);
+
+  return (
+    <div className={`border rounded-xl p-4 ${hasDrift ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <span className="flex items-center gap-2 text-xs font-bold text-slate-700">
+          <AlertTriangle className={`w-3.5 h-3.5 ${hasDrift ? 'text-amber-600' : 'text-slate-400'}`} />
+          Admin-Diagnostics: Usage-Quellen
+          {hasDrift && <span className="bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded-full text-[10px]">{warnings.length} Warnung{warnings.length !== 1 ? 'en' : ''}</span>}
+        </span>
+        <span className="text-[10px] text-slate-400">{open ? '▲ einklappen' : '▼ ausklappen'}</span>
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-3">
+          {/* Diagnostic Warnings */}
+          {warnings.length > 0 && (
+            <div className="space-y-1">
+              {warnings.map((w, i) => (
+                <div key={i} className="flex items-start gap-2 bg-amber-100 rounded-lg px-2.5 py-2 text-[11px] text-amber-900">
+                  <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                  <span>{w}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Source Policy */}
+          {policy && (
+            <div className="grid grid-cols-2 gap-2">
+              {['leads', 'research_runs', 'ai_actions', 'emails'].map(k => {
+                const src = policy[k];
+                if (!src) return null;
+                const isLowRel = src.reliability === 'low' || src.risk;
+                return (
+                  <div key={k} className={`rounded-lg px-2.5 py-2 text-[10px] border ${isLowRel ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}>
+                    <p className="font-bold text-slate-600 mb-0.5">{k}</p>
+                    <p className="text-slate-500">Quelle: <strong>{src.active_source || src.primary}</strong></p>
+                    {src.reliability && <p className={`font-semibold ${src.reliability === 'high' ? 'text-emerald-600' : src.reliability === 'low' ? 'text-red-600' : 'text-amber-600'}`}>Zuverlässigkeit: {src.reliability}</p>}
+                    {src.risk && <p className="text-amber-700">{src.risk}</p>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Reconciliation Deltas */}
+          {diag?.source_counts && (
+            <div className="bg-white rounded-lg border border-slate-200 p-2.5">
+              <p className="text-[10px] font-bold text-slate-500 mb-2">Quell-Abgleich (Monat: {usageSummary?.period_month})</p>
+              <div className="grid grid-cols-3 gap-1.5 text-center">
+                {[
+                  { label: 'QuotaReservation', val: diag.source_counts.committed_slots },
+                  { label: 'UsageLog', val: diag.source_counts.usage_log_leads },
+                  { label: 'Companies (DB)', val: diag.source_counts.companies_this_month },
+                ].map(({ label, val }) => (
+                  <div key={label} className="bg-slate-50 rounded px-2 py-1.5">
+                    <p className="text-[10px] text-slate-500">{label}</p>
+                    <p className="text-sm font-bold text-slate-900">{val ?? '–'}</p>
+                  </div>
+                ))}
+              </div>
+              {!diag.sources_agree && (
+                <p className="text-[10px] text-amber-700 mt-2 font-semibold">
+                  ⚠ Quellen stimmen nicht überein (max. Δ={diag.source_deltas?.max_delta}). UI zeigt max()-Wert.
+                </p>
+              )}
+              {diag.sources_agree && (
+                <p className="text-[10px] text-emerald-600 mt-2 font-semibold">✓ Alle Quellen stimmen überein.</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BillingSettings({ org: orgProp, user }) {
   const [org, setOrg] = useState(orgProp);
   const [plan, setPlan] = useState(null);
@@ -634,6 +723,11 @@ export default function BillingSettings({ org: orgProp, user }) {
           Kostenlose Vorschau: 10 Leads insgesamt, max. 3 Recherchen pro Tag. Danach Plan auswählen.
         </p>
       </div>
+      )}
+
+      {/* Admin-only Diagnostics */}
+      {['admin', 'platform_owner', 'platform_admin', 'organization_admin'].includes(user?.role) && usageSummary && (
+        <AdminUsageDiagnostics usageSummary={usageSummary} />
       )}
 
       {/* Nutzungshistorie */}
