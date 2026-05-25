@@ -27,7 +27,7 @@ const OUTCOME_OPTIONS = [
   },
 ];
 
-export default function OutcomeFeedback({ companyId, organizationId, onStatusSync }) {
+export default function OutcomeFeedback({ companyId, organizationId, onStatusSync, company }) {
   const [currentOutcome, setCurrentOutcome] = useState(null);
   const [outcomeId, setOutcomeId] = useState(null);
   const [reason, setReason] = useState("");
@@ -114,8 +114,24 @@ export default function OutcomeFeedback({ companyId, organizationId, onStatusSyn
 
   const activeOption = OUTCOME_OPTIONS.find(o => o.type === currentOutcome);
 
+  // Kontext für den Nutzer zusammenstellen
+  const contextParts = [];
+  if (company?.source_query) contextParts.push(`Suchbegriff „${company.source_query}"`);
+  if (company?.matched_target_customer_type) contextParts.push(`Zielkunde: ${company.matched_target_customer_type}`);
+  if (company?.matched_search_category && company.matched_search_category !== company.matched_target_customer_type)
+    contextParts.push(`Kategorie: ${company.matched_search_category}`);
+
   return (
     <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-sm">
+      {/* Kontext-Zeile: zeigt dem Nutzer was er dem System beibringt */}
+      {contextParts.length > 0 && (
+        <div className="mb-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+          <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+            Dieser Lead wurde über {contextParts[0]} gefunden.{contextParts.length > 1 && ` ${contextParts.slice(1).join(' · ')}`}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Ihr Feedback verbessert künftige Recherchen für diese Kategorie.</p>
+        </div>
+      )}
       <div className="flex items-center gap-2 mb-3">
         <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
         <h3 className="text-xs font-bold uppercase tracking-wide text-slate-600">War dieser Lead hilfreich?</h3>

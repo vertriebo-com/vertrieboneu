@@ -372,6 +372,7 @@ export default function LeadDetail() {
         <OutcomeFeedback
           companyId={id}
           organizationId={orgId}
+          company={company}
           onStatusSync={(newStatus) => setCompany(prev => ({ ...prev, status: newStatus }))}
         />
       )}
@@ -556,9 +557,7 @@ export default function LeadDetail() {
         <div className="space-y-4">
 
           {/* Warum dieser Lead? */}
-          {company.matched_target_customer_type && (
-            <RelevanceSection company={company} learnedSignals={learnedSignals} />
-          )}
+          <RelevanceSection company={company} learnedSignals={learnedSignals} />
 
           {/* Aufgaben / Nächste Aktionen */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">

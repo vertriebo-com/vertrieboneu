@@ -109,12 +109,112 @@ function getEffectiveNextBestAction(company, nba) {
   return nba;
 }
 
+// Erkennt ob engine_analysis_json Phase-1-Research-Diagnostics oder Phase-2-KI-Analyse enthält.
+// Phase-1: score_breakdown, matched_weighted_signals, bad_fit_penalty vorhanden (aus processResearchRun)
+// Phase-2: signals/next_best_action/vertriebo_score vorhanden (aus analyzeLeadEngine)
+function detectEngineJsonMode(json) {
+  if (!json) return 'none';
+  if (json.signals || json.next_best_action || json.vertriebo_score || json.summary) return 'ki_analysis';
+  if (json.score_breakdown || json.matched_weighted_signals || json.bad_fit_penalty != null || json.search_strategy) return 'research_diagnostics';
+  return 'none';
+}
+
+// Phase-1 Research-Diagnostics-Box (zeigt Scoring-Details aus processResearchRun)
+function ResearchDiagnosticsBox({ engineJson, onReanalyze, analyzing }) {
+  const [expanded, setExpanded] = useState(false);
+  const signals = engineJson.matched_weighted_signals || [];
+  const badFitSignals = engineJson.bad_fit_signals_matched || [];
+  const breakdown = engineJson.score_breakdown || "";
+  const strategy = engineJson.search_strategy || null;
+  const placeTypeStrength = engineJson.place_type_match_strength || null;
+  const category = engineJson.category_matched || null;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5" /> Recherche-Auswertung
+        </h3>
+        {engineJson.score_raw != null && (
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+            engineJson.score_raw >= 75 ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+            engineJson.score_raw >= 60 ? "bg-blue-50 text-blue-700 border-blue-200" :
+            "bg-slate-100 text-slate-600 border-slate-200"
+          }`}>Score: {engineJson.score_raw}</span>
+        )}
+      </div>
+      <p className="text-[10px] text-slate-500 mb-3">
+        Dieser Lead wurde direkt aus der Recherche-Engine bewertet. Für Gesprächsempfehlung: KI-Analyse starten.
+      </p>
+
+      <div className="space-y-2">
+        {category && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-500 flex-shrink-0">Kategorie-Match:</span>
+            <span className="font-semibold text-slate-800">{category}</span>
+          </div>
+        )}
+        {strategy && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-slate-500 flex-shrink-0">Such-Strategie:</span>
+            <span className="font-semibold text-slate-800">{strategy}</span>
+          </div>
+        )}
+        {signals.length > 0 && (
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 mb-1">Scoring-Signale</p>
+            <div className="flex flex-wrap gap-1">
+              {signals.slice(0, 5).map((s, i) => (
+                <span key={i} className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  ✓ {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {badFitSignals.length > 0 && (
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 mb-1">Bad-Fit-Signale</p>
+            <div className="flex flex-wrap gap-1">
+              {badFitSignals.map((s, i) => (
+                <span key={i} className="text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                  ⚠ {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {breakdown && (
+          <button onClick={() => setExpanded(!expanded)} className="w-full text-left text-[10px] text-slate-400 hover:text-slate-600 mt-1">
+            {expanded ? "▲ Score-Details ausblenden" : "▼ Score-Details anzeigen"}
+          </button>
+        )}
+        {expanded && breakdown && (
+          <div className="text-[10px] text-slate-500 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 font-mono break-all">
+            {breakdown}
+          </div>
+        )}
+      </div>
+
+      <div className="pt-3 mt-3 border-t border-slate-100">
+        <Button variant="outline" size="sm" onClick={onReanalyze} disabled={analyzing}
+          className="w-full h-8 text-xs gap-1.5 bg-white border-slate-200">
+          <Sparkles className={`w-3.5 h-3.5 ${analyzing ? 'animate-spin' : ''}`} />
+          {analyzing ? "Analysiert…" : "KI-Analyse starten"}
+        </Button>
+        <p className="text-[10px] text-slate-400 text-center mt-1.5">Verbraucht 1 KI-Aktion · bewertet Lead für Gesprächsempfehlung</p>
+      </div>
+    </div>
+  );
+}
+
 export default function EngineBox({ company, contactLogs = [], tasks = [], orgId, onAddTask, onReanalyze }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const engineJson = safeParseJSON(company?.engine_analysis_json);
-  const hasAnalysis = !!engineJson || (company?.lead_temperature && company.lead_temperature !== "unknown");
+  const engineMode = detectEngineJsonMode(engineJson);
+  const hasAnalysis = engineMode === 'ki_analysis' || (company?.lead_temperature && company.lead_temperature !== "unknown");
 
   const signals = engineJson ? extractSignals(engineJson) : {};
   const canonicalTemp = getLeadTemperature(company);
@@ -196,7 +296,12 @@ export default function EngineBox({ company, contactLogs = [], tasks = [], orgId
     }
   };
 
-  // Kein Analyse-Ergebnis
+  // Phase-1 Research-Diagnostics vorhanden, aber noch keine KI-Analyse
+  if (!hasAnalysis && engineMode === 'research_diagnostics') {
+    return <ResearchDiagnosticsBox engineJson={engineJson} onReanalyze={handleReanalyze} analyzing={analyzing} />;
+  }
+
+  // Kein Analyse-Ergebnis und keine Diagnostics
   if (!hasAnalysis) {
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
