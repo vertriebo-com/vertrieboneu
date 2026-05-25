@@ -16,7 +16,7 @@ import AddContactLogDialog from "../components/AddContactLogDialog";
 import AddTaskDialog from "../components/AddTaskDialog";
 import SendEmailDialog from "../components/SendEmailDialog";
 import OutcomeFeedback from "../components/lead-detail/OutcomeFeedback";
-import RelevanceSection from "../components/lead-detail/RelevanceSection";
+import RelevanceSection from "../components/lead-detail/RelevanceSection.jsx";
 import { toast } from "sonner";
 import moment from "moment";
 import { useRef } from "react";
