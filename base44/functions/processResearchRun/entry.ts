@@ -1110,6 +1110,9 @@ Deno.serve(async (req) => {
 
     console.info(`[processResearchRun] Search points: total=${allAvailablePoints.length} offset=${pointOffset} using=${pointsToSearch.length} pointRadiusMeters=${Math.round(pointRadiusMeters)} batchIndex=${batchIndex}`);
     let newLeadsSavedThisBatch = 0, rawHitsThisBatch = 0, dupSkippedThisBatch = 0, noMatchThisBatch = 0, outsideRadiusThisBatch = 0, placeDetailsUsed = 0;
+    // Chain-Skip-Diagnostik (nur diese Batch – wird am Ende mit Run-Stand akkumuliert)
+    let chainSkippedThisBatch = 0;
+    const chainSkippedExamplesThisBatch = [];
     // Track welche LocationIndex-Orte tatsächlich durchsucht wurden
     const locationsSearchedSet = new Set();
 
@@ -1172,7 +1175,42 @@ Deno.serve(async (req) => {
             distanceKm = centers.length > 0 ? Math.min(...centers.map(sc => haversineKm(sc.lat, sc.lng, placeLat, placeLng))) : null;
           }
 
-          if (isLikelyChain(place).isChain) { noMatchThisBatch++; continue; }
+          const chainCheck = isLikelyChain(place);
+          if (chainCheck.isChain) {
+            noMatchThisBatch++;
+            chainSkippedThisBatch++;
+            // Diagnostik-Beispiel sammeln (max 10 pro Run gesamt – wird später auf Gesamt-Array geprüft)
+            if (chainSkippedExamplesThisBatch.length < 5) {
+              // would_match_target_customer: prüfen ob Kette zu TC oder Kategorie passen würde
+              const candidateName = normStr(place.name || '');
+              const tcTypes = taxonomyProfile?.targetCustomerTypes || [];
+              const catList = taxonomyProfile?.searchableBusinessCategories || [];
+              const wouldMatchTC = tcTypes.some(tc => candidateName.includes(normStr(tc)) || normStr(tc).includes(candidateName.slice(0, 6)));
+              const wouldMatchCat = catList.some(c => candidateName.includes(normStr(c)) || normStr(c).includes(candidateName.slice(0, 6)));
+
+              // Empfohlene Policy basierend auf would_match
+              let recommendedPolicy = 'exclude';
+              if (wouldMatchTC) recommendedPolicy = 'allow_if_target_customer';
+              else if (wouldMatchCat) recommendedPolicy = 'downgrade';
+              else if (chainCheck.reason === '>1500 Bewertungen') recommendedPolicy = 'manual_review';
+
+              chainSkippedExamplesThisBatch.push({
+                name: place.name,
+                reason: chainCheck.reason,
+                source_query: qItem.variant || qItem.query,
+                search_category: qItem.category,
+                matched_target_customer: qItem.matched_target_customer || null,
+                place_types: place.types || [],
+                rating_count: place.user_ratings_total || 0,
+                search_center_city: point.centerCity || city,
+                coverage_source: point.coverageSource || 'grid',
+                would_match_target_customer: wouldMatchTC,
+                would_match_category: wouldMatchCat,
+                recommended_policy: recommendedPolicy,
+              });
+            }
+            continue;
+          }
 
           if (existingNames.has(normStr(place.name || ''))) { dupSkippedThisBatch++; continue; }
 
@@ -1368,12 +1406,21 @@ Deno.serve(async (req) => {
 
     console.info(`[processResearchRun] Coverage: searched=${cumulativeLocationsSearched}/${selectedLocationsCount} remaining=${locationsRemainingCount} complete=${coverageComplete}`);
 
+    // Chain-Skip-Diagnostik akkumulieren (aus freshRun lesen für korrekte Summierung)
+    const prevChainSkipped = freshRun.chain_skipped_count || 0;
+    const prevChainExamples = (() => { try { return JSON.parse(freshRun.chain_skipped_examples_json || '[]'); } catch { return []; } })();
+    const newChainSkippedTotal = prevChainSkipped + chainSkippedThisBatch;
+    // Beispiele zusammenführen, max 10 gesamt
+    const allChainExamples = [...prevChainExamples, ...chainSkippedExamplesThisBatch].slice(0, 10);
+
     await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
       status: newStatus, leads_saved: totalLeadsSaved,
       duplicates_skipped: (run.duplicates_skipped || 0) + dupSkippedThisBatch,
       no_match_count: (run.no_match_count || 0) + noMatchThisBatch,
       outside_radius_count: (run.outside_radius_count || 0) + outsideRadiusThisBatch,
       raw_hits: (run.raw_hits || 0) + rawHitsThisBatch,
+      chain_skipped_count: newChainSkippedTotal,
+      chain_skipped_examples_json: JSON.stringify(allChainExamples),
       progress_percent: isDone ? 100 : progressPercent,
       batch_index: nextBatchIndex, total_batches: totalBatches,
       current_step: newStep,

@@ -520,10 +520,47 @@ Deno.serve(async (req) => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // G) Aktuelle Research-Runs zusammenfassen
+    // G) Aktuelle Research-Runs zusammenfassen + Chain-Prozess-Diagnostik
     // ─────────────────────────────────────────────────────────────────────────
     const recentRuns = await base44.asServiceRole.entities.ResearchRun.filter(
       {}, '-created_date', 10
+    );
+
+    // G1) Echte Chain-Skip-Daten aus processResearchRun auswerten
+    const runsWithChainDiagnostics = recentRuns.filter(r => r.chain_skipped_count > 0 || r.chain_skipped_examples_json);
+    const totalChainSkippedFromRuns = recentRuns.reduce((sum, r) => sum + (r.chain_skipped_count || 0), 0);
+    const allChainExamplesFromRuns = [];
+    for (const r of recentRuns) {
+      if (r.chain_skipped_examples_json) {
+        try {
+          const examples = JSON.parse(r.chain_skipped_examples_json);
+          if (Array.isArray(examples)) {
+            examples.forEach(ex => allChainExamplesFromRuns.push({ ...ex, run_id: r.id, industry_id: r.industry_id }));
+          }
+        } catch {}
+      }
+    }
+
+    const hasProcessDiagnostics = runsWithChainDiagnostics.length > 0;
+
+    if (!hasProcessDiagnostics) {
+      warnings.push("Keine Chain-Skip-Diagnostik in ResearchRun vorhanden. skipped_chain_count aus gespeicherten Leads ist nicht beweiskräftig – echte übersprungene Kettenkandidaten sind nicht sichtbar. Erst nach neuem Research-Run mit Diagnostik entscheiden.");
+    }
+
+    addTest("chain_process_diagnostics",
+      !hasProcessDiagnostics ? "yellow" : totalChainSkippedFromRuns > 0 ? "yellow" : "green",
+      hasProcessDiagnostics
+        ? `Prozess-Diagnostik vorhanden: ${runsWithChainDiagnostics.length} Runs mit Chain-Daten. Gesamt übersprungen: ${totalChainSkippedFromRuns}. Beispiele: ${allChainExamplesFromRuns.length}`
+        : `KEINE Prozess-Diagnostik in ResearchRuns. chain_skipped_count=0 aus gespeicherten Leads ist NICHT beweiskräftig.`,
+      {
+        has_process_diagnostics: hasProcessDiagnostics,
+        runs_with_chain_data: runsWithChainDiagnostics.length,
+        total_chain_skipped_from_runs: totalChainSkippedFromRuns,
+        chain_examples_from_runs: allChainExamplesFromRuns.slice(0, 10),
+        note: hasProcessDiagnostics
+          ? "Echte Skip-Daten aus processResearchRun verfügbar."
+          : "Neue ResearchRuns werden ab jetzt Chain-Skips protokollieren. Erst danach Entscheidung über chain_policy.",
+      }
     );
 
     const runSummary = recentRuns.map(r => ({
@@ -571,8 +608,13 @@ Deno.serve(async (req) => {
       score_distribution: scoreDistribution,
       warnings,
       chain_filter_audit: {
-        skipped_chain_count: skippedChainCount,
-        skipped_chain_examples: skippedChainExamples,
+        // Aus gespeicherten Company-Daten (Proxy, nicht beweiskräftig für echte Skips)
+        skipped_chain_count_from_companies: skippedChainCount,
+        skipped_chain_examples_from_companies: skippedChainExamples,
+        // Aus echten processResearchRun-Prozessdaten (beweiskräftig)
+        has_process_diagnostics: hasProcessDiagnostics,
+        total_chain_skipped_from_runs: totalChainSkippedFromRuns,
+        chain_examples_from_runs: allChainExamplesFromRuns.slice(0, 10),
         chain_risk_by_industry: chainRiskByIndustry,
         chain_policy_matrix_summary: {
           allow_if_target_customer: Object.values(chainPolicyMatrix).filter(p => p.policy === 'allow_if_target_customer').length,

@@ -244,6 +244,17 @@
       "title": "Verwendete Suchpunkte gesamt",
       "default": 0,
       "description": "Gesamt-Anzahl Koordinaten-Punkte die f\u00fcr Google-API-Calls genutzt wurden (Grid + LocationIndex)"
+    },
+    "chain_skipped_count": {
+      "type": "number",
+      "title": "Chain-Filter: \u00dcbersprungene Treffer",
+      "default": 0,
+      "description": "Anzahl Google-Places-Kandidaten die wegen isLikelyChain \u00fcbersprungen wurden"
+    },
+    "chain_skipped_examples_json": {
+      "type": "string",
+      "title": "Chain-Filter: \u00dcbersprungene Beispiele (JSON)",
+      "description": "Max 10 Beispiele: name, reason, source_query, would_match_target_customer, recommended_policy"
     }
   },
   "required": [
