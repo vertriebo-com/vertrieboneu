@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
@@ -17,9 +17,9 @@ import AddTaskDialog from "../components/AddTaskDialog";
 import SendEmailDialog from "../components/SendEmailDialog";
 import OutcomeFeedback from "../components/lead-detail/OutcomeFeedback";
 import RelevanceSection from "../components/lead-detail/RelevanceSection";
+import { useOrganization } from "@/hooks/useOrganization";
 import { toast } from "sonner";
 import moment from "moment";
-import { useRef } from "react";
 import { isHotLead, isWarmLead } from "@/utils/leadTemperature";
 
 function temperatureBadge(company) {
@@ -31,6 +31,12 @@ function temperatureBadge(company) {
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  // ── Org-Kontext: konsistent mit Leads/Dashboard via useOrganization ──
+  const { org, user: currentUser, loading: orgLoading } = useOrganization();
+  const orgId = org?.id || null;
+  const orgOwnerEmail = org?.owner_email || null;
+
   const [company, setCompany] = useState(null);
   const [contactLogs, setContactLogs] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -47,28 +53,24 @@ export default function LeadDetail() {
   const [sonstigesSaving, setSonstigesSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showBlacklistConfirm, setShowBlacklistConfirm] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [orgId, setOrgId] = useState(null);
-  const [orgOwnerEmail, setOrgOwnerEmail] = useState(null);
   const [learnedSignals, setLearnedSignals] = useState(null);
 
-  useEffect(() => { loadData(); }, [id]);
+  // D) Wenn orgId wechselt oder id wechselt → State zurücksetzen und neu laden
+  useEffect(() => {
+    if (orgLoading) return; // Warten bis useOrganization fertig ist
+    if (!orgId) { navigate("/"); return; }
+    // Reset bei Kontextwechsel
+    setCompany(null);
+    setContactLogs([]);
+    setTasks([]);
+    setLearnedSignals(null);
+    setLoading(true);
+    loadData();
+  }, [id, orgId, orgLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = async () => {
     try {
-      const me = await base44.auth.me();
-      if (!me) { toast.error("Nicht angemeldet"); navigate("/"); return; }
-
-      // MVP: 1 Account = 1 Organisation → nur Owner-Org
-      const orgs = await base44.entities.Organization.filter({ owner_email: me.email });
-      const org = orgs?.[0] || null;
-      const orgId = org?.id || null;
-      
-      if (!orgId) { toast.error("Keine Organisation gefunden"); navigate("/"); return; }
-
-      setCurrentUser(me);
-      setOrgId(orgId);
-      setOrgOwnerEmail(org?.owner_email || null);
+      if (!orgId) { navigate("/"); return; }
 
       const [comp, logs, allTasks, signals] = await Promise.all([
         base44.entities.Company.filter({ id, organization_id: orgId }),
@@ -85,12 +87,22 @@ export default function LeadDetail() {
       }
 
       const loadedCompany = comp[0];
-      const userIsPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(me.role);
-      const userIsOwner = org.owner_email === me.email;
+
+      // C) Sicherheitscheck: company muss zur aktiven Org gehören
+      if (loadedCompany.organization_id && loadedCompany.organization_id !== orgId) {
+        const isPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(currentUser?.role);
+        if (!isPlatformAdmin) {
+          toast.error("Kein Zugriff auf diesen Lead");
+          navigate("/leads");
+          return;
+        }
+      }
+
+      const userIsPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(currentUser?.role);
+      const userIsOwner = org?.owner_email === currentUser?.email;
       const userCanAccessAllLeads = userIsPlatformAdmin || userIsOwner;
 
-      // MVP: Kein assigned_to-Check für normale Kunden (Owner hat immer Zugriff)
-      if (!userCanAccessAllLeads && loadedCompany.assigned_to && loadedCompany.assigned_to !== me.email) {
+      if (!userCanAccessAllLeads && loadedCompany.assigned_to && loadedCompany.assigned_to !== currentUser?.email) {
         toast.error("Dieses Lead ist einem anderen Vertriebler zugewiesen");
         navigate("/leads");
         return;
@@ -108,7 +120,21 @@ export default function LeadDetail() {
     }
   };
 
+  // C) Org-Kontext-Guard für alle Mutationen
+  const assertOrgMatch = () => {
+    if (company?.organization_id && company.organization_id !== orgId) {
+      const isPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(currentUser?.role);
+      if (!isPlatformAdmin) {
+        toast.error("Aktion nicht erlaubt: falscher Org-Kontext");
+        navigate("/leads");
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleStatusChange = async (newStatus) => {
+    if (!assertOrgMatch()) return;
     if (newStatus === "__sonstiges__") { setSonstigesNotiz(""); setShowSonstigesDialog(true); return; }
     await base44.entities.Company.update(id, { status: newStatus });
     setCompany(prev => ({ ...prev, status: newStatus }));
@@ -116,16 +142,11 @@ export default function LeadDetail() {
   };
 
   const handleSonstigesSubmit = async () => {
+    if (!assertOrgMatch()) return;
     setSonstigesSaving(true);
-    const me = await base44.auth.me();
-    let resolvedOrgId = company.organization_id || orgId;
-    if (!resolvedOrgId) {
-      const orgs = await base44.entities.Organization.filter({ owner_email: me.email });
-      resolvedOrgId = orgs?.[0]?.id || null;
-    }
     await base44.entities.ContactLog.create({
-      organization_id: resolvedOrgId, company_id: id, typ: "Sonstiges", ergebnis: "Abgeschlossen",
-      notiz: sonstigesNotiz, naechster_schritt: "Kunde meldet sich selbst", user_email: me.email,
+      organization_id: orgId, company_id: id, typ: "Sonstiges", ergebnis: "Abgeschlossen",
+      notiz: sonstigesNotiz, naechster_schritt: "Kunde meldet sich selbst", user_email: currentUser?.email,
     });
     await base44.entities.Company.update(id, { last_contact_date: new Date().toISOString() });
     toast.success("Notiz gespeichert");
@@ -133,8 +154,8 @@ export default function LeadDetail() {
   };
 
   const handleBlacklist = async () => {
-    const currentOrgId = company.organization_id || orgId;
-    const res = await base44.functions.invoke("blacklistCompany", { company_id: id, organization_id: currentOrgId });
+    if (!assertOrgMatch()) return;
+    const res = await base44.functions.invoke("blacklistCompany", { company_id: id, organization_id: orgId });
     if (res.data?.error) { toast.error("Fehler: " + res.data.error); return; }
     toast.success("Firma auf Blacklist gesetzt");
     setShowBlacklistConfirm(false);
@@ -142,8 +163,8 @@ export default function LeadDetail() {
   };
 
   const handleDelete = async () => {
-    const currentOrgId = company.organization_id || orgId;
-    const res = await base44.functions.invoke("deleteCompany", { company_id: id, organization_id: currentOrgId });
+    if (!assertOrgMatch()) return;
+    const res = await base44.functions.invoke("deleteCompany", { company_id: id, organization_id: orgId });
     if (res.data?.error) { toast.error("Fehler: " + res.data.error); return; }
     toast.success("Firma gelöscht");
     setShowDeleteConfirm(false);
@@ -151,17 +172,16 @@ export default function LeadDetail() {
   };
 
   const isPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(currentUser?.role);
-  // Sauberer Owner-Check: gespeicherte owner_email der Org mit aktuellem User vergleichen
   const isOwner = orgOwnerEmail !== null && currentUser?.email === orgOwnerEmail;
-  // Admin-Aktionen: PlatformAdmin oder Owner der Org
   const canUseAdminActions = isPlatformAdmin || isOwner;
 
   const handleEnrich = async () => {
+    if (!assertOrgMatch()) return;
     if (enrichingRef.current) return;
     enrichingRef.current = true;
     setEnriching(true);
     try {
-      const currentOrgId = company.organization_id || orgId;
+      const currentOrgId = orgId;
       const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout nach 30 Sekunden")), 30000));
       const res = await Promise.race([
         base44.functions.invoke("enrichCompany", { companyId: id, organization_id: currentOrgId }),
@@ -196,6 +216,7 @@ export default function LeadDetail() {
   };
 
   const handleSaveNotizen = async () => {
+    if (!assertOrgMatch()) return;
     setNotizenSaving(true);
     await base44.entities.Company.update(id, { notizen });
     setCompany(prev => ({ ...prev, notizen }));
@@ -212,7 +233,7 @@ export default function LeadDetail() {
 
   const openTasks = tasks.filter(t => !t.erledigt);
 
-  if (loading) return (
+  if (orgLoading || loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
     </div>
