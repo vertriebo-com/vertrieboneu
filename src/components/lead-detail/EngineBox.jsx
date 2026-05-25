@@ -81,10 +81,21 @@ const DUE_LABELS = {
   today: "Heute", tomorrow: "Morgen", this_week: "Diese Woche", next_week: "Nächste Woche"
 };
 
+// KI-Titel die auf Enrichment hinweisen (auch wenn KI type falsch setzt)
+const ENRICH_TITLE_PATTERNS = [
+  'ansprechpartner recherchieren', 'ansprechpartner ergänzen', 'ansprechpartner suchen',
+  'e-mail-adresse suchen', 'e-mail suchen', 'e-mail ergänzen',
+  'telefonnummer suchen', 'telefonnummer ergänzen',
+  'kontaktdaten ergänzen', 'kontaktdaten suchen',
+  'entscheidungsträger unbekannt', 'entscheidungsträger suchen',
+];
+
 // Datenlücken-bewusste NBA-Auswertung
 function getEffectiveNextBestAction(company, nba) {
   const hasTelefon = !!company?.telefon;
   const hasEmail = !!company?.email;
+  const hasAnsprechpartner = !!company?.ansprechpartner;
+  const titleLower = (nba?.title || '').toLowerCase();
 
   // Wenn beide Kontaktdaten fehlen → primäre Aktion ist immer Enrichment
   if (!hasTelefon && !hasEmail) {
@@ -95,6 +106,15 @@ function getEffectiveNextBestAction(company, nba) {
       due: nba?.due,
     };
   }
+  // KI schlägt einen Enrich-ähnlichen Titel vor → auf enrich mappen
+  if (ENRICH_TITLE_PATTERNS.some(p => titleLower.includes(p))) {
+    return {
+      type: "enrich",
+      title: "Kontaktdaten suchen",
+      reason: nba?.reason || "Für diesen Lead fehlen noch wichtige Kontaktdaten. Suchen Sie zuerst Ansprechpartner, Telefonnummer oder E-Mail, bevor Sie kontaktieren.",
+      due: nba?.due,
+    };
+  }
   // Wenn NBA "Anrufen" vorschlägt, aber kein Telefon da → Daten anreichern
   if (nba?.type === 'call' && !hasTelefon) {
     return {
@@ -102,7 +122,6 @@ function getEffectiveNextBestAction(company, nba) {
       title: "Telefonnummer suchen",
       reason: "Kein Telefon vorhanden – Kontaktdaten anreichern, um anrufen zu können.",
       type: "enrich",
-      due: nba.due,
     };
   }
   // Wenn NBA "E-Mail senden" vorschlägt, aber keine E-Mail da → Daten anreichern
@@ -112,7 +131,16 @@ function getEffectiveNextBestAction(company, nba) {
       title: "E-Mail-Adresse suchen",
       reason: "Keine E-Mail vorhanden – Kontaktdaten anreichern, um eine E-Mail zu senden.",
       type: "enrich",
-      due: nba.due,
+    };
+  }
+  // "Bedarf notieren" als primäre Aktion sperren wenn keine Kontaktaufnahme möglich
+  const isBedarfNotieren = titleLower.includes('bedarf notieren') || titleLower.includes('bedarf dokumentieren');
+  if (isBedarfNotieren && !hasTelefon && !hasEmail) {
+    return {
+      type: "enrich",
+      title: "Kontaktdaten suchen",
+      reason: "Bevor der Bedarf dokumentiert werden kann, brauchen Sie eine Möglichkeit, den Lead zu kontaktieren.",
+      due: nba?.due,
     };
   }
   return nba;
@@ -387,15 +415,14 @@ export default function EngineBox({ company, contactLogs = [], tasks = [], orgId
             </p>
           )}
           {analysis.nextBestAction.type === 'enrich' ? (
-            <div className="space-y-1.5">
-              <Button
-                size="sm"
-                onClick={() => onEnrich && onEnrich()}
-                className="w-full gap-1.5 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Kontaktdaten suchen
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              onClick={() => onEnrich ? onEnrich() : toast.info("Nutzen Sie oben 'Daten ergänzen'")}
+              disabled={!onEnrich}
+              className="w-full gap-1.5 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-60"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> Kontaktdaten suchen
+            </Button>
           ) : analysis.nextBestAction.type === 'call' || analysis.nextBestAction.type === 'email' ? (
             <div className="space-y-2">
               <Button size="sm" onClick={handleAddTask} className="w-full gap-1.5 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white">
