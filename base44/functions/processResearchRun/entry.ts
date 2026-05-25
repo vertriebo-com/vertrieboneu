@@ -1279,19 +1279,22 @@ Deno.serve(async (req) => {
             scoring.diagnostics.positive_evidence_count = sc + wc;
 
             // Tier-Mapping mit query_intent_match
-            if (scoring.score >= 85 && sc >= 3) {
+            // query_intent allein zählt als starke Evidenz, aber:
+            // strong/high erfordert zusätzlich mindestens eine weitere harte Evidenz
+            // (place_type, scoring_signal, tc_match) ODER beide Kontaktdaten (phone+website).
+            const hasAdditionalHardEvidence = scoring.evidenceFlags.place_type_match || scoring.evidenceFlags.scoring_signal_match || scoring.evidenceFlags.target_customer_match;
+            const hasStrongContactEvidence = scoring.evidenceFlags.phone && scoring.evidenceFlags.website;
+            const isTargetQueryCategory = scoring.evidenceFlags.query_intent_match && scoring.evidenceFlags.category_match;
+
+            if (scoring.score >= 85 && sc >= 3 && (hasAdditionalHardEvidence || hasStrongContactEvidence)) {
               scoring.qualityTier = 'premium'; scoring.qualityConfidence = 'high'; scoring.diagnostics.quality_reason_detail = 'strong_match';
-            } else if (scoring.score >= 75 && sc >= 2) {
+            } else if (scoring.score >= 75 && sc >= 2 && (hasAdditionalHardEvidence || hasStrongContactEvidence)) {
               scoring.qualityTier = 'strong'; scoring.qualityConfidence = 'high'; scoring.diagnostics.quality_reason_detail = 'strong_match';
-            } else if (scoring.score >= 65 && sc >= 2) {
+            } else if (scoring.score >= 65 && sc >= 2 && (hasAdditionalHardEvidence || hasStrongContactEvidence)) {
               scoring.qualityTier = 'good'; scoring.qualityConfidence = 'medium'; scoring.diagnostics.quality_reason_detail = 'good_match';
-            } else if (
-              // Sonderfall: query_intent + category_match + mindestens 1 weak evidence
-              scoring.evidenceFlags.query_intent_match &&
-              scoring.evidenceFlags.category_match &&
-              wc >= 1 &&
-              scoring.score >= 65
-            ) {
+            } else if (isTargetQueryCategory && wc >= 1 && scoring.score >= 65) {
+              // Sonderfall: query_intent + category + min. 1 Kontaktdatum → good/medium
+              // (kein hasAdditionalHardEvidence nötig, aber kein automatic strong/high mehr)
               scoring.qualityTier = 'good'; scoring.qualityConfidence = 'medium'; scoring.diagnostics.quality_reason_detail = 'found_via_target_customer_query';
             } else {
               scoring.qualityTier = 'weak'; scoring.qualityConfidence = 'low';

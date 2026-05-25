@@ -168,14 +168,22 @@ Deno.serve(async (req) => {
         .filter(k => evidenceFlags[k]).length;
       const weakEvidenceCount = ['phone','website','address'].filter(k => evidenceFlags[k]).length;
       let qualityTier, qualityConfidence;
-      if (score >= 85 && strongEvidenceCount >= 3) { qualityTier = 'premium'; qualityConfidence = 'high'; }
-      else if (score >= 75 && strongEvidenceCount >= 2) { qualityTier = 'strong'; qualityConfidence = 'high'; }
-      else if (score >= 65 && strongEvidenceCount >= 2) { qualityTier = 'good'; qualityConfidence = 'medium'; }
-      else if (queryIntentMatch && hasCat && weakEvidenceCount >= 1 && score >= 65) {
-        // Sonderfall: query_intent + category + contactable → good
+      const hasAdditionalHardEvidence = hasPlaceType || scoringSignals > 0 || hasTCMatch;
+      const hasStrongContactEvidence = hasPhone && hasWebsite;
+      const isTargetQueryCategory = queryIntentMatch && hasCat;
+
+      if (score >= 85 && strongEvidenceCount >= 3 && (hasAdditionalHardEvidence || hasStrongContactEvidence)) {
+        qualityTier = 'premium'; qualityConfidence = 'high';
+      } else if (score >= 75 && strongEvidenceCount >= 2 && (hasAdditionalHardEvidence || hasStrongContactEvidence)) {
+        qualityTier = 'strong'; qualityConfidence = 'high';
+      } else if (score >= 65 && strongEvidenceCount >= 2 && (hasAdditionalHardEvidence || hasStrongContactEvidence)) {
         qualityTier = 'good'; qualityConfidence = 'medium';
+      } else if (isTargetQueryCategory && weakEvidenceCount >= 1 && score >= 65) {
+        // Sonderfall: query_intent + category + min. 1 Kontaktdatum → good/medium (kein strong ohne harte Evidenz)
+        qualityTier = 'good'; qualityConfidence = 'medium';
+      } else {
+        qualityTier = 'weak'; qualityConfidence = 'low';
       }
-      else { qualityTier = 'weak'; qualityConfidence = 'low'; }
 
       return {
         score,
@@ -187,33 +195,49 @@ Deno.serve(async (req) => {
     }
 
     const simTests = [
-      {
-        name: "Guter B2B-Lead (TC + Kategorie + Website + Telefon + PlaceType)",
-        params: { hasCat: true, hasPlaceType: true, hasPhone: true, hasWebsite: true, distanceOk: true, hasTCMatch: true },
-        expectedSave: true,
-        expectedTier: "premium",
-      },
-      {
-        name: "target_customer_query_match_good: user_target Query + category + address → good/medium",
-        params: { hasCat: true, hasAddress: true, queryIntentMatch: true, distanceOk: true },
-        expectedSave: true,
-        expectedTier: "good",
-        expectedConfidence: "medium",
-        note: "Baustoffhändler per 'user_target'-Query gefunden + Adresse = good, nicht weak",
-      },
-      {
-        name: "pure_taxonomy_category_address: nur taxonomy Query + cat + address → weak",
-        params: { hasCat: true, hasAddress: true, queryIntentMatch: false, distanceOk: true },
-        expectedSave: true,
-        expectedTier: "weak",
-        note: "Taxonomy-Query ohne user_target, nur cat_match + address = bleibt weak",
-      },
-      {
-        name: "Nur Basis + Distanz (Score 58, 0 starke Evidenzen)",
-        params: { distanceOk: true },
-        expectedSave: true, // wird noch gespeichert (score >= 55)
-        expectedTier: "weak", // ABER als weak klassifiziert → korrekte Einstufung
-      },
+    {
+      name: "Guter B2B-Lead (TC + Kategorie + Website + Telefon + PlaceType)",
+      params: { hasCat: true, hasPlaceType: true, hasPhone: true, hasWebsite: true, distanceOk: true, hasTCMatch: true },
+      expectedSave: true,
+      expectedTier: "premium",
+    },
+    {
+      name: "target_customer_query_match_good: user_target Query + category + address → good/medium (NOT strong)",
+      params: { hasCat: true, hasAddress: true, queryIntentMatch: true, distanceOk: true },
+      expectedSave: true,
+      expectedTier: "good",
+      expectedConfidence: "medium",
+      note: "query_intent+cat+address allein = good/medium. Kein strong/high ohne weitere harte Evidenz.",
+    },
+    {
+      name: "target_customer_query_with_phone_website: query_intent + cat + phone + website → strong/high",
+      params: { hasCat: true, queryIntentMatch: true, hasPhone: true, hasWebsite: true, distanceOk: true },
+      expectedSave: true,
+      expectedTier: "strong",
+      expectedConfidence: "high",
+      note: "query_intent + cat + phone + website (hasStrongContactEvidence) → strong/high",
+    },
+    {
+      name: "target_customer_query_with_placetype: query_intent + cat + placetype → strong/high",
+      params: { hasCat: true, queryIntentMatch: true, hasPlaceType: true, distanceOk: true },
+      expectedSave: true,
+      expectedTier: "strong",
+      expectedConfidence: "high",
+      note: "query_intent + cat + placetype (hasAdditionalHardEvidence) → strong/high",
+    },
+    {
+      name: "pure_taxonomy_category_address: nur taxonomy Query + cat + address → weak",
+      params: { hasCat: true, hasAddress: true, queryIntentMatch: false, distanceOk: true },
+      expectedSave: true,
+      expectedTier: "weak",
+      note: "Taxonomy-Query ohne user_target, nur cat_match + address = bleibt weak",
+    },
+    {
+      name: "Nur Basis + Distanz (Score 58, 0 starke Evidenzen)",
+      params: { distanceOk: true },
+      expectedSave: true,
+      expectedTier: "weak",
+    },
       {
         name: "Lead mit Bad-Fit-Penalty (-35) → hard-fail",
         params: { hasCat: true, hasPlaceType: true, badFitPenalty: -35 },
