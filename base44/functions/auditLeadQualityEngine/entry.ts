@@ -244,34 +244,179 @@ Deno.serve(async (req) => {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // D) Chain-Filter-Analyse
+    // D) Chain-Filter-Analyse (erweitert)
     // ─────────────────────────────────────────────────────────────────────────
-    const chainKeywords = ['aldi','lidl','penny','netto','rewe','edeka','kaufland','dm','rossmann','h&m','zara','primark','deichmann','deutsche post','dhl','sparkasse','deutsche bank','commerzbank','mcdonalds','burger king','subway','kfc','starbucks','hilton','marriott','ibis','motel one','fitx','mcfit','fitness first','fielmann','apollo optik','telekom','vodafone','ikea','obi','bauhaus','hornbach','franchise','kette','filialen','konzern'];
-
     function normStr(str) {
       return String(str || "").toLowerCase()
         .replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").trim();
     }
 
-    // Prüfe ob ein Unternehmensname ein Chain-Keyword enthält
-    // Analyse aus bestehenden Companies (könnten irrtümlich gefiltert worden sein)
-    const chainAnalysis = {
-      hardcoded_keywords: chainKeywords,
-      keyword_count: chainKeywords.length,
-      rating_threshold: 1500,
-      notes: [
-        "Chain-Filter ist branchen-agnostisch – gilt für ALLE industries gleich",
-        "Hotel-Ketten (Hilton, Marriott, Ibis) können für Gebäudereinigung ZIELKUNDEN sein",
-        "Supermärkte (Aldi, Rewe, Lidl) können für Reinigung/Schädlingsbekämpfung ZIELKUNDEN sein",
-        "Sparkasse/Deutsche Bank können für Steuerberatung/IT ZIELKUNDEN sein",
-        ">1500 Bewertungen = Kette: trifft auch sehr aktive lokale Betriebe",
-      ],
-      recommended_evolution: "chain_policy je industry_id: exclude | allow_if_target_customer | downgrade | manual_review",
+    // Identisch mit der isLikelyChain-Logik in processResearchRun / chainBlacklist
+    const chainKeywords = ['aldi','lidl','penny','netto','rewe','edeka','kaufland','dm','rossmann','h&m','zara','primark','deichmann','deutsche post','dhl','sparkasse','deutsche bank','commerzbank','mcdonalds','burger king','subway','kfc','starbucks','hilton','marriott','ibis','motel one','fitx','mcfit','fitness first','fielmann','apollo optik','telekom','vodafone','ikea','obi','bauhaus','hornbach','franchise','kette','filialen','konzern'];
+    const RATING_CHAIN_THRESHOLD = 1500;
+
+    function isLikelyChain(name, userRatingsTotal) {
+      const n = normStr(name);
+      if (chainKeywords.some(kw => n.includes(kw))) return { isChain: true, reason: 'keyword_match' };
+      if ((userRatingsTotal || 0) > RATING_CHAIN_THRESHOLD) return { isChain: true, reason: 'rating_count_high' };
+      return { isChain: false, reason: null };
+    }
+
+    // Branchen-spezifische Policy-Empfehlung (messbar, keine Änderung)
+    // Welche Ketten können für welche Branchen ZIELKUNDEN sein?
+    const chainPolicyMatrix = {
+      // keyword → { zielkunde_fuer: [industry_ids], policy: 'allow_if_target_customer'|'exclude'|'downgrade'|'manual_review' }
+      'hilton':       { zielkunde_fuer: ['gebaeudereinigung','schadstoffe','schaedlingsbekaempfung','waeischerei','wachschutz'], policy: 'allow_if_target_customer' },
+      'marriott':     { zielkunde_fuer: ['gebaeudereinigung','schaedlingsbekaempfung','wachschutz'], policy: 'allow_if_target_customer' },
+      'ibis':         { zielkunde_fuer: ['gebaeudereinigung','schaedlingsbekaempfung'], policy: 'allow_if_target_customer' },
+      'motel one':    { zielkunde_fuer: ['gebaeudereinigung'], policy: 'allow_if_target_customer' },
+      'aldi':         { zielkunde_fuer: ['gebaeudereinigung','schaedlingsbekaempfung','waeischerei'], policy: 'allow_if_target_customer' },
+      'lidl':         { zielkunde_fuer: ['gebaeudereinigung','schaedlingsbekaempfung'], policy: 'allow_if_target_customer' },
+      'rewe':         { zielkunde_fuer: ['gebaeudereinigung','schaedlingsbekaempfung','lebensmittelsicherheit'], policy: 'allow_if_target_customer' },
+      'edeka':        { zielkunde_fuer: ['gebaeudereinigung','schaedlingsbekaempfung'], policy: 'allow_if_target_customer' },
+      'kaufland':     { zielkunde_fuer: ['gebaeudereinigung','schaedlingsbekaempfung'], policy: 'allow_if_target_customer' },
+      'sparkasse':    { zielkunde_fuer: ['gebaeudeschutz','it_dienstleistung','steuerberatung'], policy: 'manual_review' },
+      'deutsche bank':{ zielkunde_fuer: ['it_dienstleistung','steuerberatung'], policy: 'manual_review' },
+      'commerzbank':  { zielkunde_fuer: ['it_dienstleistung'], policy: 'manual_review' },
+      'mcdonalds':    { zielkunde_fuer: ['gebaeudereinigung','schaedlingsbekaempfung'], policy: 'allow_if_target_customer' },
+      'dm':           { zielkunde_fuer: ['gebaeudereinigung'], policy: 'downgrade' },
+      'rossmann':     { zielkunde_fuer: ['gebaeudereinigung'], policy: 'downgrade' },
+      'ikea':         { zielkunde_fuer: ['gebaeudereinigung','wachschutz'], policy: 'allow_if_target_customer' },
+      'obi':          { zielkunde_fuer: ['gebaeudereinigung'], policy: 'downgrade' },
+      'telekom':      { zielkunde_fuer: ['it_dienstleistung'], policy: 'manual_review' },
+      'vodafone':     { zielkunde_fuer: ['it_dienstleistung'], policy: 'manual_review' },
+      'fitx':         { zielkunde_fuer: ['gebaeudereinigung','wachschutz'], policy: 'allow_if_target_customer' },
+      'mcfit':        { zielkunde_fuer: ['gebaeudereinigung'], policy: 'allow_if_target_customer' },
+      'franchise':    { zielkunde_fuer: [], policy: 'exclude' },
+      'kette':        { zielkunde_fuer: [], policy: 'exclude' },
     };
 
-    addTest("chain_filter_analysis", "yellow",
-      `${chainKeywords.length} hartcodierte Chain-Keywords + >1500-Bewertungen-Regel. Branchen-agnostisch! Hotels/Supermärkte können Zielkunden für manche Branchen sein.`,
-      { chain_analysis: chainAnalysis }
+    // D1) skipped_chain_count: Wie viele der gespeicherten Leads WÄREN als Chain gefiltert worden?
+    // (Proxy: gespeicherte Leads die Chain-Namen enthalten → zeigt wie viel "Grenzmaterial" es gibt)
+    // Zusätzlich: ResearchRun-Logs scannen auf no_match_count (Chains landen dort)
+    const skippedChainExamples = [];
+    let skippedChainCount = 0;
+
+    // Scan gespeicherte Companies: zeigt was trotz Filter durchkam ODER was gefiltert werden könnte
+    for (const c of recentCompanies) {
+      const chainCheck = isLikelyChain(c.name, null); // rating_count nicht gespeichert
+      if (chainCheck.isChain) {
+        skippedChainCount++;
+        // D2) would_match_target_customer: prüfen ob Kette zum TC-Typ/Kategorie passt
+        const tcMatch = c.matched_target_customer_type || null;
+        const catMatch = c.matched_search_category || null;
+        const chainKw = chainKeywords.find(kw => normStr(c.name).includes(kw)) || null;
+        const policyEntry = chainKw ? chainPolicyMatrix[chainKw] : null;
+
+        // D3) Policy-Empfehlung für diesen konkreten Lead
+        const industry = c.engine_analysis_json ? (() => { try { return JSON.parse(c.engine_analysis_json)?.industry_id || null; } catch { return null; } })() : null;
+        let chainPolicyRecommendation = 'exclude';
+        if (policyEntry) {
+          if (policyEntry.zielkunde_fuer.length === 0) {
+            chainPolicyRecommendation = 'exclude';
+          } else if (tcMatch || catMatch) {
+            chainPolicyRecommendation = 'allow_if_target_customer';
+          } else {
+            chainPolicyRecommendation = policyEntry.policy;
+          }
+        }
+
+        if (skippedChainExamples.length < 10) {
+          skippedChainExamples.push({
+            name: c.name,
+            reason: chainCheck.reason,
+            source_query: c.source_query || null,
+            search_category: c.matched_search_category || null,
+            matched_target_customer_type: tcMatch,
+            industry_id: industry,
+            search_strategy: c.engine_analysis_json ? (() => { try { return JSON.parse(c.engine_analysis_json)?.search_strategy || null; } catch { return null; } })() : null,
+            place_types: c.engine_analysis_json ? (() => { try { return JSON.parse(c.engine_analysis_json)?.place_types || null; } catch { return null; } })() : null,
+            rating_count: null, // nicht gespeichert
+            relevance_score: c.relevance_score || 0,
+            quality_tier: c.quality_tier || null,
+            would_match_target_customer: !!(tcMatch || catMatch),
+            chain_policy_recommendation: chainPolicyRecommendation,
+          });
+        }
+      }
+    }
+
+    // D4) Branchen-Vergleich: Bei welchen Branchen blockt Chain-Filter potenziell gute Leads?
+    // Taxonomien laden für mindestens 5 Branchen
+    const chainRiskByIndustry = [];
+    const allTaxonomies = await base44.asServiceRole.entities.TaxonomyEntry.filter(
+      { status: 'production_ready', is_active: true }, '-sort_order', 30
+    );
+
+    for (const tx of allTaxonomies.slice(0, 15)) {
+      let tcTypes = [];
+      try { tcTypes = JSON.parse(tx.target_customer_types || '[]'); } catch {}
+      if (!Array.isArray(tcTypes)) tcTypes = [];
+
+      // Prüfe ob Target-Customer-Types Chain-Überschneidungen haben
+      const chainRisks = [];
+      const chainOpportunities = [];
+
+      for (const [kw, policy] of Object.entries(chainPolicyMatrix)) {
+        if (policy.zielkunde_fuer.includes(tx.industry_id)) {
+          chainOpportunities.push({ keyword: kw, policy: policy.policy });
+        }
+      }
+
+      // Überschneidung: TC-Types enthalten Begriffe die auch Chain sein können
+      const tcStr = tcTypes.join(' ').toLowerCase();
+      if (tcStr.includes('hotel') || tcStr.includes('supermarkt') || tcStr.includes('lebensmittel') || tcStr.includes('klinik') || tcStr.includes('krankenhaus')) {
+        chainRisks.push('TC-Types enthalten potenzielle Chain-Zielkunden (Hotels/Supermärkte/Kliniken)');
+      }
+
+      if (chainOpportunities.length > 0 || chainRisks.length > 0) {
+        chainRiskByIndustry.push({
+          industry_id: tx.industry_id,
+          label: tx.label,
+          search_strategy: tx.search_strategy || 'target_customer_search',
+          chain_opportunities: chainOpportunities,
+          chain_risks: chainRisks,
+          recommended_chain_policy: chainOpportunities.length > 0
+            ? chainOpportunities.some(o => o.policy === 'allow_if_target_customer') ? 'allow_if_target_customer' : 'manual_review'
+            : 'exclude',
+          hard_exclude_appropriate: chainOpportunities.length === 0 && chainRisks.length === 0,
+        });
+      }
+    }
+
+    // D5) Bewertungs-basierter Chain-Filter (>1500 Bewertungen)
+    // Gespeicherte Leads nach Scoring-Quelle filtern – wie viele könnten fälschlich gefiltert worden sein?
+    const recentRunsForChain = await base44.asServiceRole.entities.ResearchRun.filter(
+      {}, '-created_date', 5
+    );
+    const chainFilteredEstimate = recentRunsForChain.reduce((sum, r) => sum + (r.no_match_count || 0), 0);
+
+    addTest("chain_filter_skipped_count", skippedChainCount > 0 ? "yellow" : "green",
+      `${skippedChainCount} gespeicherte Leads haben Chain-Keywords im Namen (wurden trotz Filter gespeichert oder Grenzfälle). no_match_count letzte 5 Runs (Schätzung gefiltert+nomatch): ${chainFilteredEstimate}`,
+      {
+        skipped_chain_count: skippedChainCount,
+        skipped_chain_examples: skippedChainExamples,
+        no_match_count_recent_runs: chainFilteredEstimate,
+        chain_rating_threshold: RATING_CHAIN_THRESHOLD,
+      }
+    );
+
+    addTest("chain_filter_industry_risk", chainRiskByIndustry.length > 0 ? "yellow" : "green",
+      `${chainRiskByIndustry.length} Branchen mit potenziellem Chain-Filter-Konflikt identifiziert. Diese könnten gute Zielkunden verlieren.`,
+      { chain_risk_by_industry: chainRiskByIndustry }
+    );
+
+    addTest("chain_policy_matrix", "yellow",
+      `${Object.keys(chainPolicyMatrix).length} Chain-Keywords analysiert. ${Object.values(chainPolicyMatrix).filter(p => p.policy === 'allow_if_target_customer').length} könnten als Zielkunden erlaubt werden. ${Object.values(chainPolicyMatrix).filter(p => p.policy === 'exclude').length} sollten hart ausgeschlossen bleiben.`,
+      {
+        chain_policy_matrix: chainPolicyMatrix,
+        summary: {
+          allow_if_target_customer: Object.values(chainPolicyMatrix).filter(p => p.policy === 'allow_if_target_customer').length,
+          manual_review: Object.values(chainPolicyMatrix).filter(p => p.policy === 'manual_review').length,
+          downgrade: Object.values(chainPolicyMatrix).filter(p => p.policy === 'downgrade').length,
+          exclude: Object.values(chainPolicyMatrix).filter(p => p.policy === 'exclude').length,
+        }
+      }
     );
 
     warnings.push("Chain-Filter ist hartcodiert und branchen-agnostisch. Für Gebäudereinigung/Schädlingsbekämpfung/Wäscherei können Hotels, Supermärkte, Kliniken Zielkunden sein und werden fälschlicherweise gefiltert.");
@@ -425,6 +570,18 @@ Deno.serve(async (req) => {
       median_score: medianScore,
       score_distribution: scoreDistribution,
       warnings,
+      chain_filter_audit: {
+        skipped_chain_count: skippedChainCount,
+        skipped_chain_examples: skippedChainExamples,
+        chain_risk_by_industry: chainRiskByIndustry,
+        chain_policy_matrix_summary: {
+          allow_if_target_customer: Object.values(chainPolicyMatrix).filter(p => p.policy === 'allow_if_target_customer').length,
+          manual_review: Object.values(chainPolicyMatrix).filter(p => p.policy === 'manual_review').length,
+          downgrade: Object.values(chainPolicyMatrix).filter(p => p.policy === 'downgrade').length,
+          exclude: Object.values(chainPolicyMatrix).filter(p => p.policy === 'exclude').length,
+        },
+        note: "Keine Änderung an isLikelyChain. Nur Messung. Branchenspezifische chain_policy nach Auditdaten entscheiden.",
+      },
       recommended_thresholds: {
         current_threshold: 55,
         recommended_tiers: {
