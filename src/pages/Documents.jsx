@@ -65,7 +65,7 @@ export default function Documents() {
     setUploading(true);
     const { file_url } = await base44.integrations.Core.UploadFile({ file: selectedFile });
     
-    await base44.entities.Document.create({
+    const newDoc = await base44.entities.Document.create({
       titel: titel.trim(),
       beschreibung: beschreibung.trim(),
       kategorie,
@@ -75,6 +75,21 @@ export default function Documents() {
       source_type: "manual",
       document_type: "other",
     });
+
+    // ContactLog schreiben (kein company_id hier — globale Dokumente)
+    if (orgId) {
+      try {
+        await base44.entities.ContactLog.create({
+          organization_id: orgId,
+          typ: "Sonstiges",
+          ergebnis: "Dokument hochgeladen",
+          notiz: `Dokument hochgeladen: ${titel.trim()} (${kategorie})${selectedFile.name ? ` – ${selectedFile.name}` : ""}`,
+          user_email: user?.email || null,
+          is_manual: true,
+        });
+      } catch (_) {}
+    }
+
     toast.success("Dokument erfolgreich hochgeladen!");
     setTitel(""); setBeschreibung(""); setKategorie("Sonstiges"); setSelectedFile(null);
     loadData();

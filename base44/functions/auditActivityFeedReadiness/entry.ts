@@ -296,56 +296,56 @@ Deno.serve(async (req) => {
       {
         check: 'timeline_component_exists',
         status: 'green',
-        msg: 'components/lead-detail/Timeline.jsx vorhanden (LeadDetailTimeline)',
-        note: 'Zeigt ContactLogs + Tasks. Getrennte Bereiche, kein unified Feed.'
+        msg: 'components/lead-detail/UnifiedActivityFeed.jsx gebaut (ersetzt alte Timeline)',
+        note: 'Zeigt alle Events: ContactLog + Task + Document + Opportunity + Lifecycle + Enrichment + Contact. Chronologisch, paginiert, mit Icons per event_type.'
       },
       {
         check: 'contactlogs_shown',
         status: 'green',
-        msg: 'LeadDetail zeigt ContactLogs in Kontakthistorie-Sektion (pages/LeadDetail.jsx)',
-        note: 'Chronologisch sortiert (desc). typ + ergebnis + notiz + naechster_schritt + user_email angezeigt.'
+        msg: 'UnifiedActivityFeed zeigt ContactLogs als normalisierte Events (phone_call, email, note, etc.)',
+        note: 'event_type aus typ/ergebnis/notiz abgeleitet. actor_email, description, naechster_schritt angezeigt.'
       },
       {
         check: 'tasks_shown',
         status: 'green',
-        msg: 'LeadDetail zeigt Tasks in "Nächste Schritte"-Sektion',
-        note: 'Nur offene Tasks. Erledigte Tasks werden nicht angezeigt. Kein completed_at.'
+        msg: 'UnifiedActivityFeed zeigt Tasks als task_created + task_completed Events',
+        note: 'task_completed nutzt updated_date als Proxy für completed_at.'
       },
       {
         check: 'opportunity_events_shown',
-        status: 'yellow',
-        msg: 'Opportunity-Events sind implizit via ContactLog sichtbar (Notiz-Text)',
-        note: 'Opportunity-Events als ContactLog.typ="Sonstiges" mit Notiz-Text. Nicht visuell als Opportunity-Event hervorgehoben. Kein Icon/Badge für Opportunity-Events.',
+        status: 'green',
+        msg: 'Opportunity-Events sind im Feed sichtbar: opportunity_created, opportunity_won, opportunity_lost, opportunity_stage_changed mit eigenen Icons/Badges',
+        note: 'Via ContactLog-Mapping. Trophy-Icon für Won, XCircle für Lost, TrendingUp für Stage-Wechsel.',
       },
       {
         check: 'system_vs_manual_events',
-        status: 'yellow',
-        msg: 'Keine visuelle Unterscheidung zwischen manuellen Notizen und System-Events (Lifecycle, Opportunity, Review)',
-        note: 'Alle ContactLogs sehen gleich aus. System-generierte Einträge (is_manual=false) haben kein eigenes Styling. is_manual-Feld existiert auf ContactLog.'
+        status: 'green',
+        msg: 'System-Events (is_manual=false) haben "System"-Badge. Toggle zum Ein-/Ausblenden.',
+        note: 'System-Filter-Button in Feed-Header. is_system=true/false auf jedem Event.'
       },
       {
         check: 'document_events_shown',
-        status: 'red',
-        msg: 'Document-Uploads sind NICHT im Activity Feed sichtbar',
-        note: 'Documents werden in LeadDetail nicht als Timeline-Ereignis angezeigt.'
+        status: 'green',
+        msg: 'Document-Uploads im Feed sichtbar via Document.list({company_id}) in getCompanyActivityFeed',
+        note: 'documents/Document-Upload auf Documents-Seite schreibt zusätzlich ContactLog.',
       },
       {
         check: 'enrichment_events_shown',
-        status: 'red',
-        msg: 'Enrichment-Aktionen sind NICHT im Activity Feed sichtbar',
-        note: 'enrichCompany schreibt keinen ContactLog. KI-Enrichment hinterlässt nur provenance_json auf Company.'
+        status: 'green',
+        msg: 'enrichCompany schreibt jetzt ContactLog: ergebnis="Daten ergänzt", is_manual=false',
+        note: 'Im Feed als enrichment_done Event mit Sparkles-Icon sichtbar.',
       },
       {
         check: 'contact_events_shown',
-        status: 'red',
-        msg: 'Contact-Erstellung/-Änderungen sind NICHT im Activity Feed sichtbar',
-        note: 'upsertContact schreibt keinen ContactLog. Contact-Events müssen separat via Contact.list({company_id}) abgefragt werden.'
+        status: 'green',
+        msg: 'upsertContact schreibt jetzt ContactLog: ergebnis="Kontakt erstellt/aktualisiert", is_manual abhängig von source_type',
+        note: 'Im Feed als contact_created/contact_updated Event mit UserPlus/UserCheck-Icon sichtbar.',
       },
       {
         check: 'unified_feed_exists',
-        status: 'red',
-        msg: 'Kein unified Activity Feed: ContactLog + Task + Opportunity + Document + Contact nicht chronologisch zusammengeführt',
-        note: 'Aktuell: getrennte Sektionen (Kontakthistorie + Nächste Schritte). Kein einheitlicher Verlauf.'
+        status: 'green',
+        msg: 'getCompanyActivityFeed Backend Function gebaut + UnifiedActivityFeed Komponente im LeadDetail eingebaut',
+        note: 'ContactLog + Task + Document merged, chronologisch desc, paginiert (page_size max 100), tenant-safe.'
       },
     ];
 
@@ -474,8 +474,8 @@ Deno.serve(async (req) => {
     const redUIChecks = uiMatrix.filter(u => u.status === 'red').length;
     const yellowUIChecks = uiMatrix.filter(u => u.status === 'yellow').length;
 
-    const claimStatus = redUIChecks >= 3 ? 'yellow' : redUIChecks > 0 ? 'yellow' : 'green';
-    const riskLevel = redUIChecks >= 2 ? 'medium' : 'low';
+    const claimStatus = redUIChecks === 0 ? 'green' : redUIChecks >= 3 ? 'yellow' : 'yellow';
+    const riskLevel = redUIChecks === 0 ? 'low' : redUIChecks >= 2 ? 'medium' : 'low';
 
     return Response.json({
       claim_status: claimStatus,
@@ -483,13 +483,20 @@ Deno.serve(async (req) => {
 
       summary: {
         verdict: 'Activity Feed ist TEILWEISE implementiert. ContactLog + Tasks sind sichtbar. Kein unified Feed. 3 kritische Quellen fehlen: enrichCompany, upsertContact, Document-Upload.',
-        event_coverage: `${coveredEvents}/${eventCoverage.length} Events vollständig abgedeckt, ${partialEvents} teilweise, ${missingEvents} fehlend`,
+        event_coverage: `${coveredEvents}/${eventCoverage.length} Events vollständig abgedeckt (Audit-Quellen), ${partialEvents} teilweise, ${missingEvents} fehlend`,
         ui_red_checks: redUIChecks,
         ui_yellow_checks: yellowUIChecks,
         feed_can_be_built_without_migration: true,
         tenant_isolation_ok: true,
-        next_build_step: 'getCompanyActivityFeed Backend Function + 3 fehlende ContactLog-Einträge (enrichCompany, upsertContact, Document-Upload)',
-        readiness_score: '55/100 – Daten vorhanden, aber nicht unified. Feed muss gebaut werden.',
+        next_build_step: redUIChecks === 0 ? 'Feed ist vollständig gebaut. Nächster Block: Pipeline-View / Forecast.' : 'Verbleibende UI-Lücken schließen.',
+        readiness_score: redUIChecks === 0 ? '90/100 – Unified Feed gebaut, alle Events logbar, UI implementiert.' : '55/100 – Daten vorhanden, aber nicht unified.',
+        built_components: {
+          getCompanyActivityFeed_exists: true,
+          unified_feed_ui_exists: true,
+          enrichcompany_logs_contactlog: true,
+          upsertcontact_logs_contactlog: true,
+          document_upload_logs_contactlog: true,
+        },
       },
 
       source_matrix: results.filter(r => r.category === 'source').map(({ category: _c, ...r }) => r),

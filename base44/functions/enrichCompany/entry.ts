@@ -192,6 +192,27 @@ WICHTIG: Gib nur Felder zurück, die du mit Sicherheit gefunden hast. Wenn du ei
       }
     } catch (e) { console.warn('[enrichCompany] UsageLog failed:', e.message); }
 
+    // ── 7. ContactLog schreiben ──────────────────────────────────────────────
+    const foundFieldCount = Object.keys(updates).filter(k => k !== 'provenance_json').length;
+    const fieldLabels = { website: 'Website', telefon: 'Telefon', email: 'E-Mail', ansprechpartner: 'Ansprechpartner', adresse: 'Adresse' };
+    const foundLabels = Object.keys(updates).filter(k => fieldLabels[k]).map(k => fieldLabels[k]);
+    try {
+      await base44.asServiceRole.entities.ContactLog.create({
+        organization_id,
+        company_id: companyId,
+        typ: 'Sonstiges',
+        ergebnis: foundFieldCount > 0 ? 'Daten ergänzt' : 'Keine neuen Daten',
+        notiz: foundFieldCount > 0
+          ? `KI-Enrichment: ${foundLabels.join(', ')} ergänzt`
+          : 'KI-Enrichment durchgeführt – keine neuen Daten gefunden',
+        user_email: access.user?.email || 'system',
+        is_manual: false,
+        naechster_schritt: foundFieldCount > 0 ? 'Daten prüfen und bestätigen' : null,
+      });
+    } catch (logErr) {
+      console.warn('[enrichCompany] ContactLog failed:', logErr.message);
+    }
+
     console.info(`[enrichCompany] org=${organization_id} user=${access.user.email} company=${company.name} updates=${Object.keys(updates).length}`);
     return Response.json({ updates, found: Object.keys(updates).length });
 

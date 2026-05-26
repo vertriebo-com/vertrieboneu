@@ -26,6 +26,7 @@ import ProvenanceBadge from "../components/lead-detail/ProvenanceBadge";
 import { getFieldProvenance, parseProvenance } from "@/utils/provenance";
 import LifecycleStageBadge from "../components/lead-detail/LifecycleStageBadge";
 import OpportunitySection from "../components/lead-detail/OpportunitySection";
+import UnifiedActivityFeed from "../components/lead-detail/UnifiedActivityFeed";
 
 function temperatureBadge(company) {
   if (isHotLead(company)) return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">🔥 Heiß</span>;
@@ -538,66 +539,15 @@ export default function LeadDetail() {
             )}
           </div>
 
-          {/* Kontakthistorie */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-bold text-slate-900">Kontakthistorie</h3>
-                {contactLogs.length > 0 && (
-                  <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-1.5 py-0.5 rounded-full">{contactLogs.length}</span>
-                )}
-              </div>
-              <Button size="sm" variant="outline" className="text-xs gap-1.5 h-7 bg-white border border-slate-200" onClick={() => setShowAddLog(true)}>
-                <Plus className="w-3 h-3" /> Kontakt
-              </Button>
-            </div>
-
-            {contactLogs.length === 0 ? (
-              <div className="px-4 py-10 text-center">
-                <PhoneCall className="w-8 h-8 mx-auto mb-2 text-slate-200" />
-                <p className="text-sm text-slate-500">Noch kein Kontakt dokumentiert</p>
-                <button onClick={() => setShowAddLog(true)} className="mt-2 text-xs font-semibold text-blue-600 hover:underline">Ersten Kontakt hinzufügen</button>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {contactLogs.map((log) => (
-                  <div key={log.id} className="px-4 py-3 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <div className="w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center flex-shrink-0 text-sm mt-0.5">
-                        {log.typ === "Anruf" ? "📞" : log.typ === "E-Mail" ? "✉️" : log.typ === "Besuch" ? "🚶" : log.typ === "Termin" ? "📅" : log.typ === "Angebot" ? "📄" : "💬"}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-sm font-bold text-slate-900">{log.typ}</span>
-                            {log.ergebnis && (
-                              <span className={`text-[10px] font-bold border px-1.5 py-0.5 rounded-full ${
-                                log.ergebnis === "Erreicht" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                log.ergebnis === "Nicht erreicht" ? "bg-red-50 text-red-600 border-red-200" :
-                                log.ergebnis === "Rückruf vereinbart" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                                log.ergebnis === "Termin vereinbart" ? "bg-purple-50 text-purple-700 border-purple-200" :
-                                log.ergebnis === "Angebot gesendet" ? "bg-blue-50 text-blue-700 border-blue-200" :
-                                "bg-slate-100 text-slate-600 border-slate-200"
-                              }`}>{log.ergebnis}</span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-slate-400">{moment(log.created_date).format("DD.MM.YY HH:mm")}</span>
-                        </div>
-                        {log.notiz && <p className="text-sm text-slate-800 leading-relaxed">{log.notiz}</p>}
-                        {log.naechster_schritt && (
-                          <p className="text-xs font-semibold text-slate-600 mt-1 flex items-center gap-1">
-                            <ChevronRight className="w-3 h-3" /> {log.naechster_schritt}
-                          </p>
-                        )}
-                        {log.user_email && <p className="text-[10px] text-slate-400 mt-1">{log.user_email}</p>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Unified Activity Feed */}
+          {orgId && (
+            <UnifiedActivityFeed
+              companyId={id}
+              organizationId={orgId}
+              onAddLog={() => setShowAddLog(true)}
+              onAddTask={() => setShowAddTask(true)}
+            />
+          )}
         </div>
 
         {/* ── RECHTE SPALTE: Nächste beste Aktion + Aufgaben + Engine ── */}

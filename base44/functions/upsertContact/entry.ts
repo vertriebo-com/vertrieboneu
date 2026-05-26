@@ -114,6 +114,25 @@ Deno.serve(async (req) => {
       ));
     }
 
+    // ContactLog schreiben
+    try {
+      const contactName = contact.name || contact.first_name || 'Unbekannt';
+      const isManualSource = !contact.source_type || contact.source_type === 'manual';
+      await base44.asServiceRole.entities.ContactLog.create({
+        organization_id: org_id,
+        company_id,
+        typ: 'Sonstiges',
+        ergebnis: action === 'created' ? 'Kontakt erstellt' : 'Kontakt aktualisiert',
+        notiz: action === 'created'
+          ? `Ansprechpartner erstellt: ${contactName}${contact.role ? ` (${contact.role})` : ''}${contact.is_primary ? ' – Hauptkontakt' : ''}`
+          : `Ansprechpartner aktualisiert: ${contactName}${contact.role ? ` (${contact.role})` : ''}`,
+        user_email: access.user.email,
+        is_manual: isManualSource,
+      });
+    } catch (logErr) {
+      console.warn('[upsertContact] ContactLog failed:', logErr.message);
+    }
+
     console.info(`[upsertContact] ${action} contact for company=${company_id} org=${org_id} by ${access.user.email}`);
     return Response.json({ contact: result, action, dedupe_matched: !!matchedContact });
 
