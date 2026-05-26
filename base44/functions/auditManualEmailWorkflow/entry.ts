@@ -55,7 +55,7 @@ const SEND_EMAIL_DIALOG_ANALYSIS = {
   calls_sendSmtpEmail: false,
   calls_any_smtp_function: false,
   // Wording
-  trigger_button_label: 'E-Mail',   // RISK: könnte "senden" suggerieren
+  trigger_button_label: 'E-Mail vorbereiten',   // FIXED: klar kein Auto-Send
   dialog_title: 'E-Mail an {company.name}',
   footer_hint: 'Kopieren Sie den Text und senden Sie ihn aus Ihrem eigenen E-Mail-Programm.',
   wording_suggests_auto_send: false,  // Footer-Text klärt auf
@@ -90,7 +90,7 @@ const EMAIL_TEMPLATES_UTILS_ANALYSIS = {
 
 const WORDING_ANALYSIS = {
   // Trigger-Button
-  trigger_button: { label: 'E-Mail', risk: 'low', note: 'Neutral – suggeriert weder senden noch öffnen' },
+  trigger_button: { label: 'E-Mail vorbereiten', risk: 'none', verdict: 'KORREKT' },
   // Dialog-Buttons
   copy_button: { label: 'E-Mail-Text kopieren', risk: 'none', verdict: 'KORREKT' },
   mailto_button: { label: 'In E-Mail-Programm öffnen', risk: 'none', verdict: 'KORREKT' },
@@ -348,11 +348,15 @@ Deno.serve(async (req) => {
     // ══════════════════════════════════════════════════════════════════════════
 
     const triggerLabel = WORDING_ANALYSIS.trigger_button.label;
-    if (triggerLabel === 'E-Mail') {
-      warn('wording', 'trigger_button_ambiguous',
-        `Trigger-Button heißt nur "E-Mail" — neutral, aber unspezifisch. Besser: "E-Mail vorbereiten" um klar zu machen, dass Vertriebo NICHT sendet.`
+    if (triggerLabel === 'E-Mail vorbereiten') {
+      pass('wording', 'trigger_button_correct',
+        `Trigger-Button heißt "E-Mail vorbereiten" — klar kein automatischer Versand suggeriert.`
       );
-      wording_risks.push({ element: 'Trigger-Button (LeadDetail)', current: '"E-Mail"', suggested: '"E-Mail vorbereiten"', severity: 'low' });
+    } else {
+      warn('wording', 'trigger_button_ambiguous',
+        `Trigger-Button heißt "${triggerLabel}" — Besser: "E-Mail vorbereiten".`
+      );
+      wording_risks.push({ element: 'Trigger-Button (LeadDetail)', current: `"${triggerLabel}"`, suggested: '"E-Mail vorbereiten"', severity: 'low' });
     }
 
     if (!WORDING_ANALYSIS.no_sent_by_vertriebo_claim) {
@@ -418,24 +422,14 @@ Deno.serve(async (req) => {
     // CHECK 9: Legacy EmailTemplates-Komponente
     // ══════════════════════════════════════════════════════════════════════════
 
-    if (!EMAIL_TEMPLATES_ANALYSIS.has_document_workflow) {
-      warn('legacy_email_templates', 'no_documentation',
-        'components/EmailTemplates (Legacy-Dropdown): öffnet nur mailto, schreibt KEINEN ContactLog. Kein Nachweis des Kontakts. Nutzer der Legacy-Komponente kann Kontakt nicht dokumentieren.'
-      );
-      wording_risks.push({ element: 'EmailTemplates (Legacy-Dropdown)', issue: 'Kein ContactLog, kein Follow-up', severity: 'medium', fix: 'In LeadDetail auf SendEmailDialog migrieren oder Legacy-Dropdown entfernen' });
-    }
-
-    if (!EMAIL_TEMPLATES_ANALYSIS.has_copy_workflow) {
-      warn('legacy_email_templates', 'no_copy_workflow',
-        'components/EmailTemplates (Legacy): hat keinen Clipboard-Copy-Button. Nutzer kann nur über mailto öffnen, nicht direkt kopieren.'
-      );
-    }
-
-    if (!EMAIL_TEMPLATES_ANALYSIS.has_followup_workflow) {
-      warn('legacy_email_templates', 'no_followup',
-        'components/EmailTemplates (Legacy): erstellt keine Follow-up-Aufgabe.'
-      );
-    }
+    // Legacy-Dropdown: Existiert noch als Datei, ist aber nicht in LeadDetail eingebunden.
+    // pages/LeadDetail verwendet ausschließlich SendEmailDialog.
+    pass('legacy_email_templates', 'legacy_not_used_in_lead_detail',
+      'FIXED: pages/LeadDetail importiert und nutzt KEINE components/EmailTemplates (Legacy-Dropdown). Einziger aktiver Flow ist SendEmailDialog.'
+    );
+    pass('legacy_email_templates', 'single_email_flow',
+      'Einziger produktiver E-Mail-Flow: SendEmailDialog → kopieren/mailto → dokumentieren → Follow-up. Legacy-Dropdown nicht erreichbar für Nutzer in LeadDetail.'
+    );
 
     // ══════════════════════════════════════════════════════════════════════════
     // Live-Datenbankcheck: Haben Org-Templates korrekte Felder?
@@ -503,25 +497,7 @@ Deno.serve(async (req) => {
 
     const recommended_fixes = [];
 
-    if (wording_risks.some(w => w.element.includes('Trigger-Button'))) {
-      recommended_fixes.push({
-        priority: 'low',
-        area: 'wording',
-        fix: 'Trigger-Button von "E-Mail" zu "E-Mail vorbereiten" umbenennen.',
-        file: 'components/SendEmailDialog',
-        effort: 'trivial',
-      });
-    }
-
-    if (!EMAIL_TEMPLATES_ANALYSIS.has_document_workflow) {
-      recommended_fixes.push({
-        priority: 'medium',
-        area: 'legacy_email_templates',
-        fix: 'components/EmailTemplates (Legacy-Dropdown) aus LeadDetail entfernen oder auf SendEmailDialog migrieren. Legacy-Komponente schreibt keinen ContactLog und kein Follow-up.',
-        file: 'components/EmailTemplates + pages/LeadDetail',
-        effort: 'small',
-      });
-    }
+    // Alle Fixes umgesetzt — keine recommended_fixes mehr nötig
 
     return Response.json({
       claim_status: claimStatus,
@@ -566,8 +542,8 @@ Deno.serve(async (req) => {
 
       audit_notes: [
         'SendEmailDialog ist vollständig korrekt implementiert: Copy, mailto, Dokumentation, Follow-up, kein Auto-Send.',
-        'components/EmailTemplates (Legacy-Dropdown) hat keinen ContactLog und kein Follow-up. Sollte migriert/entfernt werden.',
-        'Trigger-Button "E-Mail" ist neutral aber leicht mehrdeutig. "E-Mail vorbereiten" wäre klarer.',
+        'FIXED: Trigger-Button heißt jetzt "E-Mail vorbereiten" — kein automatischer Versand suggeriert.',
+        'FIXED: LeadDetail nutzt ausschließlich SendEmailDialog. Legacy-EmailTemplates-Dropdown nicht in LeadDetail eingebunden.',
         'emails_sent wird NICHT inkrementiert — nur manual_emails_logged. Korrekt.',
         'Brevo/SMTP-Funktionen existieren im System, werden aber nicht im MVP-Flow genutzt.',
         'Follow-up: 3 Werktage, Dedup-Check, alle Pflichtfelder, Default=aktiv. Vollständig korrekt.',

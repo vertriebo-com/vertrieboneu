@@ -351,7 +351,7 @@ export default function SendEmailDialog({ company, organizationId }) {
         title={hasEmail ? company.email : "Keine E-Mail vorhanden"}
         className="inline-flex items-center gap-1.5 h-9 text-sm font-semibold border border-slate-200 bg-white text-slate-800 px-3 rounded-lg hover:bg-slate-50 transition-colors"
       >
-        <Mail className="w-3.5 h-3.5" /> E-Mail
+        <Mail className="w-3.5 h-3.5" /> E-Mail vorbereiten
       </button>
 
       <Dialog open={open} onOpenChange={handleClose}>
