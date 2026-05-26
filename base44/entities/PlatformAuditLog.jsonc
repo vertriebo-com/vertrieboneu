@@ -1,6 +1,12 @@
 {
   "name": "PlatformAuditLog",
   "type": "object",
+  "x-acl": {
+    "create": "admin",
+    "read": "admin",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "actor_email": {
       "type": "string",

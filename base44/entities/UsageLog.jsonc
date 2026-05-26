@@ -1,6 +1,12 @@
 {
   "name": "UsageLog",
   "type": "object",
+  "x-acl": {
+    "create": "admin",
+    "read": "user",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",

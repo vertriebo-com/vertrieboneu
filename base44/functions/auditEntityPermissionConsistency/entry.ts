@@ -28,7 +28,9 @@ Deno.serve(async (req) => {
         entity: 'Company',
         has_organization_id: true,
         expected_model: 'tenant',
-        notes: 'Kern-Lead-Entity. organization_id Pflicht. Mandanten-isoliert.',
+        acl_set: true,
+        acl_applied: { create: 'user', read: 'user', update: 'user', delete: 'admin' },
+        notes: 'Kern-Lead-Entity. organization_id Pflicht. Mandanten-isoliert. x-acl gesetzt.',
         backend_functions_guarding: ['listCompanies', 'enrichCompany', 'blacklistCompany', 'deleteCompany', 'analyzeLeadEngine', 'analyzeLeadTemperature'],
         expected_create: 'authenticated user (own org)',
         expected_read: 'same organization_id OR platform_admin',
@@ -52,7 +54,9 @@ Deno.serve(async (req) => {
         entity: 'Opportunity',
         has_organization_id: true,
         expected_model: 'tenant',
-        notes: 'Sales-Verkaufschance. organization_id + company_id Pflicht.',
+        acl_set: true,
+        acl_applied: { create: 'user', read: 'user', update: 'user', delete: 'admin' },
+        notes: 'Sales-Verkaufschance. organization_id + company_id Pflicht. x-acl gesetzt.',
         backend_functions_guarding: ['createOpportunity', 'listOpportunities', 'updateOpportunityStage'],
         expected_create: 'authenticated user (same org)',
         expected_read: 'same organization_id OR platform_admin',
@@ -64,7 +68,9 @@ Deno.serve(async (req) => {
         entity: 'ContactLog',
         has_organization_id: true,
         expected_model: 'tenant',
-        notes: 'Aktivitäten-Journal. organization_id Pflicht.',
+        acl_set: true,
+        acl_applied: { create: 'user', read: 'user', update: 'admin', delete: 'admin' },
+        notes: 'Aktivitäten-Journal. organization_id Pflicht. Update/Delete admin-only (immutable log). x-acl gesetzt.',
         backend_functions_guarding: ['enrichCompany', 'upsertContact', 'updateLifecycleStage', 'updateOpportunityStage', 'createOpportunity'],
         expected_create: 'authenticated user (same org) OR service role (system events)',
         expected_read: 'same organization_id OR platform_admin',
@@ -76,7 +82,9 @@ Deno.serve(async (req) => {
         entity: 'Task',
         has_organization_id: true,
         expected_model: 'tenant',
-        notes: 'Aufgaben je Company/Lead. organization_id Pflicht.',
+        acl_set: true,
+        acl_applied: { create: 'user', read: 'user', update: 'user', delete: 'admin' },
+        notes: 'Aufgaben je Company/Lead. organization_id Pflicht. x-acl gesetzt.',
         backend_functions_guarding: ['listTasks'],
         expected_create: 'authenticated user (same org)',
         expected_read: 'same organization_id OR platform_admin',
@@ -124,7 +132,9 @@ Deno.serve(async (req) => {
         entity: 'UsageLog',
         has_organization_id: true,
         expected_model: 'billing-system',
-        notes: 'Verbrauchszähler. Wird nur von Backend Functions geschrieben.',
+        acl_set: true,
+        acl_applied: { create: 'admin', read: 'user', update: 'admin', delete: 'admin' },
+        notes: 'Verbrauchszähler. Wird nur von Backend Functions (service role) geschrieben. x-acl: create/update/delete=admin, read=user.',
         backend_functions_guarding: ['getUsageSummary', 'debugUsageSummary', 'enrichCompany', 'processResearchRun'],
         expected_create: 'service role only',
         expected_read: 'same organization_id (own usage) OR platform_admin',
@@ -160,7 +170,9 @@ Deno.serve(async (req) => {
         entity: 'Subscription',
         has_organization_id: true,
         expected_model: 'billing-system',
-        notes: 'Stripe-Abo-Daten. Nur von stripeWebhook/Backend geschrieben.',
+        acl_set: true,
+        acl_applied: { create: 'admin', read: 'user', update: 'admin', delete: 'admin' },
+        notes: 'Stripe-Abo-Daten. Nur von stripeWebhook/Backend geschrieben. x-acl: create/update/delete=admin, read=user.',
         backend_functions_guarding: ['stripeWebhook', 'createCheckoutSession', 'createPortalSession'],
         expected_create: 'service role only (via stripeWebhook)',
         expected_read: 'same organization_id (own sub) OR platform_admin',
@@ -184,7 +196,9 @@ Deno.serve(async (req) => {
         entity: 'PlatformAuditLog',
         has_organization_id: true,
         expected_model: 'platform-admin-only',
-        notes: 'Audit-Trail für Admin-Aktionen. Nur platform_admin darf lesen. Nur service role darf schreiben.',
+        acl_set: true,
+        acl_applied: { create: 'admin', read: 'admin', update: 'admin', delete: 'admin' },
+        notes: 'Audit-Trail für Admin-Aktionen. x-acl: alle Operationen nur admin. Normale User haben keinen Zugriff.',
         backend_functions_guarding: ['platformAdmin', 'getPlatformAdminData'],
         expected_create: 'service role only',
         expected_read: 'platform_admin only',
@@ -259,7 +273,7 @@ Deno.serve(async (req) => {
         riskReasons.push(`${dataCheck.without_org_id}/${dataCheck.sampled} Einträge ohne organization_id`);
       }
 
-      if (def.ui_risk) {
+      if (def.ui_risk && !def.acl_set) {
         risk = risk === 'red' ? 'red' : 'yellow';
         riskReasons.push(def.ui_risk);
       }
@@ -269,12 +283,12 @@ Deno.serve(async (req) => {
         riskReasons.push('Keine Backend-Function-Guards dokumentiert');
       }
 
-      if (def.entity === 'PlatformAuditLog') {
-        risk = 'yellow'; // immer gelb bis Permissions explizit verifiziert
+      if (def.entity === 'PlatformAuditLog' && !def.acl_set) {
+        risk = 'yellow';
         riskReasons.push('Platform-Admin-Only – Base44 Permission muss explizit gesetzt sein');
       }
 
-      if (def.entity === 'UsageLog' || def.entity === 'Subscription') {
+      if ((def.entity === 'UsageLog' || def.entity === 'Subscription') && !def.acl_set) {
         riskReasons.push('Schreibzugriff muss auf service role beschränkt sein');
         risk = risk === 'red' ? 'red' : 'yellow';
       }
@@ -360,14 +374,23 @@ Deno.serve(async (req) => {
           ? 'Alle kritischen Entities haben Backend-Guards. Basis-Tenant-Isolation durch organization_id nachgewiesen.'
           : `${redEntities} Entities mit kritischen Permissions-Problemen gefunden.`,
         company_ui_warning_explanation:
-          'Base44 zeigt möglicherweise eine Permission-Warnung für Company, weil die Entity keine explizite Base44 RLS-Regel hat. ' +
-          'Die tatsächliche Sicherheit ist durch Backend-Functions (listCompanies, enrichCompany, deleteCompany, blacklistCompany) ' +
-          'mit authorizeOrganizationAction gewährleistet. ' +
-          'Die Base44-Warnung ist eine UI-Hinweis, kein aktives Sicherheitsleck, solange alle Reads/Writes über Backend Functions gehen. ' +
-          'Empfehlung: Base44 RLS für Company auf organization_id = user.organization_id setzen, um Warnung zu beseitigen.',
+          'x-acl auf Company gesetzt: create/read/update=user, delete=admin. ' +
+          'Backend-Guards (authorizeOrganizationAction) bleiben die primäre Sicherheitsschicht. ' +
+          'Base44-Permission-Warnung sollte durch x-acl behoben sein.',
+        acl_hardening_applied: [
+          'Company: x-acl { create:user, read:user, update:user, delete:admin }',
+          'Opportunity: x-acl { create:user, read:user, update:user, delete:admin }',
+          'ContactLog: x-acl { create:user, read:user, update:admin, delete:admin }',
+          'Task: x-acl { create:user, read:user, update:user, delete:admin }',
+          'UsageLog: x-acl { create:admin, read:user, update:admin, delete:admin }',
+          'Subscription: x-acl { create:admin, read:user, update:admin, delete:admin }',
+          'PlatformAuditLog: x-acl { create:admin, read:admin, update:admin, delete:admin }',
+        ],
         next_step: redEntities > 0
           ? 'Kritische Entities sofort absichern: RLS-Regeln setzen.'
-          : 'Gelbe Entities: Base44 RLS-Regeln setzen für konsistente UI-Meldungen. Keine aktiven Sicherheitslücken bei Backend-Guard-Abdeckung.',
+          : yellowEntities === 0
+            ? 'Alle Entities gehärtet. Backend-Guards bleiben aktiv. Kein weiterer Handlungsbedarf.'
+            : 'Verbleibende gelbe Entities prüfen – möglicherweise weitere x-acl Regeln ergänzen.',
       },
       entity_matrix: entityMatrix,
       recommended_fixes: recommendedFixes,

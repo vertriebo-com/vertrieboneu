@@ -1,6 +1,12 @@
 {
   "name": "ContactLog",
   "type": "object",
+  "x-acl": {
+    "create": "user",
+    "read": "user",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",
