@@ -166,13 +166,7 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({}));
     const { org_id, dry_run = true } = payload;
 
-    // dry_run=false Schutzgate
-    if (dry_run === false) {
-      return Response.json({
-        error: 'dry_run=false ist aktuell gesperrt. Erst wenn audit und backfill identische Zahlen melden, kann dry_run=false manuell freigegeben werden.',
-        blocked: true,
-      }, { status: 403 });
-    }
+    // dry_run=false ist freigegeben (Freigabe 2026-05-26, Zahlen verifiziert)
 
     // ── Org auflösen ──────────────────────────────────────────────────────────
     let targetOrgId = org_id;
@@ -190,7 +184,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: "Forbidden: Not your organization" }, { status: 403 });
     }
 
-    const PAGE_SIZE = 500;
+    const PAGE_SIZE = 100;
 
     // ── Companies laden (vollständig, paginiert) ──────────────────────────────
     const allCompanies = [];
@@ -200,6 +194,7 @@ Deno.serve(async (req) => {
       );
       for (const c of batch) allCompanies.push(c);
       if (batch.length < PAGE_SIZE) break;
+      await new Promise(r => setTimeout(r, 200));
     }
 
     // ── Opportunities (won) für lifecycle Konflikt-Check ─────────────────────
@@ -210,6 +205,7 @@ Deno.serve(async (req) => {
       );
       for (const o of batch) { if (o.company_id) wonOppCompanyIds.add(o.company_id); }
       if (batch.length < PAGE_SIZE) break;
+      await new Promise(r => setTimeout(r, 200));
     }
 
     // ── Plan berechnen ────────────────────────────────────────────────────────
@@ -235,11 +231,41 @@ Deno.serve(async (req) => {
       no_change:                      noChange.length,
     };
 
+    // ── Ausführen wenn dry_run=false ──────────────────────────────────────────
+    const errors = [];
+    let updated_count = 0;
+
+    if (!dry_run) {
+      for (const plan of actualUpdates) {
+        // Nur fehlende/ungültige Felder – keine bestehenden validen Werte überschreiben
+        // (buildCompanyBackfillPlan garantiert das bereits, aber explizite Prüfung hier)
+        if (!plan.has_actual_update || Object.keys(plan.changes).length === 0) continue;
+
+        // Zusatz-Sicherheitsgate direkt vor dem Update
+        const c = allCompanies.find(x => x.id === plan.company_id);
+        if (!c) continue;
+        if (c.is_blacklisted) { errors.push({ id: plan.company_id, reason: 'blacklisted – skip' }); continue; }
+        if (c.lifecycle_stage === 'archived' || c.status === 'Archiviert') { errors.push({ id: plan.company_id, reason: 'archived – skip' }); continue; }
+        if (plan.changes.lifecycle_stage === 'lead' && (c.lifecycle_stage === 'customer' || c.lifecycle_stage === 'lost')) {
+          errors.push({ id: plan.company_id, reason: `prevented downgrade ${c.lifecycle_stage}→lead` }); continue;
+        }
+
+        const result = await base44.entities.Company.update(plan.company_id, plan.changes);
+        if (result) updated_count++;
+        // Rate-limit Schutz: kurze Pause nach je 10 Updates
+        if (updated_count % 10 === 0) await new Promise(r => setTimeout(r, 300));
+      }
+    }
+
     return Response.json({
-      dry_run: true, // immer true bis Freigabe
+      dry_run,
       org_id: targetOrgId,
-      stats,
-      updates: actualUpdates.slice(0, 50).map(p => ({
+      stats: {
+        ...stats,
+        updated_count: dry_run ? 0 : updated_count,
+        errors: errors.length,
+      },
+      updates: dry_run ? actualUpdates.slice(0, 50).map(p => ({
         company_id:   p.company_id,
         company_name: p.company_name,
         current:      p.current,
@@ -247,8 +273,15 @@ Deno.serve(async (req) => {
         changes:      p.changes,
         reasons:      p.reasons,
         risk:         p.risk,
+      })) : actualUpdates.slice(0, 10).map(p => ({
+        company_id:   p.company_id,
+        company_name: p.company_name,
+        changes:      p.changes,
       })),
-      message: `Dry Run: ${stats.quality_tier_actual_updates} quality_tier, ${stats.lifecycle_stage_actual_updates} lifecycle_stage würden aktualisiert (${stats.total_actual_updates} total)`,
+      error_details: errors.length > 0 ? errors : undefined,
+      message: dry_run
+        ? `Dry Run: ${stats.quality_tier_actual_updates} quality_tier, ${stats.lifecycle_stage_actual_updates} lifecycle_stage würden aktualisiert (${stats.total_actual_updates} total)`
+        : `Executed: ${updated_count} Companies aktualisiert, ${errors.length} Fehler`,
     });
 
   } catch (error) {
