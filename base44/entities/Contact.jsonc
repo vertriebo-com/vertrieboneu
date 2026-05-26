@@ -1,0 +1,114 @@
+{
+  "name": "Contact",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "title": "Organisation ID"
+    },
+    "company_id": {
+      "type": "string",
+      "title": "Firma ID"
+    },
+    "name": {
+      "type": "string",
+      "title": "Vollst\u00e4ndiger Name"
+    },
+    "first_name": {
+      "type": "string",
+      "title": "Vorname"
+    },
+    "last_name": {
+      "type": "string",
+      "title": "Nachname"
+    },
+    "role": {
+      "type": "string",
+      "title": "Rolle / Funktion"
+    },
+    "title": {
+      "type": "string",
+      "title": "Titel (z.B. Dr., Dipl.-Ing.)"
+    },
+    "department": {
+      "type": "string",
+      "title": "Abteilung"
+    },
+    "email": {
+      "type": "string",
+      "title": "E-Mail"
+    },
+    "phone": {
+      "type": "string",
+      "title": "Telefon"
+    },
+    "mobile": {
+      "type": "string",
+      "title": "Mobilnummer"
+    },
+    "is_primary": {
+      "type": "boolean",
+      "title": "Hauptkontakt",
+      "default": false
+    },
+    "source_type": {
+      "type": "string",
+      "title": "Datenquelle",
+      "enum": [
+        "manual",
+        "enrichment",
+        "google_places",
+        "import",
+        "ai",
+        "unknown"
+      ],
+      "default": "manual"
+    },
+    "source_function": {
+      "type": "string",
+      "title": "Quell-Funktion"
+    },
+    "confidence": {
+      "type": "string",
+      "title": "Konfidenz",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "unknown"
+      ],
+      "default": "unknown"
+    },
+    "review_status": {
+      "type": "string",
+      "title": "Review-Status",
+      "enum": [
+        "unreviewed",
+        "confirmed",
+        "rejected"
+      ],
+      "default": "unreviewed"
+    },
+    "provenance_json": {
+      "type": "string",
+      "title": "Provenance JSON (Datenherkunft)"
+    },
+    "notes": {
+      "type": "string",
+      "title": "Notizen"
+    },
+    "linkedin_url": {
+      "type": "string",
+      "title": "LinkedIn URL"
+    },
+    "last_contact_date": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Letzter Kontakt"
+    }
+  },
+  "required": [
+    "organization_id",
+    "company_id"
+  ]
+}

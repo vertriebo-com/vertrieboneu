@@ -140,19 +140,25 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Kein Contact Entity
-  warn('contacts', 'no_contact_entity',
-    'Kein eigenständiges Contact/Ansprechpartner-Entity. Company hat nur 1x ansprechpartner-Feld (String). Mehrere Kontakte pro Firma, Rollen, Titel, eigene E-Mail/Telefon pro Person nicht möglich.'
+  // Contact Entity jetzt vorhanden (MVP implementiert)
+  pass('contacts', 'contact_entity_exists',
+    'FIXED: Contact Entity mit organization_id, company_id, name, role, email, phone, is_primary, source_type, confidence, review_status implementiert.'
   );
-  warn('contacts', 'no_multi_contact',
-    'Multi-Contact (z.B. Einkäufer + Geschäftsführer + Assistent) nicht abbildbar. Für B2B-Vertrieb MVP-Lücke.'
+  pass('contacts', 'multiple_contacts_per_company',
+    'FIXED: Mehrere Contacts pro Company möglich – Geschäftsführer, Einkauf, Technik etc. abbildbar.'
   );
-  recommended_fixes.push({
-    priority: 'high',
-    area: 'contacts',
-    fix: 'Contact Entity ergänzen: organization_id, company_id, name, role/title, email, phone, is_primary, source_type, confidence, review_status. Kein sofortiger Umbau, aber als nächster MVP-Baustein priorisieren.',
-    effort: 'medium',
-  });
+  pass('contacts', 'contact_org_isolation',
+    'FIXED: Contact.organization_id + company_id Pflicht → harte Mandantentrennung.'
+  );
+  pass('contacts', 'primary_contact_supported',
+    'FIXED: Contact.is_primary-Flag + upsertContact setzt andere is_primary=false. Primary Contact eindeutig.'
+  );
+  pass('contacts', 'company_contact_legacy_fallback',
+    'FIXED: ContactsSection zeigt Company.ansprechpartner als Legacy-Fallback wenn noch keine Contact-Entity existiert. "Als Kontakt übernehmen"-Button via buildPrimaryContactFromCompany.'
+  );
+  pass('contacts', 'contact_provenance_supported',
+    'FIXED: Contact hat source_type, confidence, review_status. Enrichment-Contacts als unreviewed markiert. Manuelle Contacts als confirmed.'
+  );
 
   // ── 3. OPPORTUNITY / DEAL READINESS ──────────────────────────────────────
 
@@ -364,11 +370,11 @@ Deno.serve(async (req) => {
     },
     {
       domain: 'Contacts/Ansprechpartner',
-      existing_entities: ['Company.ansprechpartner (1 String-Feld)'],
-      current_coverage: 'Nur 1 Ansprechpartner pro Firma als freier String. Provenance/Review für dieses Feld vorhanden.',
-      missing_capabilities: ['Contact Entity', 'Multi-Contact', 'Rolle/Titel pro Kontakt', 'eigene E-Mail+Telefon pro Kontakt', 'is_primary-Flag'],
-      risk: 'red',
-      recommended_fix: 'Contact Entity als nächster MVP-Baustein: organization_id, company_id, name, role, email, phone, is_primary, source_type, confidence, review_status.',
+      existing_entities: ['Contact Entity (MVP)', 'Company.ansprechpartner (Legacy-Fallback)'],
+      current_coverage: 'FIXED: Contact Entity mit org_id, company_id, name, role, department, email, phone, mobile, is_primary, source_type, confidence, review_status. Multi-Contact pro Firma. Legacy-Fallback auf Company.ansprechpartner. buildPrimaryContactFromCompany für Migration.',
+      missing_capabilities: ['LinkedIn-URL vorhanden aber kein Import-Flow', 'keine Bulk-Migration bestehender ansprechpartner-Felder'],
+      risk: 'green',
+      recommended_fix: 'Kein sofortiger Fix. Bulk-Migration Company.ansprechpartner → Contact später bei Bedarf.',
     },
     {
       domain: 'Opportunities/Deals',
@@ -573,7 +579,7 @@ Deno.serve(async (req) => {
     acceptance_score: `${acceptancePassed}/7 Acceptance-Kriterien erfüllt`,
     crm_domains_checked: 8,
     company_model_clarity: 'YELLOW — Dual-Role Lead+Account ohne lifecycle_stage',
-    contacts_ready: 'RED — Kein Contact Entity, nur 1 String-Feld. B2B-Kernlücke.',
+    contacts_ready: 'GREEN — Contact Entity implementiert: Multi-Contact, is_primary, Provenance, org_isolation, Legacy-Fallback.',
     opportunities_ready: 'RED — Kein Opportunity Entity. Kein Wert/Datum/Forecast.',
     pipeline_ready: 'YELLOW — Status-Enum vorhanden, keine Stage-History, kein Kanban-UI.',
     activity_feed_ready: 'YELLOW — ContactLog + Task decken MVP ab, aber kein auto Stage-Change-Log.',
@@ -586,7 +592,7 @@ Deno.serve(async (req) => {
     next_mvp_block_priority_3: 'Stage-Change-Log im Activity Feed (ContactLog-Event bei Statuswechsel)',
     next_mvp_block_priority_4: 'Document.company_id ergänzen (trivial)',
     next_mvp_block_priority_5: 'Opportunity Entity (erst nach Contact)',
-    verdict: 'YELLOW: CRM-Footprint klar inventarisiert. Kritische Lücken: Contact Entity + Opportunity Entity fehlen. Activity Feed + Notes + Mandantentrennung für MVP ausreichend. Empfohlener nächster Schritt: Contact Entity als MVP-Baustein 1.',
+    verdict: 'YELLOW: CRM-Footprint klar inventarisiert. Contact Entity MVP implementiert (GREEN). Verbleibende Lücken: Opportunity Entity (kein Wert/Forecast), Stage-History, Pipeline-Wert. Empfohlener nächster Schritt: Company.lifecycle_stage-Feld + Stage-Change-Log.',
   };
 
   return Response.json({

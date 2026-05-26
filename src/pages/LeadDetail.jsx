@@ -17,6 +17,7 @@ import AddTaskDialog from "../components/AddTaskDialog";
 import SendEmailDialog from "../components/SendEmailDialog";
 import OutcomeFeedback from "../components/lead-detail/OutcomeFeedback";
 import RelevanceSection from "../components/lead-detail/RelevanceSection";
+import ContactsSection from "../components/lead-detail/ContactsSection";
 import { useOrganization } from "@/hooks/useOrganization";
 import { toast } from "sonner";
 import moment from "moment";
@@ -590,6 +591,9 @@ export default function LeadDetail() {
 
         {/* ── RECHTE SPALTE: Nächste beste Aktion + Aufgaben + Engine ── */}
         <div className="space-y-4">
+
+          {/* Ansprechpartner */}
+          <ContactsSection company={company} organizationId={orgId} />
 
           {/* Warum dieser Lead? */}
           <RelevanceSection company={company} learnedSignals={learnedSignals} />
