@@ -296,18 +296,9 @@ export default function Dashboard() {
           <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-500" />
             <h2 className="text-sm font-semibold text-slate-900">Heute wichtig</h2>
-            {(todayTasks.length + overdueTasks.length) > 0 && (
-              <span className="ml-auto text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">
-                {todayTasks.length + overdueTasks.length} Aufgaben
-              </span>
-            )}
           </div>
           <div className="p-4">
-            <DailyActionList
-              actionableLeads={actionableLeads}
-              todayTasksCount={todayTasks.length}
-              overdueTasksCount={overdueTasks.length}
-            />
+            <DailyActionList orgId={activeOrg?.id} />
           </div>
         </div>
 

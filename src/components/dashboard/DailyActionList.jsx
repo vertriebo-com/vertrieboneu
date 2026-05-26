@@ -4,95 +4,90 @@
  * WHY: Vertriebo soll nicht leer wirken wenn Leads vorhanden sind.
  *      Statt "Keine Aufgaben" soll der Nutzer konkrete Handlungen sehen.
  *
- * LOGIC: Zeigt priorisierte Aktionsliste aus getDashboardData.actionableLeads:
- *   Priority 0 – task_overdue:       Überfällige Aufgaben (allgemein) → rot
- *   Priority 0 – callback_overdue:   Überfälliger Rückruf → rot + Telefon-Icon
- *   Priority 1 – task_today:         Heute fällige Aufgaben (allgemein) → blau
- *   Priority 1 – callback_due_today: Heute fälliger Rückruf → blau + Telefon-Icon
- *   Priority 2 – hot_lead:           Heißer Lead ohne offene Task → orange 🔥
- *   Priority 2.5 – offer_followup:   Offenes Angebot ohne offene Task → indigo
- *   Priority 3 – warm_lead_action:   Warmer Lead mit KI-Empfehlung → amber
- *   Priority 3 – callback_pending:   Rückruf-Status ohne Task → violet
- *   Priority 4 – new_contactable:    Neuer Lead (Score ≥65, kontaktierbar) → grün
+ * LOGIC: Nutzt getDailyActions backend function mit Scoring + Deduplizierung.
+ *   Action Types: call_lead, follow_up, prepare_email, create_opportunity,
+ *   update_opportunity_stage, add_contact, review_enrichment, schedule_task
  *
- * DATA: actionableLeads aus getDashboardData (serverseitig priorisiert, max 6)
- * UX: Klick → direkt zur Firma (/leads/:id) oder Aufgabenansicht (/tasks)
+ * DATA: actions aus getDailyActions (serverseitig priorisiert, max 25)
+ * UX: Klick → direkt zur Firma (/leads/:id) oder Aufgabe
  */
+import { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { AlertCircle, Phone, ArrowRight, CheckCircle2, Zap, Flame, Star, FileText } from "lucide-react";
+import { Phone, ArrowRight, CheckCircle2, Zap, Flame, Star, FileText, UserPlus, RefreshCw, Calendar, AlertCircle } from "lucide-react";
 
-const TYPE_CONFIG = {
-  task_overdue: {
+const ACTION_CONFIG = {
+  schedule_task: {
     icon: AlertCircle,
     iconColor: "text-red-600",
     bg: "bg-red-50 border-red-200",
     textColor: "text-red-900",
     subColor: "text-red-700",
-    dot: "bg-red-500",
+    label: "Überfällige Aufgabe",
   },
-  callback_overdue: {
-    icon: Phone,
-    iconColor: "text-red-600",
-    bg: "bg-red-50 border-red-200",
-    textColor: "text-red-900",
-    subColor: "text-red-700",
-    dot: "bg-red-500",
-  },
-  task_today: {
-    icon: Zap,
-    iconColor: "text-blue-600",
-    bg: "bg-blue-50 border-blue-200",
-    textColor: "text-blue-900",
-    subColor: "text-blue-700",
-    dot: "bg-blue-500",
-  },
-  callback_due_today: {
-    icon: Phone,
-    iconColor: "text-blue-600",
-    bg: "bg-blue-50 border-blue-200",
-    textColor: "text-blue-900",
-    subColor: "text-blue-700",
-    dot: "bg-blue-500",
-  },
-  hot_lead: {
-    icon: Flame,
-    iconColor: "text-orange-600",
-    bg: "bg-orange-50 border-orange-200",
-    textColor: "text-orange-900",
-    subColor: "text-orange-700",
-    dot: "bg-orange-500",
-  },
-  offer_followup: {
+  update_opportunity_stage: {
     icon: FileText,
-    iconColor: "text-indigo-600",
-    bg: "bg-indigo-50 border-indigo-200",
-    textColor: "text-indigo-900",
-    subColor: "text-indigo-700",
-    dot: "bg-indigo-500",
+    iconColor: "text-violet-600",
+    bg: "bg-violet-50 border-violet-200",
+    textColor: "text-violet-900",
+    subColor: "text-violet-700",
+    label: "Opportunity",
   },
-  warm_lead_action: {
+  follow_up: {
+    icon: Phone,
+    iconColor: "text-blue-600",
+    bg: "bg-blue-50 border-blue-200",
+    textColor: "text-blue-900",
+    subColor: "text-blue-700",
+    label: "Follow-up",
+  },
+  call_lead: {
+    icon: Phone,
+    iconColor: "text-emerald-600",
+    bg: "bg-emerald-50 border-emerald-200",
+    textColor: "text-emerald-900",
+    subColor: "text-emerald-700",
+    label: "Anrufen",
+  },
+  create_opportunity: {
     icon: Star,
     iconColor: "text-amber-600",
     bg: "bg-amber-50 border-amber-200",
     textColor: "text-amber-900",
     subColor: "text-amber-700",
-    dot: "bg-amber-500",
+    label: "Opportunity anlegen",
   },
-  callback_pending: {
-    icon: Phone,
-    iconColor: "text-violet-600",
-    bg: "bg-violet-50 border-violet-200",
-    textColor: "text-violet-900",
-    subColor: "text-violet-700",
-    dot: "bg-violet-500",
+  add_contact: {
+    icon: UserPlus,
+    iconColor: "text-indigo-600",
+    bg: "bg-indigo-50 border-indigo-200",
+    textColor: "text-indigo-900",
+    subColor: "text-indigo-700",
+    label: "Ansprechpartner",
   },
-  new_contactable: {
-    icon: ArrowRight,
-    iconColor: "text-emerald-600",
-    bg: "bg-emerald-50 border-emerald-200",
-    textColor: "text-emerald-900",
-    subColor: "text-emerald-700",
-    dot: "bg-emerald-500",
+  review_enrichment: {
+    icon: RefreshCw,
+    iconColor: "text-slate-600",
+    bg: "bg-slate-50 border-slate-200",
+    textColor: "text-slate-900",
+    subColor: "text-slate-700",
+    label: "Daten prüfen",
+  },
+  prepare_email: {
+    icon: FileText,
+    iconColor: "text-cyan-600",
+    bg: "bg-cyan-50 border-cyan-200",
+    textColor: "text-cyan-900",
+    subColor: "text-cyan-700",
+    label: "E-Mail",
+  },
+  mark_lost_or_archive: {
+    icon: AlertCircle,
+    iconColor: "text-orange-600",
+    bg: "bg-orange-50 border-orange-200",
+    textColor: "text-orange-900",
+    subColor: "text-orange-700",
+    label: "Archivieren",
   },
 };
 
@@ -102,11 +97,41 @@ const DEFAULT_CONFIG = {
   bg: "bg-slate-50 border-slate-200",
   textColor: "text-slate-900",
   subColor: "text-slate-600",
-  dot: "bg-slate-400",
+  label: "Aktion",
 };
 
-export default function DailyActionList({ actionableLeads = [], todayTasksCount = 0, overdueTasksCount = 0 }) {
-  if (actionableLeads.length === 0) {
+export default function DailyActionList({ orgId }) {
+  const [actions, setActions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!orgId) return;
+    setLoading(true);
+    base44.functions.invoke('getDailyActions', { org_id: orgId, limit: 6 })
+      .then(res => {
+        setActions(res.data?.actions || []);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [orgId]);
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="flex items-center gap-3 p-3 border rounded-lg bg-slate-50 border-slate-200">
+            <div className="w-4 h-4 rounded bg-slate-200 animate-pulse" />
+            <div className="flex-1 space-y-1">
+              <div className="h-3 bg-slate-200 rounded animate-pulse w-3/4" />
+              <div className="h-2 bg-slate-200 rounded animate-pulse w-1/2" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (actions.length === 0) {
     return (
       <div className="text-center py-8">
         <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
@@ -118,29 +143,24 @@ export default function DailyActionList({ actionableLeads = [], todayTasksCount 
 
   return (
     <div className="space-y-2">
-      {actionableLeads.map((item, idx) => {
-        const cfg = TYPE_CONFIG[item.type] || DEFAULT_CONFIG;
+      {actions.map((action) => {
+        const cfg = ACTION_CONFIG[action.action_type] || DEFAULT_CONFIG;
         const Icon = cfg.icon;
-
-        // Ziel-URL: Task → /tasks, Company → /leads/:id
-        const href = item.company_id
-          ? `/leads/${item.company_id}`
-          : `/tasks`;
 
         return (
           <Link
-            key={`${item.type}-${item.company_id || item.task_id || idx}`}
-            to={href}
+            key={action.id}
+            to={`/leads/${action.company_id}`}
             className={`flex items-center gap-3 p-3 border rounded-lg hover:brightness-95 transition-all ${cfg.bg}`}
           >
             <Icon className={`w-4 h-4 shrink-0 ${cfg.iconColor}`} />
             <div className="flex-1 min-w-0">
               <p className={`text-sm font-semibold truncate ${cfg.textColor}`}>
-                {item.company_name}
+                {action.company_name}
               </p>
               <p className={`text-xs mt-0.5 truncate ${cfg.subColor}`}>
-                <span className="font-medium">{item.action}</span>
-                {item.reason ? ` · ${item.reason}` : ""}
+                <span className="font-medium">{cfg.label}</span>
+                {action.reason ? ` · ${action.reason}` : ""}
               </p>
             </div>
             <ArrowRight className={`w-3.5 h-3.5 shrink-0 ${cfg.iconColor} opacity-60`} />
