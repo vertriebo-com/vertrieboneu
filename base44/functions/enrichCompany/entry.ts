@@ -136,6 +136,34 @@ WICHTIG: Gib nur Felder zurück, die du mit Sicherheit gefunden hast. Wenn du ei
     if (!company.adresse && isValid(result.adresse)) updates.adresse = result.adresse.trim();
 
     if (Object.keys(updates).length > 0) {
+      // ── PROVENANCE: KI-Enrichment-Herkunft dokumentieren ──────────────────
+      // provenance_json mergen: bestehende Felder (z.B. google_places) bleiben erhalten.
+      // source_type='enrichment', review_status='unreviewed' → UI kann Badge zeigen.
+      // Supabase-ready: future table lead_provenance(org_id, company_id, field_name, ...)
+      const existingProv = (() => {
+        try { return JSON.parse(company.provenance_json || '{}'); } catch { return {}; }
+      })();
+      const provFields = existingProv.fields || {};
+      const provNow = new Date().toISOString();
+      const fieldMap = {
+        website: 'website', telefon: 'phone', email: 'email',
+        ansprechpartner: 'contact_person', adresse: 'address',
+      };
+      for (const [apiField, provKey] of Object.entries(fieldMap)) {
+        if (!updates[apiField]) continue;
+        const prevSource = provFields[provKey]?.source_type || null;
+        provFields[provKey] = {
+          source_type: 'enrichment',
+          source_function: 'enrichCompany',
+          confidence: apiField === 'ansprechpartner' ? 'low' : 'medium',
+          review_status: 'unreviewed',
+          updated_at: provNow,
+          updated_by: access.user?.email || 'system',
+          ...(prevSource ? { previous_source: prevSource } : {}),
+        };
+      }
+      updates.provenance_json = JSON.stringify({ fields: provFields });
+
       await base44.asServiceRole.entities.Company.update(companyId, updates);
     }
 

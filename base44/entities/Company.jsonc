@@ -306,6 +306,11 @@
       "type": "string",
       "title": "Speicher-Begr\u00fcndung",
       "description": "Kurzer Code warum dieser Lead gespeichert wurde, z.B. tc_match+phone+website"
+    },
+    "provenance_json": {
+      "type": "string",
+      "title": "Provenance JSON (Datenherkunft pro Feld)",
+      "description": "\u00dcbergangsfeld: JSON-Objekt mit Herkunft, Confidence und Review-Status pro Kontaktfeld. Struktur: { fields: { phone: { source_type, source_function, confidence, review_status, updated_at, updated_by }, email: {...}, website: {...}, contact_person: {...}, address: {...} } }. Supabase-ready: Future table lead_provenance(organization_id, company_id, field_name, source_type, confidence, review_status, created_at, created_by)."
     }
   },
   "required": [

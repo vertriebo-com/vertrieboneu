@@ -21,6 +21,8 @@ import { useOrganization } from "@/hooks/useOrganization";
 import { toast } from "sonner";
 import moment from "moment";
 import { isHotLead, isWarmLead } from "@/utils/leadTemperature";
+import ProvenanceBadge from "../components/lead-detail/ProvenanceBadge";
+import { getFieldProvenance, parseProvenance } from "@/utils/provenance";
 
 function temperatureBadge(company) {
   if (isHotLead(company)) return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">🔥 Heiß</span>;
@@ -416,7 +418,10 @@ export default function LeadDetail() {
                     <User className="w-3.5 h-3.5 text-slate-500" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{company.ansprechpartner}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-semibold text-slate-900">{company.ansprechpartner}</p>
+                      <ProvenanceBadge provenance={getFieldProvenance(company, 'contact_person')} />
+                    </div>
                     <p className="text-xs text-slate-500">Ansprechpartner</p>
                   </div>
                 </div>
@@ -439,7 +444,10 @@ export default function LeadDetail() {
                     <Phone className="w-3.5 h-3.5 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-emerald-700 group-hover:underline">{company.telefon}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-semibold text-emerald-700 group-hover:underline">{company.telefon}</p>
+                      <ProvenanceBadge provenance={getFieldProvenance(company, 'phone')} />
+                    </div>
                     <p className="text-xs text-slate-500">Telefon</p>
                   </div>
                 </a>
@@ -450,7 +458,10 @@ export default function LeadDetail() {
                     <Mail className="w-3.5 h-3.5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-blue-700 group-hover:underline truncate">{company.email}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-semibold text-blue-700 group-hover:underline truncate">{company.email}</p>
+                      <ProvenanceBadge provenance={getFieldProvenance(company, 'email')} />
+                    </div>
                     <p className="text-xs text-slate-500">E-Mail</p>
                   </div>
                 </a>
@@ -461,7 +472,10 @@ export default function LeadDetail() {
                     <Globe className="w-3.5 h-3.5 text-slate-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-blue-600 group-hover:underline truncate">{company.website}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-semibold text-blue-600 group-hover:underline truncate">{company.website}</p>
+                      <ProvenanceBadge provenance={getFieldProvenance(company, 'website')} />
+                    </div>
                     <p className="text-xs text-slate-500">Website</p>
                   </div>
                 </a>

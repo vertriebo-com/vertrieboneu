@@ -1365,6 +1365,26 @@ Deno.serve(async (req) => {
             matched_target_customer,
           };
 
+          // ── PROVENANCE: Feldherkunft aus Google Places dokumentieren ─────────
+          // Übergangsfeld provenance_json (Phase 1). Supabase-ready:
+          // future table: lead_provenance(org_id, company_id, field_name, source_type, ...)
+          const provenanceFields = {};
+          const provenanceNow = new Date().toISOString();
+          const provenanceBase = {
+            source_type: 'google_places',
+            source_function: 'processResearchRun',
+            confidence: 'high',
+            review_status: 'confirmed',
+            updated_at: provenanceNow,
+            updated_by: 'system',
+          };
+          // name, adresse, ort, plz immer von Google Places
+          provenanceFields.name    = { ...provenanceBase };
+          provenanceFields.address = { ...provenanceBase };
+          // Kontaktfelder nur wenn tatsächlich vorhanden
+          if (details?.formatted_phone_number) provenanceFields.phone   = { ...provenanceBase };
+          if (details?.website)                provenanceFields.website = { ...provenanceBase };
+
 // ── SCHRITT 1: Company.create (kritisch) ───────────────────────────────
           let companyId = null;
           let companyCreateError = null;
@@ -1401,6 +1421,8 @@ Deno.serve(async (req) => {
               quality_tier: scoring.qualityTier,
               quality_confidence: scoring.qualityConfidence,
               save_reason_code: scoring.saveReasonCode,
+              // Provenance: Feldherkunft aus Google Places
+              provenance_json: JSON.stringify({ fields: provenanceFields }),
               // LocationIndex Coverage-Diagnostik
               matched_location_city: point.locationCity || null,
               matched_location_postal_code: point.locationPostalCode || null,
