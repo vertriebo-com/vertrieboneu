@@ -1,0 +1,135 @@
+{
+  "name": "Opportunity",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "title": "Organisation ID",
+      "description": "Pflicht. Mandanten-Isolation."
+    },
+    "company_id": {
+      "type": "string",
+      "title": "Firma ID",
+      "description": "Pflicht. Zugeh\u00f6rige Company. Muss gleiche organization_id haben."
+    },
+    "primary_contact_id": {
+      "type": "string",
+      "title": "Prim\u00e4rer Ansprechpartner ID",
+      "description": "Optional. Verweis auf Contact.id. Muss gleiche company_id + organization_id haben."
+    },
+    "title": {
+      "type": "string",
+      "title": "Titel",
+      "description": "Kurzbezeichnung des Verkaufsfalls, z.B. 'Angebot Reinigung Q3 2026'"
+    },
+    "stage": {
+      "type": "string",
+      "title": "Pipeline Stage",
+      "enum": [
+        "new",
+        "contacted",
+        "qualified",
+        "offer_planned",
+        "offer_sent",
+        "negotiation",
+        "won",
+        "lost"
+      ],
+      "default": "new",
+      "description": "Sales-Pipeline-Stage. Unabh\u00e4ngig von Company.lifecycle_stage."
+    },
+    "status": {
+      "type": "string",
+      "title": "Status",
+      "enum": [
+        "open",
+        "won",
+        "lost",
+        "archived"
+      ],
+      "default": "open",
+      "description": "Grob-Status. Won/Lost = Endzust\u00e4nde. Wird aus stage abgeleitet."
+    },
+    "value": {
+      "type": "number",
+      "title": "Auftragswert (EUR)",
+      "description": "Gesch\u00e4tzter oder tats\u00e4chlicher Auftragswert in EUR."
+    },
+    "probability": {
+      "type": "number",
+      "title": "Abschluss-Wahrscheinlichkeit (%)",
+      "description": "0-100. F\u00fcr Forecast: value * probability / 100."
+    },
+    "expected_close_date": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Geplanter Abschluss",
+      "description": "Geplantes Abschluss-Datum."
+    },
+    "source_type": {
+      "type": "string",
+      "title": "Herkunft",
+      "enum": [
+        "manual",
+        "research",
+        "email",
+        "import",
+        "unknown"
+      ],
+      "default": "manual"
+    },
+    "source_research_run_id": {
+      "type": "string",
+      "title": "Recherche-Lauf ID",
+      "description": "Falls aus ResearchRun erstellt. F\u00fcr Conversion Lead\u2192Opportunity\u2192Won."
+    },
+    "won_lost_reason": {
+      "type": "string",
+      "title": "Grund (Won/Lost)",
+      "description": "Warum gewonnen oder verloren? F\u00fcr Learning Loop."
+    },
+    "notes": {
+      "type": "string",
+      "title": "Notizen",
+      "description": "Interne Notizen zum Deal."
+    },
+    "assigned_to": {
+      "type": "string",
+      "title": "Zugewiesen an (E-Mail)"
+    },
+    "created_by": {
+      "type": "string",
+      "title": "Erstellt von (E-Mail)"
+    },
+    "stage_changed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Stage ge\u00e4ndert am"
+    },
+    "stage_changed_by": {
+      "type": "string",
+      "title": "Stage ge\u00e4ndert von (E-Mail)"
+    },
+    "closed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Abgeschlossen am",
+      "description": "Wird bei won oder lost gesetzt."
+    },
+    "won_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Gewonnen am"
+    },
+    "lost_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Verloren am"
+    }
+  },
+  "required": [
+    "organization_id",
+    "company_id",
+    "title"
+  ]
+}

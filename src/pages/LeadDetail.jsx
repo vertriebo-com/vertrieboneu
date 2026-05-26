@@ -25,6 +25,7 @@ import { isHotLead, isWarmLead } from "@/utils/leadTemperature";
 import ProvenanceBadge from "../components/lead-detail/ProvenanceBadge";
 import { getFieldProvenance, parseProvenance } from "@/utils/provenance";
 import LifecycleStageBadge from "../components/lead-detail/LifecycleStageBadge";
+import OpportunitySection from "../components/lead-detail/OpportunitySection";
 
 function temperatureBadge(company) {
   if (isHotLead(company)) return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">🔥 Heiß</span>;
@@ -601,6 +602,9 @@ export default function LeadDetail() {
 
         {/* ── RECHTE SPALTE: Nächste beste Aktion + Aufgaben + Engine ── */}
         <div className="space-y-4">
+
+          {/* Verkaufschancen */}
+          <OpportunitySection company={company} organizationId={orgId} />
 
           {/* Ansprechpartner */}
           <ContactsSection company={company} organizationId={orgId} />
