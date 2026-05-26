@@ -119,6 +119,7 @@ WICHTIG: Gib nur Felder zurück, die du mit Sicherheit gefunden hast. Wenn du ei
           properties: {
             website: { type: "string" }, telefon: { type: "string" },
             email: { type: "string" }, ansprechpartner: { type: "string" }, adresse: { type: "string" },
+            evidence_url: { type: "string" },
           }
         }
       }),
@@ -149,17 +150,26 @@ WICHTIG: Gib nur Felder zurück, die du mit Sicherheit gefunden hast. Wenn du ei
         website: 'website', telefon: 'phone', email: 'email',
         ansprechpartner: 'contact_person', adresse: 'address',
       };
+      // Confidence-Logik: email und ansprechpartner sind schwer verifizierbar → 'low'
+      // website/telefon/adresse sind im Web meist direkt auffindbar → 'medium'
+      const fieldConfidence = {
+        website: 'medium', telefon: 'medium', email: 'low',
+        ansprechpartner: 'low', adresse: 'medium',
+      };
       for (const [apiField, provKey] of Object.entries(fieldMap)) {
         if (!updates[apiField]) continue;
         const prevSource = provFields[provKey]?.source_type || null;
+        const prevValue = company[apiField] || null;
         provFields[provKey] = {
           source_type: 'enrichment',
           source_function: 'enrichCompany',
-          confidence: apiField === 'ansprechpartner' ? 'low' : 'medium',
+          confidence: fieldConfidence[apiField] || 'low',
           review_status: 'unreviewed',
           updated_at: provNow,
           updated_by: access.user?.email || 'system',
           ...(prevSource ? { previous_source: prevSource } : {}),
+          ...(prevValue ? { previous_value: prevValue } : {}),
+          ...(result.evidence_url ? { evidence_url: result.evidence_url } : {}),
         };
       }
       updates.provenance_json = JSON.stringify({ fields: provFields });

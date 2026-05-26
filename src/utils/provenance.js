@@ -137,18 +137,31 @@ export function buildEnrichmentProvenance(existingProvenanceJson, updatedFields,
     adresse:      'address',
   };
 
+  // email + ansprechpartner sind schwer verifizierbar → 'low'
+  const FIELD_CONFIDENCE = {
+    website: CONFIDENCE.MEDIUM,
+    telefon: CONFIDENCE.MEDIUM,
+    email: CONFIDENCE.LOW,
+    ansprechpartner: CONFIDENCE.LOW,
+    adresse: CONFIDENCE.MEDIUM,
+  };
+
   for (const [apiField, provenanceKey] of Object.entries(fieldMap)) {
     if (!updatedFields[apiField]) continue;
-    // Vorherige Provenance aufbewahren als previous_source
+    // Vorherige Provenance aufbewahren
     const previousSource = fields[provenanceKey]?.source_type || null;
+    const previousValue = updatedFields[`_prev_${apiField}`] || null;
+    const evidenceUrl = updatedFields['_evidence_url'] || null;
     fields[provenanceKey] = {
       source_type: SOURCE_TYPES.ENRICHMENT,
       source_function: 'enrichCompany',
-      confidence: CONFIDENCE.MEDIUM,
+      confidence: FIELD_CONFIDENCE[apiField] || CONFIDENCE.LOW,
       review_status: REVIEW_STATUS.UNREVIEWED,
       updated_at: now,
       updated_by: userEmail || 'system',
       ...(previousSource ? { previous_source: previousSource } : {}),
+      ...(previousValue ? { previous_value: previousValue } : {}),
+      ...(evidenceUrl ? { evidence_url: evidenceUrl } : {}),
     };
   }
 
