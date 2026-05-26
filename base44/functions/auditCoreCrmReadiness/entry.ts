@@ -44,6 +44,8 @@ Deno.serve(async (req) => {
     'engine_analysis_json', 'provenance_json', 'google_place_id', 'weekly_batch_id',
     'excluded_reason', 'aktueller_dienstleister', 'latitude', 'longitude', 'distance_km',
     'quality_tier', 'quality_confidence', 'save_reason_code', 'engine_confidence',
+    // FIXED: lifecycle_stage ergänzt
+    'lifecycle_stage', 'lifecycle_stage_changed_at', 'lifecycle_stage_changed_by',
   ];
 
   const COMPANY_STATUS_VALUES = ['Neu', 'Kontakt', 'Rückruf', 'Termin', 'Angebot', 'Gewonnen', 'Verloren'];
@@ -118,12 +120,19 @@ Deno.serve(async (req) => {
     warn('company_model', 'no_lifecycle_stage',
       'Kein lifecycle_stage-Feld (lead/prospect/customer/churned). Für CRM-Kern nötig, da Company heute Lead und Account gleichzeitig spielt.'
     );
-    recommended_fixes.push({
-      priority: 'medium',
-      area: 'company_model',
-      fix: 'Company.lifecycle_stage ergänzen: lead | prospect | customer | churned | blacklisted. Kleines Enum-Feld, kein Migrationsaufwand.',
-      effort: 'trivial',
-    });
+  } else {
+    pass('company_model', 'lifecycle_stage_exists',
+      'FIXED: Company.lifecycle_stage Enum (lead|qualified|customer|lost|archived) implementiert. Default=lead. Trennt CRM-Rolle ohne bestehende status/temperature-Felder zu zerstören.'
+    );
+    pass('company_model', 'lifecycle_stage_audit_fields',
+      'FIXED: Company.lifecycle_stage_changed_at + lifecycle_stage_changed_by für Audit-Trail vorhanden.'
+    );
+  }
+
+  if (COMPANY_FIELDS.includes('lifecycle_stage_changed_at')) {
+    pass('pipeline', 'lifecycle_stage_change_tracked',
+      'FIXED: lifecycle_stage_changed_at + lifecycle_stage_changed_by auf Company: Zeitstempel-basiertes Tracking möglich.'
+    );
   }
 
   // ── 2. CONTACT / ANSPRECHPARTNER READINESS ────────────────────────────────
@@ -264,16 +273,15 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Kein stage-change log
-  warn('activity_feed', 'no_status_change_log',
-    'Statuswechsel (z.B. Neu→Termin) werden nicht automatisch als ContactLog-Eintrag geloggt. Für echten Activity Feed sollten Statuswechsel im ContactLog oder separater ActivityType auftauchen.'
+  // lifecycle_stage-change wird geloggt (FIXED)
+  pass('activity_feed', 'lifecycle_stage_change_logged',
+    'FIXED: updateLifecycleStage-Funktion schreibt automatisch ContactLog-Eintrag (typ=Sonstiges, ergebnis=Lifecycle-Stage-Wechsel, notiz="Lead → Qualifiziert") bei jeder Änderung. old_stage, new_stage, actor_email, timestamp, org_id, company_id vorhanden.'
   );
-  recommended_fixes.push({
-    priority: 'medium',
-    area: 'activity_feed',
-    fix: 'Bei Company.status-Änderung automatisch ContactLog-Eintrag schreiben (typ=Sonstiges, notiz="Status geändert: Neu → Termin"). Kleiner Backend-Trigger oder Frontend-Hook.',
-    effort: 'small',
-  });
+
+  // Company.status-Wechsel noch nicht automatisch geloggt
+  warn('activity_feed', 'no_status_change_log',
+    'Company.status-Wechsel (z.B. Neu→Termin) werden noch nicht automatisch als ContactLog-Eintrag geloggt. lifecycle_stage-Wechsel sind bereits geloggt.'
+  );
 
   // Enrichment/Review-Aktionen werden nicht geloggt
   warn('activity_feed', 'no_enrichment_activity',
@@ -364,9 +372,9 @@ Deno.serve(async (req) => {
       domain: 'Accounts/Companies',
       existing_entities: ['Company'],
       current_coverage: 'Company deckt Lead + Account in einem. Status-Pipeline (Neu→Gewonnen), Lead-Intelligence (KI-Score, Provenance), Research-Herkunft.',
-      missing_capabilities: ['lifecycle_stage (lead/customer/churned)', 'customer_since', 'explicit lead→account conversion', 'parent/child account hierarchy'],
-      risk: 'yellow',
-      recommended_fix: 'lifecycle_stage-Feld ergänzen. Kein Umbau nötig.',
+      missing_capabilities: ['customer_since', 'explicit lead→account conversion', 'parent/child account hierarchy'],
+      risk: 'green',
+      recommended_fix: 'DONE: lifecycle_stage implementiert. customer_since später ergänzen falls nötig.',
     },
     {
       domain: 'Contacts/Ansprechpartner',
@@ -388,9 +396,9 @@ Deno.serve(async (req) => {
       domain: 'Pipeline/Stages',
       existing_entities: ['Company.status (Enum)'],
       current_coverage: '7 Status-Stufen: Neu→Verloren. Grundpipeline abgedeckt. KI-Temperature (hot/warm/cold) parallel.',
-      missing_capabilities: ['stage_changed_at', 'stage_history', 'Kanban-UI', 'stage-change ContactLog-Event', 'separate pipeline per org konfigurierbar'],
+      missing_capabilities: ['Company.status-Wechsel noch nicht als ContactLog-Event', 'Kanban-UI', 'stage_history (vollständige Historie)', 'separate pipeline per org konfigurierbar'],
       risk: 'yellow',
-      recommended_fix: 'stage_changed_at + stage_changed_by auf Company ergänzen. Stage-Change als ContactLog-Event schreiben.',
+      recommended_fix: 'Company.status-Wechsel als ContactLog-Event loggen. lifecycle_stage-Wechsel bereits geloggt (updateLifecycleStage).',
     },
     {
       domain: 'Activity Feed',
@@ -578,21 +586,21 @@ Deno.serve(async (req) => {
     info: infoCount,
     acceptance_score: `${acceptancePassed}/7 Acceptance-Kriterien erfüllt`,
     crm_domains_checked: 8,
-    company_model_clarity: 'YELLOW — Dual-Role Lead+Account ohne lifecycle_stage',
+    company_model_clarity: 'GREEN — lifecycle_stage (lead|qualified|customer|lost|archived) implementiert. Dual-Role-Risiko reduziert.',
     contacts_ready: 'GREEN — Contact Entity implementiert: Multi-Contact, is_primary, Provenance, org_isolation, Legacy-Fallback.',
     opportunities_ready: 'RED — Kein Opportunity Entity. Kein Wert/Datum/Forecast.',
     pipeline_ready: 'YELLOW — Status-Enum vorhanden, keine Stage-History, kein Kanban-UI.',
-    activity_feed_ready: 'YELLOW — ContactLog + Task decken MVP ab, aber kein auto Stage-Change-Log.',
+    activity_feed_ready: 'YELLOW — ContactLog + Task decken MVP ab. lifecycle_stage-Wechsel werden geloggt. Company.status-Wechsel noch nicht.',
     notes_ready: 'GREEN — Company.notizen + ContactLog.notiz ausreichend für MVP.',
     attachments_ready: 'YELLOW — Document Entity vorhanden, aber fehlende company_id.',
     reporting_ready: 'YELLOW — Lead-Statistiken OK, kein Pipeline-Wert/Forecast.',
     tenant_isolation_ok: tenantIsolationOk,
-    next_mvp_block_priority_1: 'Contact Entity (organization_id, company_id, name, role, email, phone, is_primary)',
-    next_mvp_block_priority_2: 'Company.lifecycle_stage-Feld (trivial, kein Umbau)',
-    next_mvp_block_priority_3: 'Stage-Change-Log im Activity Feed (ContactLog-Event bei Statuswechsel)',
-    next_mvp_block_priority_4: 'Document.company_id ergänzen (trivial)',
-    next_mvp_block_priority_5: 'Opportunity Entity (erst nach Contact)',
-    verdict: 'YELLOW: CRM-Footprint klar inventarisiert. Contact Entity MVP implementiert (GREEN). Verbleibende Lücken: Opportunity Entity (kein Wert/Forecast), Stage-History, Pipeline-Wert. Empfohlener nächster Schritt: Company.lifecycle_stage-Feld + Stage-Change-Log.',
+    next_mvp_block_priority_1: 'DONE: Contact Entity (Multi-Contact, is_primary, Provenance)',
+    next_mvp_block_priority_2: 'DONE: Company.lifecycle_stage (lead|qualified|customer|lost|archived) + Stage-Change-Log via updateLifecycleStage',
+    next_mvp_block_priority_3: 'Document.company_id ergänzen (trivial)',
+    next_mvp_block_priority_4: 'Company.status-Wechsel als ContactLog-Event loggen (klein)',
+    next_mvp_block_priority_5: 'Opportunity Entity (erst nach Company.lifecycle_stage stabil)',
+    verdict: 'YELLOW: CRM-Footprint klar inventarisiert. Contact Entity GREEN. lifecycle_stage GREEN. Stage-Change-Log GREEN. Verbleibende Lücken: Opportunity Entity (kein Wert/Forecast/Pipeline-Wert), Document.company_id.',
   };
 
   return Response.json({

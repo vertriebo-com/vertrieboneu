@@ -24,6 +24,7 @@ import moment from "moment";
 import { isHotLead, isWarmLead } from "@/utils/leadTemperature";
 import ProvenanceBadge from "../components/lead-detail/ProvenanceBadge";
 import { getFieldProvenance, parseProvenance } from "@/utils/provenance";
+import LifecycleStageBadge from "../components/lead-detail/LifecycleStageBadge";
 
 function temperatureBadge(company) {
   if (isHotLead(company)) return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">🔥 Heiß</span>;
@@ -294,6 +295,15 @@ export default function LeadDetail() {
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
                   <StatusBadge status={company.status} />
                   {temperatureBadge(company)}
+                  <LifecycleStageBadge
+                    company={company}
+                    organizationId={orgId}
+                    canEdit={canUseAdminActions}
+                    onChanged={(newStage) => {
+                      setCompany(prev => ({ ...prev, lifecycle_stage: newStage }));
+                      loadData();
+                    }}
+                  />
                 </div>
               </div>
             </div>

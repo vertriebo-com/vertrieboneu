@@ -88,6 +88,28 @@
       ],
       "default": "Neu"
     },
+    "lifecycle_stage": {
+      "type": "string",
+      "title": "Lifecycle Stage (CRM-Rolle)",
+      "enum": [
+        "lead",
+        "qualified",
+        "customer",
+        "lost",
+        "archived"
+      ],
+      "default": "lead",
+      "description": "Trennt die grunds\u00e4tzliche CRM-Rolle: lead = noch kein Kontakt/qualifiziert, qualified = qualifizierter Lead im Sales-Prozess, customer = gewonnener Kunde, lost = verloren/abgebrochen, archived = inaktiv/archiviert. Erg\u00e4nzt status (Prozesspipeline) und lead_temperature (KI-Score) ohne diese zu ersetzen."
+    },
+    "lifecycle_stage_changed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Lifecycle Stage ge\u00e4ndert am"
+    },
+    "lifecycle_stage_changed_by": {
+      "type": "string",
+      "title": "Lifecycle Stage ge\u00e4ndert von (E-Mail)"
+    },
     "notizen": {
       "type": "string",
       "title": "Notizen"
