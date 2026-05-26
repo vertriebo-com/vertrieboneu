@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { useLeadsFilter } from "../hooks/useLeadsFilter";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft, ChevronRight, Calendar, Plus,
-  Phone, Clock, Building2, CheckCircle2, X,
-  AlertCircle, ListTodo, Flame
+  Clock, Building2, CheckCircle2, X,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import moment from "moment";
@@ -186,17 +187,15 @@ function DayDetailSheet({ day, tasks, onClose, onToggle, onAddTask, isMobile }) 
 }
 
 export default function CalendarView() {
-  const { user, filterCompanies, loading: filterLoading, org } = useLeadsFilter();
+  const { user, loading: filterLoading, org } = useLeadsFilter();
   const orgId = org?.id || null;
-  const [companies, setCompanies]   = useState([]);
-  const [tasks, setTasks]           = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const queryClient = useQueryClient();
 
-  const [view, setView]             = useState("week");
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [view, setView]               = useState("week");
+  const [weekOffset, setWeekOffset]   = useState(0);
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDay, setSelectedDay] = useState(null);
-  const [isMobile, setIsMobile]     = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile]       = useState(window.innerWidth < 768);
 
   // New task dialog
   const [showAddTask, setShowAddTask] = useState(false);
@@ -208,42 +207,77 @@ export default function CalendarView() {
     return () => window.removeEventListener("resize", handler);
   }, []);
 
-  const loadData = useCallback(async () => {
-    if (!orgId) { setLoading(false); return; }
-    const [comps, t] = await Promise.all([
-      base44.entities.Company.filter({ organization_id: orgId }, "-created_date", 500),
-      base44.entities.Task.filter({ organization_id: orgId }, "-faellig_am", 300),
-    ]);
-    setCompanies(comps);
-    setTasks(t);
-    setLoading(false);
-  }, [orgId]);
+  // ── Sichtbaren Datumsbereich berechnen ───────────────────────────────────────
+  const startOfWeek   = moment().startOf("isoWeek").add(weekOffset, "weeks");
+  const currentMonth  = moment().startOf("month").add(monthOffset, "months");
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Lade-Bereich: für Woche ±1 Woche, für Monat ±1 Monat (Buffer für smooth navigation)
+  const dateFrom = useMemo(() => {
+    if (view === "week") return startOfWeek.clone().subtract(1, "week").toISOString();
+    return currentMonth.clone().subtract(1, "month").startOf("isoWeek").toISOString();
+  }, [view, weekOffset, monthOffset]);
 
+  const dateTo = useMemo(() => {
+    if (view === "week") return startOfWeek.clone().add(2, "weeks").endOf("isoWeek").toISOString();
+    return currentMonth.clone().add(1, "month").endOf("month").endOf("isoWeek").toISOString();
+  }, [view, weekOffset, monthOffset]);
+
+  // ── React Query: listTasks mit date-range ────────────────────────────────────
+  const { data: tasksResult, isLoading: tasksLoading, refetch } = useQuery({
+    queryKey: ["calendar-tasks", orgId, dateFrom, dateTo],
+    queryFn: async () => {
+      const res = await base44.functions.invoke("listTasks", {
+        org_id: orgId,
+        page: 1,
+        page_size: 100,
+        date_from: dateFrom,
+        date_to: dateTo,
+        status: "all",
+      });
+      return res?.data || { tasks: [] };
+    },
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+
+  const tasks = tasksResult?.tasks || [];
+
+  // ── Optimistic Toggle mit Org-Guard ──────────────────────────────────────────
   const handleToggleTask = async (task) => {
-    // Guard: Task muss zur aktiven Org gehören
     if (task.organization_id && task.organization_id !== orgId) {
       toast.error("Org-Kontext stimmt nicht überein – Aktion abgebrochen");
       return;
     }
     const updated = { erledigt: !task.erledigt };
     await base44.entities.Task.update(task.id, updated);
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...updated } : t));
+    // Optimistic update im Query-Cache
+    queryClient.setQueryData(["calendar-tasks", orgId, dateFrom, dateTo], (old) => {
+      if (!old) return old;
+      return { ...old, tasks: old.tasks.map(t => t.id === task.id ? { ...t, ...updated } : t) };
+    });
     toast.success(updated.erledigt ? "Aufgabe erledigt ✓" : "Aufgabe wieder geöffnet");
   };
 
   const myTasks = user?.role === "admin" ? tasks : tasks.filter(t => t.assigned_to === user?.email);
 
-  const getTasksForDay = (day) => {
-    const ds = day.format("YYYY-MM-DD");
-    return myTasks.filter(t => t.faellig_am && moment(t.faellig_am).format("YYYY-MM-DD") === ds);
-  };
+  // useMemo: Tasks nach Tag indexieren (vermeidet O(n×35) Iteration pro Render)
+  const tasksByDay = useMemo(() => {
+    const map = {};
+    for (const t of myTasks) {
+      if (!t.faellig_am) continue;
+      const ds = moment(t.faellig_am).format("YYYY-MM-DD");
+      if (!map[ds]) map[ds] = [];
+      map[ds].push(t);
+    }
+    return map;
+  }, [myTasks]);
 
-  const startOfWeek = moment().startOf("isoWeek").add(weekOffset, "weeks");
-  const weekDays    = Array.from({ length: 7 }, (_, i) => startOfWeek.clone().add(i, "days"));
+  const getTasksForDay = useCallback((day) => {
+    return tasksByDay[day.format("YYYY-MM-DD")] || [];
+  }, [tasksByDay]);
 
-  const currentMonth     = moment().startOf("month").add(monthOffset, "months");
+  const weekDays = Array.from({ length: 7 }, (_, i) => startOfWeek.clone().add(i, "days"));
+
   const startOfMonthGrid = currentMonth.clone().startOf("isoWeek");
   const endOfMonthGrid   = currentMonth.clone().endOf("month").endOf("isoWeek");
   const monthDays = [];
@@ -255,12 +289,15 @@ export default function CalendarView() {
 
   const selectedDayTasks = selectedDay ? getTasksForDay(selectedDay) : [];
 
-  const totalOverdue = myTasks.filter(t =>
-    !t.erledigt && t.faellig_am && moment(t.faellig_am).isBefore(moment(), "day")
-  ).length;
+  const totalOverdue = useMemo(() =>
+    myTasks.filter(t => !t.erledigt && t.faellig_am && moment(t.faellig_am).isBefore(moment(), "day")).length,
+    [myTasks]
+  );
   const totalToday = getTasksForDay(moment()).length;
 
-  if (loading || filterLoading) {
+  const loading = tasksLoading || filterLoading;
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -493,7 +530,7 @@ export default function CalendarView() {
       <AddTaskDialog
         open={showAddTask}
         onClose={() => setShowAddTask(false)}
-        onCreated={loadData}
+        onCreated={() => refetch()}
         organizationId={orgId}
         initialData={addTaskDate ? { faellig_am: addTaskDate } : undefined}
       />

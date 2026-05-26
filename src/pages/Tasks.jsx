@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useOrganization } from "../hooks/useOrganization";
 import { usePullToRefresh } from "../hooks/usePullToRefresh";
 import {
-  ListTodo,
   CheckCircle2,
   Clock,
   AlertTriangle
@@ -15,48 +16,55 @@ import moment from "moment";
 import { toast } from "sonner";
 
 export default function Tasks() {
-  const [tasks, setTasks] = useState([]);
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { org, user, loading: orgLoading } = useOrganization();
+  const orgId = org?.id || null;
+  const queryClient = useQueryClient();
+
   const [filter, setFilter] = useState("offen");
+  const [page, setPage] = useState(1);
   const [pendingDone, setPendingDone] = useState(new Set());
+  const PAGE_SIZE = 50;
 
-  const loadData = async () => {
-    const me = await base44.auth.me();
-    setUser(me);
+  // Status-Mapping: UI-Filter → listTasks status
+  const statusMap = { offen: "open", erledigt: "done", ueberfaellig: "overdue", heute: "today", alle: "all" };
 
-    // Organisation ermitteln
-    let orgId = null;
-    const orgs = await base44.entities.Organization.filter({ owner_email: me.email });
-    let org = orgs?.[0] || null;
-    if (!org) {
-      const memberships = await base44.entities.OrganizationMember.filter({ user_email: me.email, status: "active" });
-      if (memberships?.[0]?.organization_id) {
-        const memberOrgs = await base44.entities.Organization.filter({ id: memberships[0].organization_id });
-        org = memberOrgs?.[0] || null;
-      }
-    }
-    orgId = org?.id || null;
+  const { data: result, isLoading: tasksLoading, refetch } = useQuery({
+    queryKey: ["tasks", orgId, page, PAGE_SIZE, filter],
+    queryFn: async () => {
+      const res = await base44.functions.invoke("listTasks", {
+        org_id: orgId,
+        page,
+        page_size: PAGE_SIZE,
+        status: statusMap[filter] || "all",
+        sort: { field: "prioritaet", direction: "asc" },
+      });
+      return res?.data || { tasks: [], total: 0, has_more: false };
+    },
+    enabled: !!orgId,
+    staleTime: 30_000,
+  });
 
-    const allTasks = orgId
-      ? await base44.entities.Task.filter({ organization_id: orgId }, "-created_date", 200)
-      : [];
-    setTasks(allTasks);
-    setLoading(false);
-  };
+  const tasks = result?.tasks || [];
+  const hasMore = result?.has_more || false;
+  const total = result?.total || 0;
 
-  const { containerRef, isRefreshing } = usePullToRefresh(loadData);
+  const refetchAll = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["tasks", orgId] });
+  }, [queryClient, orgId]);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const { containerRef, isRefreshing } = usePullToRefresh(refetchAll);
+
+  // Filter-Wechsel → zurück zu Seite 1
+  const handleFilterChange = (val) => { setFilter(val); setPage(1); };
 
   const toggleTask = async (task) => {
     const nowDone = !task.erledigt;
-    // Optimistic update
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, erledigt: nowDone } : t));
+    // Optimistic update im Cache
+    queryClient.setQueryData(["tasks", orgId, page, PAGE_SIZE, filter], (old) => {
+      if (!old) return old;
+      return { ...old, tasks: old.tasks.map(t => t.id === task.id ? { ...t, erledigt: nowDone } : t) };
+    });
     if (nowDone) {
-      // Keep visible briefly so user sees the strikethrough before it disappears
       setPendingDone(prev => new Set([...prev, task.id]));
       setTimeout(() => {
         setPendingDone(prev => { const n = new Set(prev); n.delete(task.id); return n; });
@@ -67,20 +75,15 @@ export default function Tasks() {
   };
 
   const isAdmin = user?.role === "admin";
+  // Für nicht-Admins: client-seitig eigene Tasks filtern (server kann assigned_to nicht kennen ohne extra param)
   const myTasks = isAdmin ? tasks : tasks.filter(t => t.assigned_to === user?.email);
 
   const filtered = myTasks.filter(t => {
     if (filter === "offen") return !t.erledigt || pendingDone.has(t.id);
-    if (filter === "erledigt") return t.erledigt;
-    if (filter === "ueberfaellig") return !t.erledigt && t.faellig_am && moment(t.faellig_am).isBefore(moment());
-    if (filter === "heute") return !t.erledigt && t.faellig_am && moment(t.faellig_am).isSame(moment(), "day");
-    return true;
-  }).sort((a, b) => {
-    // Priorität Hoch > Mittel > Niedrig, dann nach Fälligkeit
-    const prio = { Hoch: 0, Mittel: 1, Niedrig: 2 };
-    if (prio[a.prioritaet] !== prio[b.prioritaet]) return prio[a.prioritaet] - prio[b.prioritaet];
-    return new Date(a.faellig_am || "9999") - new Date(b.faellig_am || "9999");
+    return true; // Server hat bereits gefiltert
   });
+
+  const loading = orgLoading || (tasksLoading && tasks.length === 0);
 
   if (loading) {
     return (
@@ -89,9 +92,6 @@ export default function Tasks() {
       </div>
     );
   }
-
-  const openCount = myTasks.filter(t => !t.erledigt).length;
-  const overdueCount = myTasks.filter(t => !t.erledigt && t.faellig_am && moment(t.faellig_am).isBefore(moment())).length;
 
   return (
     <div className="space-y-5" ref={containerRef}>
@@ -105,10 +105,10 @@ export default function Tasks() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Aufgaben</h1>
           <p className="text-xs sm:text-sm font-medium text-slate-700 mt-1">
-            {openCount} offen{overdueCount > 0 && ` · ${overdueCount} überfällig`}
+            {total > 0 ? `${total} Aufgaben` : "Keine Aufgaben"}
           </p>
         </div>
-        <Select value={filter} onValueChange={setFilter}>
+        <Select value={filter} onValueChange={handleFilterChange}>
           <SelectTrigger className="w-full sm:w-44">
             <SelectValue />
           </SelectTrigger>
@@ -167,11 +167,23 @@ export default function Tasks() {
             </div>
           );
         })}
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !tasksLoading && (
           <div className="bg-white border border-[#E2E8F0] rounded-xl text-center py-16">
             <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <p className="text-sm font-semibold text-slate-900">Alle Aufgaben erledigt!</p>
             <p className="text-xs font-medium text-slate-700 mt-1">Keine ausstehenden Aufgaben</p>
+          </div>
+        )}
+
+        {hasMore && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={tasksLoading}
+              className="px-5 py-2.5 text-sm font-semibold text-blue-600 hover:text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 disabled:opacity-50"
+            >
+              {tasksLoading ? "Wird geladen…" : `Weitere ${PAGE_SIZE} laden`}
+            </button>
           </div>
         )}
       </div>
