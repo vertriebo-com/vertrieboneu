@@ -52,15 +52,24 @@ Deno.serve(async (req) => {
     const authz = await authorizeOrgAction(base44, org_id, user);
     if (!authz.allowed) return Response.json({ error: authz.error }, { status: authz.status || 403 });
 
-    // Company org-match prüfen
-    const companies = await base44.asServiceRole.entities.Company.filter({ id: company_id, organization_id: org_id });
-    if (!companies[0]) return Response.json({ error: 'Company nicht gefunden oder gehört nicht zu dieser Organisation.' }, { status: 404 });
-    const company = companies[0];
+    // Company org-match prüfen (mit ID-Format-Guard)
+    let company;
+    try {
+      const companies = await base44.asServiceRole.entities.Company.filter({ id: company_id, organization_id: org_id });
+      if (!companies[0]) return Response.json({ error: 'Company nicht gefunden oder gehört nicht zu dieser Organisation.' }, { status: 404 });
+      company = companies[0];
+    } catch {
+      return Response.json({ error: 'Company nicht gefunden oder gehört nicht zu dieser Organisation.' }, { status: 404 });
+    }
 
-    // Contact org/company-match prüfen (optional)
+    // Contact org/company-match prüfen (optional, mit ID-Format-Guard)
     if (primary_contact_id) {
-      const contacts = await base44.asServiceRole.entities.Contact.filter({ id: primary_contact_id, organization_id: org_id, company_id });
-      if (!contacts[0]) return Response.json({ error: 'Kontakt nicht gefunden oder gehört nicht zu dieser Company/Organisation.' }, { status: 404 });
+      try {
+        const contacts = await base44.asServiceRole.entities.Contact.filter({ id: primary_contact_id, organization_id: org_id, company_id });
+        if (!contacts[0]) return Response.json({ error: 'Kontakt nicht gefunden oder gehört nicht zu dieser Company/Organisation.' }, { status: 404 });
+      } catch {
+        return Response.json({ error: 'Kontakt nicht gefunden oder gehört nicht zu dieser Company/Organisation.' }, { status: 404 });
+      }
     }
 
     // Status aus stage ableiten
