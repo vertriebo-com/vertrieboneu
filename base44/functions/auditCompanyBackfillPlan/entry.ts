@@ -1,21 +1,156 @@
 /**
  * auditCompanyBackfillPlan
  * =========================
- * Erstellt einen Review-Report für backfillCompanyQualityAndLifecycle.
- * Zeigt welche Companies wie geändert würden – OHNE Daten zu ändern.
+ * Dry-run Audit für quality_tier / lifecycle_stage Backfill.
+ * Verwendet dieselbe Planungslogik wie backfillCompanyQualityAndLifecycle.
  *
- * Input: { org_id?, limit = 200, include_samples = true }
- * Output: { claim_status, risk_level, summary, quality_tier_plan, lifecycle_stage_plan, sample_changes, warnings, recommended_action }
- *
- * Sicherheitsregeln:
- * - dry_run only (keine Datenänderung)
- * - archived/blacklisted nicht aggressiv ändern
- * - Companies mit won Opportunity oder lifecycle=customer nicht auf lead setzen
- * - Companies mit lost status nicht auf lead setzen
- * - quality_tier nur aus vorhandenen Daten ableiten
- * - Wenn Daten unsicher: unknown oder nicht ändern
+ * *** SHARED PLANNING LOGIC – START ***
+ * Die Funktion buildCompanyBackfillPlan() ist in BEIDEN Functions
+ * (auditCompanyBackfillPlan UND backfillCompanyQualityAndLifecycle) identisch.
+ * Änderungen hier müssen dort übernommen werden und umgekehrt.
+ * *** SHARED PLANNING LOGIC – END ***
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHARED PLANNING LOGIC (identisch in backfillCompanyQualityAndLifecycle)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const VALID_QUALITY_TIERS   = ['premium', 'strong', 'good', 'weak'];
+const VALID_LIFECYCLE_STAGES = ['lead', 'qualified', 'customer', 'lost', 'archived'];
+
+function deriveQualityTier(company) {
+  // Primär: engine_analysis_json.quality_tier
+  const engineJson = company.engine_analysis_json;
+  if (engineJson) {
+    try {
+      const engine = typeof engineJson === 'string' ? JSON.parse(engineJson) : engineJson;
+      const tier = engine.quality_tier;
+      if (tier && VALID_QUALITY_TIERS.includes(tier)) {
+        return { tier, reason: `engine_json.quality_tier="${tier}"`, source: 'engine_json' };
+      }
+    } catch (_) { /* parse error – weiter mit Fallback */ }
+  }
+  // Fallback: bester verfügbarer Score
+  const score = company.relevance_score || company.engine_confidence || 0;
+  if (score >= 85) return { tier: 'premium', reason: `score ${score}>=85`, source: 'score' };
+  if (score >= 75) return { tier: 'strong',  reason: `score ${score}>=75`, source: 'score' };
+  if (score >= 65) return { tier: 'good',    reason: `score ${score}>=65`, source: 'score' };
+  if (score >  0)  return { tier: 'weak',    reason: `score ${score}<65`,  source: 'score' };
+  return { tier: null, reason: 'no data for quality_tier', source: 'none' };
+}
+
+function deriveLifecycleStage(company, wonOppCompanyIds) {
+  if (wonOppCompanyIds.has(company.id))   return { stage: 'customer', reason: 'won opportunity' };
+  if (company.status === 'Gewonnen')      return { stage: 'customer', reason: 'status=Gewonnen' };
+  if (company.status === 'Verloren')      return { stage: 'lost',     reason: 'status=Verloren' };
+  return { stage: 'lead', reason: 'default' };
+}
+
+/**
+ * Zentrale Planungsfunktion.
+ * Gibt exakt zurück was geändert werden soll – oder nicht.
+ * has_actual_update = true NUR wenn mindestens ein Feld wirklich geändert wird.
+ */
+function buildCompanyBackfillPlan(company, wonOppCompanyIds) {
+  const reasons = [];
+  const changes = {};
+
+  // Aktuelle Werte – KEIN Fallback-Default (null bleibt null)
+  const currentQT  = company.quality_tier    || null;
+  const currentLS  = company.lifecycle_stage || null;
+
+  // Skip: archived oder blacklisted
+  const isArchived    = currentLS === 'archived' || company.status === 'Archiviert';
+  const isBlacklisted = company.is_blacklisted === true;
+
+  if (isArchived || isBlacklisted) {
+    return {
+      company_id:        company.id,
+      company_name:      company.name,
+      current:           { quality_tier: currentQT, lifecycle_stage: currentLS },
+      proposed:          { quality_tier: currentQT, lifecycle_stage: currentLS },
+      changes:           {},
+      has_actual_update: false,
+      quality_changed:   false,
+      lifecycle_changed: false,
+      conflict:          false,
+      skip_reason:       isArchived ? 'archived' : 'blacklisted',
+      reasons:           [isArchived ? 'skip: archived' : 'skip: blacklisted'],
+      risk:              'low',
+    };
+  }
+
+  // ── quality_tier ──────────────────────────────────────────────────────────
+  const hasValidQT = currentQT !== null && VALID_QUALITY_TIERS.includes(currentQT);
+  let proposedQT = currentQT;
+  let qualityChanged = false;
+
+  if (!hasValidQT) {
+    const d = deriveQualityTier(company);
+    if (d.tier !== null && d.tier !== currentQT) {
+      proposedQT = d.tier;
+      changes.quality_tier = d.tier;
+      qualityChanged = true;
+      reasons.push(`quality_tier: "${currentQT}" → "${d.tier}" (${d.reason})`);
+    } else if (d.tier !== null) {
+      reasons.push(`quality_tier: already "${currentQT}" – no change`);
+    } else {
+      reasons.push(`quality_tier: not derivable – ${d.reason}`);
+    }
+  } else {
+    reasons.push(`quality_tier: valid "${currentQT}" – no change`);
+  }
+
+  // ── lifecycle_stage ───────────────────────────────────────────────────────
+  const hasValidLS = currentLS !== null && VALID_LIFECYCLE_STAGES.includes(currentLS);
+  let proposedLS = currentLS;
+  let lifecycleChanged = false;
+  let conflict = false;
+
+  if (!hasValidLS) {
+    const d = deriveLifecycleStage(company, wonOppCompanyIds);
+
+    // Sicherheitsgate: customer/lost/archived NIEMALS überschreiben
+    if (currentLS === 'customer' || currentLS === 'lost' || currentLS === 'archived') {
+      conflict = true;
+      reasons.push(`lifecycle_stage: BLOCKED – "${currentLS}" → "${d.stage}" verboten`);
+    } else if (d.stage !== currentLS) {
+      proposedLS = d.stage;
+      changes.lifecycle_stage = d.stage;
+      lifecycleChanged = true;
+      reasons.push(`lifecycle_stage: "${currentLS}" → "${d.stage}" (${d.reason})`);
+    } else {
+      reasons.push(`lifecycle_stage: already "${currentLS}" – no change`);
+    }
+  } else {
+    reasons.push(`lifecycle_stage: valid "${currentLS}" – no change`);
+  }
+
+  // ── Risiko ────────────────────────────────────────────────────────────────
+  let risk = 'low';
+  if (conflict) risk = 'high';
+  else if (currentLS === 'customer' || currentLS === 'lost') risk = 'medium';
+
+  return {
+    company_id:        company.id,
+    company_name:      company.name,
+    current:           { quality_tier: currentQT, lifecycle_stage: currentLS },
+    proposed:          { quality_tier: proposedQT, lifecycle_stage: proposedLS },
+    changes,
+    has_actual_update: qualityChanged || lifecycleChanged,
+    quality_changed:   qualityChanged,
+    lifecycle_changed: lifecycleChanged,
+    conflict,
+    skip_reason:       null,
+    reasons,
+    risk,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HTTP HANDLER
+// ═══════════════════════════════════════════════════════════════════════════
 
 Deno.serve(async (req) => {
   try {
@@ -25,7 +160,7 @@ Deno.serve(async (req) => {
 
     const isPlatformAdmin = ["admin", "platform_owner", "platform_admin", "support_agent", "readonly_support"].includes(user.role);
     const body = await req.json().catch(() => ({}));
-    const { org_id, limit = 200, include_samples = true } = body;
+    const { org_id, include_samples = true } = body;
 
     // ── Org auflösen ──────────────────────────────────────────────────────────
     let org = null;
@@ -48,344 +183,96 @@ Deno.serve(async (req) => {
 
     const orgId = org.id;
     const now = new Date();
-    const PAGE_SIZE = 100;
+    const PAGE_SIZE = 500;
 
-    // ── Companies laden (paginiert, org-scoped) ───────────────────────────────
+    // ── Companies laden (vollständig, paginiert) ──────────────────────────────
     const allCompanies = [];
-    for (let skip = 0; skip < limit && skip < 2000; skip += PAGE_SIZE) {
-      const batchSize = Math.min(PAGE_SIZE, limit - skip);
+    for (let skip = 0; skip < 10000; skip += PAGE_SIZE) {
       const batch = await base44.asServiceRole.entities.Company.filter(
-        { organization_id: orgId }, '-created_date', batchSize, skip
-      );
-      for (const c of batch) allCompanies.push(c);
-      if (batch.length < batchSize) break;
-    }
-
-    // ── Opportunities laden (für customer/won Konflikte) ──────────────────────
-    const allOpportunities = [];
-    for (let skip = 0; skip < 5000; skip += PAGE_SIZE) {
-      const batch = await base44.asServiceRole.entities.Opportunity.filter(
         { organization_id: orgId }, '-created_date', PAGE_SIZE, skip
       );
-      for (const o of batch) allOpportunities.push(o);
+      for (const c of batch) allCompanies.push(c);
       if (batch.length < PAGE_SIZE) break;
     }
 
-    // Company-IDs mit won Opportunities
-    const wonOppCompanyIds = new Set(
-      allOpportunities.filter(o => o.status === 'won').map(o => o.company_id)
-    );
-
-    // ── Analyse pro Company ───────────────────────────────────────────────────
-    // Präzise Zählung: field_missing vs inferred vs actual_update
-    const qualityTierAnalysis = {
-      field_missing_count: 0,        // quality_tier Feld fehlt wirklich
-      inferred_available_count: 0,   // quality_tier aus engine_analysis_json ableitbar
-      actual_update_count: 0,        // Companies die wirklich geändert würden
-      no_change_count: 0,            // Companies ohne Änderung
-    };
-    
-    const lifecycleStageAnalysis = {
-      field_missing_count: 0,        // lifecycle_stage Feld fehlt
-      actual_update_count: 0,        // Companies die wirklich geändert würden
-      no_change_count: 0,            // Companies ohne Änderung
-    };
-
-    // Detailierte Pläne für Report
-    const qualityTierPlan = { premium: 0, strong: 0, good: 0, weak: 0, unknown: 0, no_change: 0 };
-    const lifecycleStagePlan = { lead: 0, qualified: 0, customer: 0, lost: 0, archived: 0, no_change: 0 };
-    
-    const sampleChanges = [];
-    const warnings = [];
-    
-    let excludedArchived = 0;
-    let excludedBlacklisted = 0;
-    let potentialCustomerConflicts = 0;
-    let safeToApply = true;
-
-    for (const company of allCompanies) {
-      const currentQualityTier = company.quality_tier || null;
-      const currentLifecycleStage = company.lifecycle_stage || 'lead';
-      
-      const isArchived = company.lifecycle_stage === 'archived' || company.status === 'Archiviert';
-      const isBlacklisted = company.is_blacklisted === true;
-      const isLost = company.lifecycle_stage === 'lost' || company.status === 'Verloren';
-      const isCustomer = company.lifecycle_stage === 'customer' || company.status === 'Gewonnen';
-      const hasWonOpp = wonOppCompanyIds.has(company.id);
-
-      // Archivierte/blacklisted zählen aber nicht aggressiv ändern
-      if (isArchived) {
-        excludedArchived++;
-        qualityTierAnalysis.no_change_count++;
-        lifecycleStageAnalysis.no_change_count++;
-        qualityTierPlan.no_change++;
-        lifecycleStagePlan.no_change++;
-        continue;
-      }
-      if (isBlacklisted) {
-        excludedBlacklisted++;
-        qualityTierAnalysis.no_change_count++;
-        lifecycleStageAnalysis.no_change_count++;
-        qualityTierPlan.no_change++;
-        lifecycleStagePlan.no_change++;
-        continue;
-      }
-
-      // ── quality_tier analysieren ────────────────────────────────────────────
-      // Prüfen: Feld existiert bereits mit validem Wert?
-      const validQualityTiers = ['premium', 'strong', 'good', 'weak'];
-      const hasValidQualityTier = currentQualityTier && validQualityTiers.includes(currentQualityTier);
-      
-      let proposedQualityTier = currentQualityTier;
-      let qualityReason = '';
-      let willUpdateQuality = false;
-
-      if (!hasValidQualityTier) {
-        // Feld fehlt wirklich oder hat invaliden Wert
-        qualityTierAnalysis.field_missing_count++;
-        
-        // Aus engine_analysis_json oder relevance_score ableiten
-        const engineJson = company.engine_analysis_json;
-        const relevanceScore = company.relevance_score || 0;
-
-        if (engineJson) {
-          try {
-            const engine = typeof engineJson === 'string' ? JSON.parse(engineJson) : engineJson;
-            proposedQualityTier = engine.quality_tier || null;
-            if (proposedQualityTier && validQualityTiers.includes(proposedQualityTier)) {
-              qualityTierAnalysis.inferred_available_count++;
-              qualityReason = `from engine_analysis_json (${proposedQualityTier})`;
-              willUpdateQuality = true;
-            } else {
-              qualityReason = 'engine_analysis_json has no valid quality_tier';
-            }
-          } catch {
-            qualityReason = 'engine_analysis_json parse error';
-          }
-        } else if (relevanceScore >= 85) {
-          proposedQualityTier = 'strong';
-          qualityReason = `relevance_score ${relevanceScore} >= 85`;
-          willUpdateQuality = true;
-        } else if (relevanceScore >= 70) {
-          proposedQualityTier = 'good';
-          qualityReason = `relevance_score ${relevanceScore} >= 70`;
-          willUpdateQuality = true;
-        } else if (relevanceScore >= 50) {
-          proposedQualityTier = 'weak';
-          qualityReason = `relevance_score ${relevanceScore} >= 50`;
-          willUpdateQuality = true;
-        } else {
-          proposedQualityTier = 'unknown';
-          qualityReason = 'insufficient data for quality_tier';
-          willUpdateQuality = true;
-        }
-      } else {
-        // Feld existiert bereits mit validem Wert → kein Update nötig
-        qualityTierAnalysis.no_change_count++;
-      }
-
-      // ── lifecycle_stage analysieren ─────────────────────────────────────────
-      // Prüfen: Feld existiert bereits mit validem Wert?
-      const validLifecycleStages = ['lead', 'qualified', 'customer', 'lost', 'archived'];
-      const hasValidLifecycleStage = currentLifecycleStage && validLifecycleStages.includes(currentLifecycleStage);
-      
-      let proposedLifecycleStage = currentLifecycleStage;
-      let lifecycleReason = '';
-      let willUpdateLifecycle = false;
-
-      if (!hasValidLifecycleStage) {
-        // Feld fehlt wirklich oder hat invaliden Wert
-        lifecycleStageAnalysis.field_missing_count++;
-        
-        // Prüfen ob Company eigentlich customer oder lost sein sollte
-        if (hasWonOpp) {
-          // Company mit won Opportunity sollte customer sein
-          proposedLifecycleStage = 'customer';
-          lifecycleReason = 'has won opportunity → should be customer';
-          willUpdateLifecycle = true;
-          potentialCustomerConflicts++;
-          warnings.push({
-            type: 'lifecycle_conflict',
-            company_id: company.id,
-            company_name: company.name,
-            issue: 'Company hat won Opportunity aber lifecycle_stage nicht customer',
-            recommendation: 'Manuell prüfen: lifecycle_stage auf customer setzen oder Opportunity archivieren',
-            severity: 'high',
-          });
-          safeToApply = false;
-        } else if (isLost) {
-          // status=Verloren aber lifecycle!=lost
-          proposedLifecycleStage = 'lost';
-          lifecycleReason = 'status=Verloren → should be lost';
-          willUpdateLifecycle = true;
-        } else {
-          // Default: lead (Update nötig weil Feld fehlt)
-          proposedLifecycleStage = 'lead';
-          lifecycleReason = 'default value (field missing)';
-          willUpdateLifecycle = true;
-        }
-      } else if (currentLifecycleStage === 'customer') {
-        // Customer nicht auf lead zurücksetzen!
-        if (hasWonOpp) {
-          lifecycleReason = 'customer with won opportunity → keep as customer';
-        } else {
-          // Customer ohne won Opp → Warning aber nicht automatisch ändern
-          warnings.push({
-            type: 'customer_without_won_opp',
-            company_id: company.id,
-            company_name: company.name,
-            issue: 'Company lifecycle_stage=customer aber keine won Opportunity',
-            recommendation: 'Manuell prüfen: Customer-Status plausibel?',
-            severity: 'medium',
-          });
-          lifecycleReason = 'customer without won opportunity → manual review recommended';
-        }
-        lifecycleStageAnalysis.no_change_count++;
-      } else if (currentLifecycleStage === 'lost') {
-        // Lost nicht auf lead zurücksetzen!
-        lifecycleReason = 'lost → keep as lost (no downgrade to lead)';
-        lifecycleStageAnalysis.no_change_count++;
-      } else if (currentLifecycleStage === 'archived') {
-        lifecycleReason = 'archived → no change';
-        lifecycleStageAnalysis.no_change_count++;
-      } else if (currentLifecycleStage === 'qualified') {
-        lifecycleReason = 'qualified → keep as qualified';
-        lifecycleStageAnalysis.no_change_count++;
-      }
-
-      // ── Konflikte prüfen ────────────────────────────────────────────────────
-      // Customer/won nicht auf lead setzen
-      if (currentLifecycleStage === 'customer' && proposedLifecycleStage === 'lead') {
-        proposedLifecycleStage = 'customer';
-        lifecycleReason = 'PREVENTED: customer → lead (would overwrite historical truth)';
-        willUpdateLifecycle = false;
-        safeToApply = false;
-        warnings.push({
-          type: 'prevented_lifecycle_downgrade',
-          company_id: company.id,
-          company_name: company.name,
-          issue: 'Backfill würde customer auf lead setzen',
-          recommendation: 'Company manuell prüfen, nicht automatisch ändern',
-          severity: 'critical',
-        });
-      }
-
-      // Lost nicht auf lead setzen
-      if (currentLifecycleStage === 'lost' && proposedLifecycleStage === 'lead') {
-        proposedLifecycleStage = 'lost';
-        lifecycleReason = 'PREVENTED: lost → lead (would overwrite historical truth)';
-        willUpdateLifecycle = false;
-        safeToApply = false;
-        warnings.push({
-          type: 'prevented_lifecycle_downgrade',
-          company_id: company.id,
-          company_name: company.name,
-          issue: 'Backfill würde lost auf lead setzen',
-          recommendation: 'Company manuell prüfen, nicht automatisch ändern',
-          severity: 'critical',
-        });
-      }
-
-      // ── Zählen: actual updates vs no change ─────────────────────────────────
-      if (willUpdateQuality && proposedQualityTier) {
-        qualityTierAnalysis.actual_update_count++;
-        qualityTierPlan[proposedQualityTier] = (qualityTierPlan[proposedQualityTier] || 0) + 1;
-      } else {
-        qualityTierAnalysis.no_change_count++;
-        qualityTierPlan.no_change++;
-      }
-
-      if (willUpdateLifecycle && proposedLifecycleStage) {
-        lifecycleStageAnalysis.actual_update_count++;
-        lifecycleStagePlan[proposedLifecycleStage] = (lifecycleStagePlan[proposedLifecycleStage] || 0) + 1;
-      } else {
-        lifecycleStageAnalysis.no_change_count++;
-        lifecycleStagePlan.no_change++;
-      }
-
-      // ── Samples: NUR echte Änderungen (no-change ausschließen) ──────────────
-      if (include_samples && (willUpdateQuality || willUpdateLifecycle)) {
-        if (sampleChanges.length < 20) {
-          sampleChanges.push({
-            company_id: company.id,
-            company_name: company.name,
-            current_quality_tier: currentQualityTier || 'unknown',
-            proposed_quality_tier: proposedQualityTier || 'unknown',
-            current_lifecycle_stage: currentLifecycleStage || 'lead',
-            proposed_lifecycle_stage: proposedLifecycleStage || 'lead',
-            quality_reason: qualityReason,
-            lifecycle_reason: lifecycleReason,
-            risk: (currentLifecycleStage === 'customer' || currentLifecycleStage === 'lost') ? 'high' : 
-                  (isArchived || isBlacklisted) ? 'medium' : 'low',
-          });
-        }
-      }
+    // ── Opportunities (won) für lifecycle Konflikt-Check ─────────────────────
+    const wonOppCompanyIds = new Set();
+    for (let skip = 0; skip < 5000; skip += PAGE_SIZE) {
+      const batch = await base44.asServiceRole.entities.Opportunity.filter(
+        { organization_id: orgId, status: 'won' }, '-created_date', PAGE_SIZE, skip
+      );
+      for (const o of batch) { if (o.company_id) wonOppCompanyIds.add(o.company_id); }
+      if (batch.length < PAGE_SIZE) break;
     }
+
+    // ── Plan berechnen ────────────────────────────────────────────────────────
+    const plans = allCompanies.map(c => buildCompanyBackfillPlan(c, wonOppCompanyIds));
+
+    // ── Aggregation ───────────────────────────────────────────────────────────
+    const skipped        = plans.filter(p => p.skip_reason !== null);
+    const active         = plans.filter(p => p.skip_reason === null);
+    const actualUpdates  = active.filter(p => p.has_actual_update);
+    const conflicts      = active.filter(p => p.conflict);
+    const noChange       = active.filter(p => !p.has_actual_update && !p.conflict);
+
+    const qualityUpdates   = active.filter(p => p.quality_changed);
+    const lifecycleUpdates = active.filter(p => p.lifecycle_changed);
+
+    const summary = {
+      companies_checked:            allCompanies.length,
+      skipped_archived_blacklisted: skipped.length,
+      active_checked:               active.length,
+      quality_tier_actual_updates:  qualityUpdates.length,
+      lifecycle_stage_actual_updates: lifecycleUpdates.length,
+      total_actual_updates:         actualUpdates.length,
+      conflicts:                    conflicts.length,
+      no_change:                    noChange.length,
+      won_opportunity_companies:    wonOppCompanyIds.size,
+    };
 
     // ── Risikobewertung ───────────────────────────────────────────────────────
-    const criticalWarnings = warnings.filter(w => w.severity === 'critical');
-    const highWarnings = warnings.filter(w => w.severity === 'high');
-
-    let riskLevel, claimStatus;
-
-    if (criticalWarnings.length > 0) {
-      riskLevel = 'critical';
-      claimStatus = 'red';
-    } else if (highWarnings.length > 0 || potentialCustomerConflicts > 0) {
-      riskLevel = 'high';
-      claimStatus = 'yellow';
-    } else if (!safeToApply) {
-      riskLevel = 'medium';
-      claimStatus = 'yellow';
-    } else {
-      riskLevel = 'low';
-      claimStatus = 'green';
+    let risk_level = 'low';
+    let claim_status = 'green';
+    if (conflicts.length > 0) {
+      risk_level = 'high';
+      claim_status = 'yellow';
     }
 
-    // ── Empfehlung ────────────────────────────────────────────────────────────
-    let recommendedAction;
-    if (claimStatus === 'red') {
-      recommendedAction = 'NICHT AUSFÜHREN. Kritische Konflikte manuell prüfen. Backfill nur für unproblematische Companies mit org_id-Filter und expliziter Freigabe.';
-    } else if (claimStatus === 'yellow') {
-      recommendedAction = 'Eingeschränkt ausführen. Nur für Companies ohne Konflikte (exclude: customer, lost, archived, blacklisted). Dry-run Report speichern und manuell freigeben.';
-    } else {
-      recommendedAction = 'Sicher ausführen. Keine kritischen Konflikte erkannt. Backfill kann mit dry_run=false durchgeführt werden.';
+    // ── Samples ───────────────────────────────────────────────────────────────
+    let sample_changes = [];
+    if (include_samples) {
+      sample_changes = actualUpdates.slice(0, 20).map(p => ({
+        company_id:           p.company_id,
+        company_name:         p.company_name,
+        current:              p.current,
+        proposed:             p.proposed,
+        changes:              p.changes,
+        reasons:              p.reasons,
+        risk:                 p.risk,
+      }));
     }
 
     return Response.json({
-      claim_status: claimStatus,
-      risk_level: riskLevel,
-      summary: {
-        companies_checked: allCompanies.length,
-        quality_tier_field_missing: qualityTierAnalysis.field_missing_count,
-        quality_tier_inferred_available: qualityTierAnalysis.inferred_available_count,
-        quality_tier_actual_updates: qualityTierAnalysis.actual_update_count,
-        quality_tier_no_change: qualityTierAnalysis.no_change_count,
-        lifecycle_stage_field_missing: lifecycleStageAnalysis.field_missing_count,
-        lifecycle_stage_actual_updates: lifecycleStageAnalysis.actual_update_count,
-        lifecycle_stage_no_change: lifecycleStageAnalysis.no_change_count,
-        excluded_archived: excludedArchived,
-        excluded_blacklisted: excludedBlacklisted,
-        potential_customer_conflicts: potentialCustomerConflicts,
-        safe_to_apply: safeToApply,
-      },
-      quality_tier_plan: qualityTierPlan,
-      lifecycle_stage_plan: lifecycleStagePlan,
-      sample_changes: sampleChanges,
-      warnings: warnings,
-      recommended_action: recommendedAction,
+      claim_status,
+      risk_level,
+      summary,
+      sample_changes,
+      conflict_details: conflicts.slice(0, 10).map(p => ({
+        company_id:   p.company_id,
+        company_name: p.company_name,
+        current:      p.current,
+        reasons:      p.reasons,
+      })),
       diagnostics: {
-        org_id: orgId,
-        generated_at: now.toISOString(),
-        limit_requested: limit,
+        org_id:         orgId,
+        generated_at:   now.toISOString(),
         companies_loaded: allCompanies.length,
-        opportunities_checked: allOpportunities.length,
-        won_opportunities_count: wonOppCompanyIds.size,
+        won_opp_ids_count: wonOppCompanyIds.size,
       },
     });
 
   } catch (error) {
-    console.error('[auditCompanyBackfillPlan] Error:', error?.message, error?.stack);
-    return Response.json({ error: error?.message || 'Unbekannter Fehler', success: false }, { status: 500 });
+    console.error('[auditCompanyBackfillPlan]', error?.message, error?.stack);
+    return Response.json({ error: error?.message || 'Unbekannter Fehler' }, { status: 500 });
   }
 });
