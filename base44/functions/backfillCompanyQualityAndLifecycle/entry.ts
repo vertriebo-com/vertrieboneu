@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 Deno.serve(async (req) => {
   try {
@@ -45,33 +45,52 @@ Deno.serve(async (req) => {
 
     for (const company of companies) {
       const changes = {};
+      let willUpdate = false;
 
-      // 1. QUALITY_TIER BACKFILL
-      if (!company.quality_tier) {
+      // 1. QUALITY_TIER BACKFILL – nur wenn Feld fehlt ODER invalid
+      const validQualityTiers = ['premium', 'strong', 'good', 'weak'];
+      const hasValidQualityTier = company.quality_tier && validQualityTiers.includes(company.quality_tier);
+      
+      if (!hasValidQualityTier) {
         // Aus relevance_score + engine_confidence ableiten
         const score = company.relevance_score || 0;
         const engineConf = company.engine_confidence || 0;
         const combinedScore = (score + engineConf) / 2;
 
-        if (combinedScore >= 85) changes.quality_tier = 'premium';
-        else if (combinedScore >= 75) changes.quality_tier = 'strong';
-        else if (combinedScore >= 65) changes.quality_tier = 'good';
-        else changes.quality_tier = 'weak';
+        let proposedTier;
+        if (combinedScore >= 85) proposedTier = 'premium';
+        else if (combinedScore >= 75) proposedTier = 'strong';
+        else if (combinedScore >= 65) proposedTier = 'good';
+        else proposedTier = 'weak';
 
-        stats.quality_tier_backfilled++;
+        // Nur ändern wenn neuer Wert anders ist als aktueller
+        if (proposedTier !== company.quality_tier) {
+          changes.quality_tier = proposedTier;
+          stats.quality_tier_backfilled++;
+          willUpdate = true;
+        }
       }
 
-      // 2. LIFECYCLE_STAGE BACKFILL
-      if (!company.lifecycle_stage) {
+      // 2. LIFECYCLE_STAGE BACKFILL – nur wenn Feld fehlt ODER invalid
+      const validLifecycleStages = ['lead', 'qualified', 'customer', 'lost', 'archived'];
+      const hasValidLifecycleStage = company.lifecycle_stage && validLifecycleStages.includes(company.lifecycle_stage);
+      
+      if (!hasValidLifecycleStage) {
         // Default: lead
-        changes.lifecycle_stage = 'lead';
-        changes.lifecycle_stage_changed_at = now.toISOString();
-        changes.lifecycle_stage_changed_by = user.email;
-        stats.lifecycle_backfilled++;
+        const proposedStage = 'lead';
+        
+        // Nur ändern wenn neuer Wert anders ist als aktueller
+        if (proposedStage !== company.lifecycle_stage) {
+          changes.lifecycle_stage = proposedStage;
+          changes.lifecycle_stage_changed_at = now.toISOString();
+          changes.lifecycle_stage_changed_by = user.email;
+          stats.lifecycle_backfilled++;
+          willUpdate = true;
+        }
       }
 
-      // UPDATE QUEUEN
-      if (Object.keys(changes).length > 0) {
+      // UPDATE QUEUEN – nur wenn echte Änderungen
+      if (willUpdate && Object.keys(changes).length > 0) {
         updates.push({
           company_id: company.id,
           company_name: company.name,

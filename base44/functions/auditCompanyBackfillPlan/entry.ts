@@ -77,14 +77,27 @@ Deno.serve(async (req) => {
     );
 
     // ── Analyse pro Company ───────────────────────────────────────────────────
+    // Präzise Zählung: field_missing vs inferred vs actual_update
+    const qualityTierAnalysis = {
+      field_missing_count: 0,        // quality_tier Feld fehlt wirklich
+      inferred_available_count: 0,   // quality_tier aus engine_analysis_json ableitbar
+      actual_update_count: 0,        // Companies die wirklich geändert würden
+      no_change_count: 0,            // Companies ohne Änderung
+    };
+    
+    const lifecycleStageAnalysis = {
+      field_missing_count: 0,        // lifecycle_stage Feld fehlt
+      actual_update_count: 0,        // Companies die wirklich geändert würden
+      no_change_count: 0,            // Companies ohne Änderung
+    };
+
+    // Detailierte Pläne für Report
     const qualityTierPlan = { premium: 0, strong: 0, good: 0, weak: 0, unknown: 0, no_change: 0 };
     const lifecycleStagePlan = { lead: 0, qualified: 0, customer: 0, lost: 0, archived: 0, no_change: 0 };
     
     const sampleChanges = [];
     const warnings = [];
     
-    let qualityTierMissing = 0;
-    let lifecycleStageMissing = 0;
     let excludedArchived = 0;
     let excludedBlacklisted = 0;
     let potentialCustomerConflicts = 0;
@@ -103,68 +116,99 @@ Deno.serve(async (req) => {
       // Archivierte/blacklisted zählen aber nicht aggressiv ändern
       if (isArchived) {
         excludedArchived++;
-        lifecycleStagePlan.no_change++;
+        qualityTierAnalysis.no_change_count++;
+        lifecycleStageAnalysis.no_change_count++;
         qualityTierPlan.no_change++;
+        lifecycleStagePlan.no_change++;
         continue;
       }
       if (isBlacklisted) {
         excludedBlacklisted++;
-        lifecycleStagePlan.no_change++;
+        qualityTierAnalysis.no_change_count++;
+        lifecycleStageAnalysis.no_change_count++;
         qualityTierPlan.no_change++;
+        lifecycleStagePlan.no_change++;
         continue;
       }
 
-      // ── quality_tier ableiten ───────────────────────────────────────────────
+      // ── quality_tier analysieren ────────────────────────────────────────────
+      // Prüfen: Feld existiert bereits mit validem Wert?
+      const validQualityTiers = ['premium', 'strong', 'good', 'weak'];
+      const hasValidQualityTier = currentQualityTier && validQualityTiers.includes(currentQualityTier);
+      
       let proposedQualityTier = currentQualityTier;
       let qualityReason = '';
+      let willUpdateQuality = false;
 
-      if (!currentQualityTier) {
-        qualityTierMissing++;
+      if (!hasValidQualityTier) {
+        // Feld fehlt wirklich oder hat invaliden Wert
+        qualityTierAnalysis.field_missing_count++;
+        
         // Aus engine_analysis_json oder relevance_score ableiten
         const engineJson = company.engine_analysis_json;
         const relevanceScore = company.relevance_score || 0;
-        const qualityConfidence = company.quality_confidence;
 
         if (engineJson) {
           try {
             const engine = typeof engineJson === 'string' ? JSON.parse(engineJson) : engineJson;
             proposedQualityTier = engine.quality_tier || null;
-            qualityReason = `from engine_analysis_json (${engine.quality_tier || 'unknown'})`;
+            if (proposedQualityTier && validQualityTiers.includes(proposedQualityTier)) {
+              qualityTierAnalysis.inferred_available_count++;
+              qualityReason = `from engine_analysis_json (${proposedQualityTier})`;
+              willUpdateQuality = true;
+            } else {
+              qualityReason = 'engine_analysis_json has no valid quality_tier';
+            }
           } catch {
-            proposedQualityTier = null;
             qualityReason = 'engine_analysis_json parse error';
           }
         } else if (relevanceScore >= 85) {
           proposedQualityTier = 'strong';
           qualityReason = `relevance_score ${relevanceScore} >= 85`;
+          willUpdateQuality = true;
         } else if (relevanceScore >= 70) {
           proposedQualityTier = 'good';
           qualityReason = `relevance_score ${relevanceScore} >= 70`;
+          willUpdateQuality = true;
         } else if (relevanceScore >= 50) {
           proposedQualityTier = 'weak';
           qualityReason = `relevance_score ${relevanceScore} >= 50`;
+          willUpdateQuality = true;
         } else {
           proposedQualityTier = 'unknown';
           qualityReason = 'insufficient data for quality_tier';
+          willUpdateQuality = true;
         }
+      } else {
+        // Feld existiert bereits mit validem Wert → kein Update nötig
+        qualityTierAnalysis.no_change_count++;
       }
 
-      // ── lifecycle_stage ableiten ────────────────────────────────────────────
+      // ── lifecycle_stage analysieren ─────────────────────────────────────────
+      // Prüfen: Feld existiert bereits mit validem Wert?
+      const validLifecycleStages = ['lead', 'qualified', 'customer', 'lost', 'archived'];
+      const hasValidLifecycleStage = currentLifecycleStage && validLifecycleStages.includes(currentLifecycleStage);
+      
       let proposedLifecycleStage = currentLifecycleStage;
       let lifecycleReason = '';
+      let willUpdateLifecycle = false;
 
-      if (currentLifecycleStage === 'lead' || !currentLifecycleStage) {
+      if (!hasValidLifecycleStage) {
+        // Feld fehlt wirklich oder hat invaliden Wert
+        lifecycleStageAnalysis.field_missing_count++;
+        
         // Prüfen ob Company eigentlich customer oder lost sein sollte
         if (hasWonOpp) {
-          // Company mit won Opportunity sollte customer sein, nicht lead
+          // Company mit won Opportunity sollte customer sein
           proposedLifecycleStage = 'customer';
           lifecycleReason = 'has won opportunity → should be customer';
+          willUpdateLifecycle = true;
           potentialCustomerConflicts++;
           warnings.push({
             type: 'lifecycle_conflict',
             company_id: company.id,
             company_name: company.name,
-            issue: 'Company hat won Opportunity aber lifecycle_stage=lead',
+            issue: 'Company hat won Opportunity aber lifecycle_stage nicht customer',
             recommendation: 'Manuell prüfen: lifecycle_stage auf customer setzen oder Opportunity archivieren',
             severity: 'high',
           });
@@ -173,10 +217,12 @@ Deno.serve(async (req) => {
           // status=Verloren aber lifecycle!=lost
           proposedLifecycleStage = 'lost';
           lifecycleReason = 'status=Verloren → should be lost';
+          willUpdateLifecycle = true;
         } else {
-          // Bleibt lead (keine Änderung nötig)
+          // Default: lead (Update nötig weil Feld fehlt)
           proposedLifecycleStage = 'lead';
-          lifecycleReason = 'no change needed';
+          lifecycleReason = 'default value (field missing)';
+          willUpdateLifecycle = true;
         }
       } else if (currentLifecycleStage === 'customer') {
         // Customer nicht auf lead zurücksetzen!
@@ -194,13 +240,17 @@ Deno.serve(async (req) => {
           });
           lifecycleReason = 'customer without won opportunity → manual review recommended';
         }
+        lifecycleStageAnalysis.no_change_count++;
       } else if (currentLifecycleStage === 'lost') {
         // Lost nicht auf lead zurücksetzen!
         lifecycleReason = 'lost → keep as lost (no downgrade to lead)';
+        lifecycleStageAnalysis.no_change_count++;
       } else if (currentLifecycleStage === 'archived') {
         lifecycleReason = 'archived → no change';
+        lifecycleStageAnalysis.no_change_count++;
       } else if (currentLifecycleStage === 'qualified') {
         lifecycleReason = 'qualified → keep as qualified';
+        lifecycleStageAnalysis.no_change_count++;
       }
 
       // ── Konflikte prüfen ────────────────────────────────────────────────────
@@ -208,6 +258,7 @@ Deno.serve(async (req) => {
       if (currentLifecycleStage === 'customer' && proposedLifecycleStage === 'lead') {
         proposedLifecycleStage = 'customer';
         lifecycleReason = 'PREVENTED: customer → lead (would overwrite historical truth)';
+        willUpdateLifecycle = false;
         safeToApply = false;
         warnings.push({
           type: 'prevented_lifecycle_downgrade',
@@ -223,6 +274,7 @@ Deno.serve(async (req) => {
       if (currentLifecycleStage === 'lost' && proposedLifecycleStage === 'lead') {
         proposedLifecycleStage = 'lost';
         lifecycleReason = 'PREVENTED: lost → lead (would overwrite historical truth)';
+        willUpdateLifecycle = false;
         safeToApply = false;
         warnings.push({
           type: 'prevented_lifecycle_downgrade',
@@ -234,21 +286,25 @@ Deno.serve(async (req) => {
         });
       }
 
-      // ── Zählen ──────────────────────────────────────────────────────────────
-      if (proposedQualityTier && proposedQualityTier !== currentQualityTier) {
+      // ── Zählen: actual updates vs no change ─────────────────────────────────
+      if (willUpdateQuality && proposedQualityTier) {
+        qualityTierAnalysis.actual_update_count++;
         qualityTierPlan[proposedQualityTier] = (qualityTierPlan[proposedQualityTier] || 0) + 1;
       } else {
+        qualityTierAnalysis.no_change_count++;
         qualityTierPlan.no_change++;
       }
 
-      if (proposedLifecycleStage && proposedLifecycleStage !== currentLifecycleStage) {
+      if (willUpdateLifecycle && proposedLifecycleStage) {
+        lifecycleStageAnalysis.actual_update_count++;
         lifecycleStagePlan[proposedLifecycleStage] = (lifecycleStagePlan[proposedLifecycleStage] || 0) + 1;
       } else {
+        lifecycleStageAnalysis.no_change_count++;
         lifecycleStagePlan.no_change++;
       }
 
-      // ── Samples (nur wenn include_samples) ──────────────────────────────────
-      if (include_samples && (proposedQualityTier !== currentQualityTier || proposedLifecycleStage !== currentLifecycleStage)) {
+      // ── Samples: NUR echte Änderungen (no-change ausschließen) ──────────────
+      if (include_samples && (willUpdateQuality || willUpdateLifecycle)) {
         if (sampleChanges.length < 20) {
           sampleChanges.push({
             company_id: company.id,
@@ -301,8 +357,13 @@ Deno.serve(async (req) => {
       risk_level: riskLevel,
       summary: {
         companies_checked: allCompanies.length,
-        quality_tier_missing: qualityTierMissing,
-        lifecycle_stage_missing: lifecycleStageMissing,
+        quality_tier_field_missing: qualityTierAnalysis.field_missing_count,
+        quality_tier_inferred_available: qualityTierAnalysis.inferred_available_count,
+        quality_tier_actual_updates: qualityTierAnalysis.actual_update_count,
+        quality_tier_no_change: qualityTierAnalysis.no_change_count,
+        lifecycle_stage_field_missing: lifecycleStageAnalysis.field_missing_count,
+        lifecycle_stage_actual_updates: lifecycleStageAnalysis.actual_update_count,
+        lifecycle_stage_no_change: lifecycleStageAnalysis.no_change_count,
         excluded_archived: excludedArchived,
         excluded_blacklisted: excludedBlacklisted,
         potential_customer_conflicts: potentialCustomerConflicts,
