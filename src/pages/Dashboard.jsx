@@ -20,6 +20,7 @@ import DailyActionList from "@/components/dashboard/DailyActionList";
 import DashboardPrimaryAction from "@/components/dashboard/DashboardPrimaryAction";
 import ActiveResearchBanner from "@/components/leads/ActiveResearchBanner";
 import TrialStatusBanner from "@/components/TrialStatusBanner";
+import ResearchObservabilityPanel from "@/components/research/ResearchObservabilityPanel";
 
 export default function Dashboard() {
   const { user: authUser, org: authOrg, loading: orgLoading } = useLeadsFilter();
@@ -217,6 +218,13 @@ export default function Dashboard() {
               </Button>
             </Link>
           </div>
+        </div>
+      )}
+
+      {/* Research Observability – letzte Recherchen (nur Owner/Admin, kompakt) */}
+      {activeOrg?.id && (authUser?.role === 'organization_admin' || authUser?.role === 'admin' || dashboardData?.user?.role === 'organization_admin') && (
+        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm p-4">
+          <ResearchObservabilityPanel orgId={activeOrg.id} />
         </div>
       )}
 
