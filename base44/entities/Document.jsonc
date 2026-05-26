@@ -6,6 +6,21 @@
       "type": "string",
       "title": "Organisation ID"
     },
+    "company_id": {
+      "type": "string",
+      "title": "Firma ID",
+      "description": "Optional: Zuordnung zu einer spezifischen Company/Lead. Wenn gesetzt, ist das Dokument ein Lead-spezifischer Anhang."
+    },
+    "contact_id": {
+      "type": "string",
+      "title": "Kontakt ID",
+      "description": "Optional: Zuordnung zu einem spezifischen Kontakt."
+    },
+    "opportunity_id": {
+      "type": "string",
+      "title": "Opportunity ID",
+      "description": "Optional: F\u00fcr sp\u00e4tere Opportunity-Zuordnung vorbereitet. Noch nicht aktiv."
+    },
     "titel": {
       "type": "string",
       "title": "Titel"
@@ -33,6 +48,32 @@
         "Sonstiges"
       ],
       "default": "Sonstiges"
+    },
+    "document_type": {
+      "type": "string",
+      "title": "Dokumenttyp",
+      "enum": [
+        "note",
+        "offer",
+        "contract",
+        "email_attachment",
+        "other"
+      ],
+      "default": "other",
+      "description": "Semantischer Typ f\u00fcr sp\u00e4tere Filterung/Verarbeitung."
+    },
+    "source_type": {
+      "type": "string",
+      "title": "Herkunft",
+      "enum": [
+        "manual",
+        "generated",
+        "import",
+        "email",
+        "unknown"
+      ],
+      "default": "manual",
+      "description": "Wie dieses Dokument erstellt wurde."
     }
   },
   "required": [

@@ -71,7 +71,9 @@ export default function Documents() {
       kategorie,
       file_url,
       dateiname: selectedFile.name,
-      organization_id: user.org?.id,
+      organization_id: orgId,
+      source_type: "manual",
+      document_type: "other",
     });
     toast.success("Dokument erfolgreich hochgeladen!");
     setTitel(""); setBeschreibung(""); setKategorie("Sonstiges"); setSelectedFile(null);

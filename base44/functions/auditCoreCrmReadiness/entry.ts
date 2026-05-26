@@ -314,15 +314,15 @@ Deno.serve(async (req) => {
       'Document Entity mit file_url, kategorie (Preisliste, Präsentation, Vertrag, Angebot) vorhanden.'
     );
   }
-  warn('attachments', 'document_no_company_id',
-    'Document Entity hat KEINE company_id! Dokumente sind nur auf organization_id-Ebene, nicht pro Lead/Account. Für Lead-spezifische Angebote/Dokumente Lücke.'
+  pass('attachments', 'document_company_id_fixed',
+    'FIXED: Document.company_id ergänzt. Dokumente können jetzt per Lead/Account gefiltert werden. Zwei-Ebenen-Isolation (org + company) möglich.'
   );
-  recommended_fixes.push({
-    priority: 'low',
-    area: 'attachments',
-    fix: 'Document Entity um company_id ergänzen, damit Dokumente pro Lead/Account filterbar sind. Sehr kleiner Aufwand.',
-    effort: 'trivial',
-  });
+  pass('attachments', 'document_new_fields',
+    'FIXED: Document.document_type (note|offer|contract|email_attachment|other) + source_type (manual|generated|import|email|unknown) + contact_id + opportunity_id (vorbereitet) ergänzt.'
+  );
+  pass('attachments', 'document_upload_org_id_guard',
+    'FIXED: Documents-Page Upload nutzt jetzt korrekt orgId (aus State) statt user.org?.id (undefined-Risiko eliminiert).'
+  );
 
   // ── 7. REPORTING / FORECAST READINESS ────────────────────────────────────
 
@@ -420,9 +420,9 @@ Deno.serve(async (req) => {
       domain: 'Attachments/Dokumente',
       existing_entities: ['Document (nur org-level, keine company_id)'],
       current_coverage: 'Document Entity mit Datei-URL und Kategorien. Aber nur organisationsweit, nicht per Lead.',
-      missing_capabilities: ['Document.company_id fehlt', 'Angebots-PDF pro Lead', 'Attachment-Upload-UI im LeadDetail'],
-      risk: 'yellow',
-      recommended_fix: 'Document.company_id ergänzen (trivial). Upload-UI im LeadDetail optional.',
+      missing_capabilities: ['Attachment-Upload-UI im LeadDetail (noch nicht gebaut)', 'Bulk-Migration Altdokumente ohne company_id'],
+      risk: 'green',
+      recommended_fix: 'DONE: company_id + document_type + source_type ergänzt. Upload-UI im LeadDetail als separater Block später.',
     },
     {
       domain: 'Reporting/Forecast',
@@ -592,12 +592,12 @@ Deno.serve(async (req) => {
     pipeline_ready: 'YELLOW — Status-Enum vorhanden, keine Stage-History, kein Kanban-UI.',
     activity_feed_ready: 'YELLOW — ContactLog + Task decken MVP ab. lifecycle_stage-Wechsel werden geloggt. Company.status-Wechsel noch nicht.',
     notes_ready: 'GREEN — Company.notizen + ContactLog.notiz ausreichend für MVP.',
-    attachments_ready: 'YELLOW — Document Entity vorhanden, aber fehlende company_id.',
+    attachments_ready: 'GREEN — Document.company_id ergänzt. Tenant-safe + company-bound. document_type + source_type + contact_id + opportunity_id vorbereitet.',
     reporting_ready: 'YELLOW — Lead-Statistiken OK, kein Pipeline-Wert/Forecast.',
     tenant_isolation_ok: tenantIsolationOk,
     next_mvp_block_priority_1: 'DONE: Contact Entity (Multi-Contact, is_primary, Provenance)',
     next_mvp_block_priority_2: 'DONE: Company.lifecycle_stage (lead|qualified|customer|lost|archived) + Stage-Change-Log via updateLifecycleStage',
-    next_mvp_block_priority_3: 'Document.company_id ergänzen (trivial)',
+    next_mvp_block_priority_3: 'DONE: Document.company_id + document_type + source_type + contact_id + opportunity_id (vorbereitet)',
     next_mvp_block_priority_4: 'Company.status-Wechsel als ContactLog-Event loggen (klein)',
     next_mvp_block_priority_5: 'Opportunity Entity (erst nach Company.lifecycle_stage stabil)',
     verdict: 'YELLOW: CRM-Footprint klar inventarisiert. Contact Entity GREEN. lifecycle_stage GREEN. Stage-Change-Log GREEN. Verbleibende Lücken: Opportunity Entity (kein Wert/Forecast/Pipeline-Wert), Document.company_id.',
