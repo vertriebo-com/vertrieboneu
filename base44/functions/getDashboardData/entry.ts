@@ -56,6 +56,11 @@ Deno.serve(async (req) => {
     const isOrgAdmin = isPlatformAdmin || isOrgOwner;
     const isAdmin = isOrgAdmin;
 
+    // Opportunities laden (top 100 für Dashboard-Metriken, org-scoped)
+    const allOpportunities = await base44.asServiceRole.entities.Opportunity.filter(
+      { organization_id: orgId }, '-created_date', 100
+    );
+
     // Blacklist laden für Filter
     const blacklist = await base44.entities.Blacklist.filter({ organization_id: orgId });
     const blacklistNames = blacklist.map(b => b.firmenname?.toLowerCase().trim());
@@ -75,6 +80,37 @@ Deno.serve(async (req) => {
     // Tasks laden
     const allTasks = await base44.entities.Task.filter({ organization_id: orgId }, "-faellig_am", 100);
     const tasks = isAdmin ? allTasks : allTasks.filter(t => t.assigned_to === user.email);
+
+    // ── CRM Pipeline Metriken ────────────────────────────────────────────────
+    const oppsOpen      = allOpportunities.filter(o => o.status === 'open');
+    const oppsWon       = allOpportunities.filter(o => o.status === 'won');
+    const oppsLost      = allOpportunities.filter(o => o.status === 'lost');
+    const pipelineValue = oppsOpen.reduce((s, o) => s + (o.value || 0), 0);
+    const weightedForecast = oppsOpen.reduce((s, o) =>
+      (o.value != null && o.probability != null) ? s + (o.value * o.probability / 100) : s, 0);
+    const nowTs2 = Date.now();
+    const overdueOpps = oppsOpen.filter(o => o.expected_close_date && new Date(o.expected_close_date).getTime() < nowTs2);
+
+    // Top 5 offene Opportunities (nächstes Close-Datum zuerst)
+    const nextBestOpportunities = [...oppsOpen]
+      .sort((a, b) => {
+        if (a.expected_close_date && b.expected_close_date)
+          return new Date(a.expected_close_date) - new Date(b.expected_close_date);
+        if (a.expected_close_date) return -1;
+        if (b.expected_close_date) return 1;
+        return (b.value || 0) - (a.value || 0);
+      })
+      .slice(0, 5)
+      .map(o => ({ id: o.id, title: o.title, company_id: o.company_id, stage: o.stage, value: o.value || 0, expected_close_date: o.expected_close_date || null }));
+
+    const crmPipeline = {
+      open_opportunities_count: oppsOpen.length,
+      pipeline_value: Math.round(pipelineValue * 100) / 100,
+      weighted_forecast: Math.round(weightedForecast * 100) / 100,
+      won_this_period: oppsWon.length,
+      lost_this_period: oppsLost.length,
+      overdue_opportunities_count: overdueOpps.length,
+    };
 
     // Dashboard-Statistiken serverseitig aggregieren
     const openTasks = tasks.filter(t => !t.erledigt);
@@ -485,7 +521,9 @@ Deno.serve(async (req) => {
         recentActivities,
         newLeadsFromResearch,
         actionableLeads: allActionItems,
+        nextBestOpportunities,
       },
+      crm_pipeline: crmPipeline,
       meta: {
         totalCompanies: allCompanies.length,
         totalTasks: tasks.length,

@@ -141,6 +141,7 @@ export default function Dashboard() {
   const org = dashboardData?.org || activeOrg;
 
   const pipelineStats = stats.pipelineStats || {};
+  const crmPipeline = dashboardData?.crm_pipeline || null;
   const hotLeads = data.hotLeads || [];
   const todayTasks = data.todayTasks || [];
   const overdueTasks = data.overdueTasks || [];
@@ -402,6 +403,47 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Opportunity Pipeline – nur wenn Daten vorhanden */}
+      {crmPipeline && crmPipeline.open_opportunities_count > 0 && (
+        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm">
+          <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-violet-500" />
+            <h2 className="text-sm font-semibold text-slate-900">Opportunity-Pipeline</h2>
+            {crmPipeline.overdue_opportunities_count > 0 && (
+              <span className="ml-auto text-xs bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded-full">
+                {crmPipeline.overdue_opportunities_count} überfällig
+              </span>
+            )}
+          </div>
+          <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-blue-700">{crmPipeline.open_opportunities_count}</p>
+              <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide mt-0.5">Offen</p>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-emerald-700">
+                {(crmPipeline.pipeline_value || 0) >= 1000
+                  ? `${((crmPipeline.pipeline_value) / 1000).toFixed(1)}k`
+                  : `${(crmPipeline.pipeline_value || 0).toFixed(0)}`}€
+              </p>
+              <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wide mt-0.5">Pipeline</p>
+            </div>
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-violet-700">
+                {(crmPipeline.weighted_forecast || 0) >= 1000
+                  ? `${((crmPipeline.weighted_forecast) / 1000).toFixed(1)}k`
+                  : `${(crmPipeline.weighted_forecast || 0).toFixed(0)}`}€
+              </p>
+              <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wide mt-0.5">Forecast</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-slate-700">{crmPipeline.won_this_period}</p>
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide mt-0.5">Gewonnen</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Learning Loop Box */}
       <LearningLoopBox learnedSignals={learnedSignals} />

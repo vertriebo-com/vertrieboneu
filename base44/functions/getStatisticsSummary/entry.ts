@@ -97,6 +97,16 @@ Deno.serve(async (req) => {
       if (batch.length < PAGE_SIZE) break;
     }
 
+    // Opportunities paginiert laden
+    const allOpportunities = [];
+    for (let skip = 0; skip < 5000; skip += PAGE_SIZE) {
+      const batch = await base44.asServiceRole.entities.Opportunity.filter(
+        { organization_id: orgId }, '-created_date', PAGE_SIZE, skip
+      );
+      for (const o of batch) allOpportunities.push(o);
+      if (batch.length < PAGE_SIZE) break;
+    }
+
     // ContactLogs + LeadOutcomes + Tasks paginiert laden
     const allContactLogs = [];
     for (let skip = 0; skip < 10000; skip += PAGE_SIZE) {
@@ -130,6 +140,51 @@ Deno.serve(async (req) => {
       if (c.is_hot === true) return 'hot';
       return 'unknown';
     };
+
+    // ── Opportunity-Aggregationen ─────────────────────────────────────────────
+    const oppsOpen     = allOpportunities.filter(o => o.status === 'open');
+    const oppsWon      = allOpportunities.filter(o => o.status === 'won');
+    const oppsLost     = allOpportunities.filter(o => o.status === 'lost');
+    const oppsArchived = allOpportunities.filter(o => o.status === 'archived');
+
+    const oppsByStage = {};
+    for (const o of oppsOpen) {
+      const s = o.stage || 'unknown';
+      oppsByStage[s] = (oppsByStage[s] || 0) + 1;
+    }
+    const oppsByStatus = {
+      open: oppsOpen.length,
+      won: oppsWon.length,
+      lost: oppsLost.length,
+      archived: oppsArchived.length,
+    };
+
+    const pipelineValue    = oppsOpen.reduce((s, o) => s + (o.value || 0), 0);
+    const weightedForecast = oppsOpen.reduce((s, o) => {
+      return (o.value != null && o.probability != null) ? s + (o.value * o.probability / 100) : s;
+    }, 0);
+    const wonValue  = oppsWon.reduce((s, o) => s + (o.value || 0), 0);
+    const lostValue = oppsLost.reduce((s, o) => s + (o.value || 0), 0);
+
+    const oppsWithValue = allOpportunities.filter(o => o.value != null && o.value > 0);
+    const avgDealValue = oppsWithValue.length > 0
+      ? oppsWithValue.reduce((s, o) => s + o.value, 0) / oppsWithValue.length
+      : 0;
+
+    const overdueOpen = oppsOpen.filter(o => o.expected_close_date && new Date(o.expected_close_date) < now);
+
+    // Conversion Rates
+    const totalComps = allCompanies.length;
+    const companiesWithOpp = new Set(allOpportunities.map(o => o.company_id)).size;
+    const companyToOppRate = totalComps > 0 ? Math.round(companiesWithOpp / totalComps * 1000) / 10 : 0;
+    const oppToWonRate = allOpportunities.length > 0
+      ? Math.round(oppsWon.length / allOpportunities.length * 1000) / 10
+      : 0;
+
+    // Opp By Stage chart data
+    const oppsByStageChart = Object.entries(oppsByStage)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
 
     // ── Lead-Aggregationen ────────────────────────────────────────────────────
     const totalCompanies = allCompanies.length;
@@ -276,6 +331,24 @@ Deno.serve(async (req) => {
 
     return Response.json({
       summary: {
+        // Opportunity-Kennzahlen
+        opportunities: {
+          total_count:          allOpportunities.length,
+          open_count:           oppsOpen.length,
+          won_count:            oppsWon.length,
+          lost_count:           oppsLost.length,
+          archived_count:       oppsArchived.length,
+          pipeline_value:       Math.round(pipelineValue * 100) / 100,
+          weighted_forecast:    Math.round(weightedForecast * 100) / 100,
+          won_value:            Math.round(wonValue * 100) / 100,
+          lost_value:           Math.round(lostValue * 100) / 100,
+          avg_deal_value:       Math.round(avgDealValue * 100) / 100,
+          overdue_open_count:   overdueOpen.length,
+          opportunities_by_stage:  oppsByStage,
+          opportunities_by_status: oppsByStatus,
+          company_to_opp_rate_pct: companyToOppRate,
+          opp_to_won_rate_pct:     oppToWonRate,
+        },
         // Lead-Zahlen
         total_companies:        totalCompanies,
         new_companies_period:   newInPeriod,
@@ -310,10 +383,11 @@ Deno.serve(async (req) => {
         outcome_conversion_rate: outcomeConversionRate,
       },
       charts: {
-        pipeline:          pipelineItems,
-        contact_types:     contactTypeData,
-        weekly_leads:      weeklyLeads,
-        weekly_contacts:   weeklyContacts,
+        pipeline:             pipelineItems,
+        opportunities_by_stage: oppsByStageChart,
+        contact_types:        contactTypeData,
+        weekly_leads:         weeklyLeads,
+        weekly_contacts:      weeklyContacts,
         outcome_breakdown: [
           { name: 'Gewonnen',       value: wonCount },
           { name: 'Relevant',       value: relevantCount },

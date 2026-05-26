@@ -68,6 +68,9 @@ export default function Statistics() {
   const relevantCount        = summary.relevant_count        || 0;
   const notRelevantCount     = summary.not_relevant_count    || 0;
 
+  const opps = summary.opportunities || {};
+  const oppsByStageChart = charts.opportunities_by_stage || [];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -116,6 +119,51 @@ export default function Statistics() {
           <p className="text-xs font-semibold text-blue-600 mt-0.5">Überfällige Aufgaben</p>
         </div>
       </div>
+
+      {/* Opportunity Pipeline Karten */}
+      {opps.total_count > 0 && (
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">Opportunity-Pipeline</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-blue-700">{opps.open_count || 0}</p>
+              <p className="text-xs font-semibold text-blue-600 mt-0.5">Offen</p>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-emerald-700">
+                {(opps.pipeline_value || 0) >= 1000
+                  ? `${((opps.pipeline_value || 0) / 1000).toFixed(1)}k`
+                  : `${(opps.pipeline_value || 0).toFixed(0)}`}€
+              </p>
+              <p className="text-xs font-semibold text-emerald-600 mt-0.5">Pipeline-Wert</p>
+            </div>
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-violet-700">
+                {(opps.weighted_forecast || 0) >= 1000
+                  ? `${((opps.weighted_forecast || 0) / 1000).toFixed(1)}k`
+                  : `${(opps.weighted_forecast || 0).toFixed(0)}`}€
+              </p>
+              <p className="text-xs font-semibold text-violet-600 mt-0.5">Forecast</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-slate-700">{opps.opp_to_won_rate_pct || 0}%</p>
+              <p className="text-xs font-semibold text-slate-600 mt-0.5">Won-Rate</p>
+            </div>
+          </div>
+          {oppsByStageChart.length > 0 && (
+            <div className="h-40">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={oppsByStageChart}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Charts: Pipeline + Kontaktarten */}
       <div className="grid lg:grid-cols-2 gap-6">

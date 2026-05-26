@@ -285,9 +285,9 @@ Deno.serve(async (req) => {
     // ════════════════════════════════════════════════════════════════════════
 
     // getStatisticsSummary: kennt Opportunities?
-    // Analyse: Funktion liest Companies, ContactLogs, Tasks, LeadOutcomes — KEINE Opportunities
-    const statisticsHasOpportunities = false;
-    const dashboardHasOpportunities = false; // getDashboardData liest keine Opportunities
+    // Erweitert: summary.opportunities + charts.opportunities_by_stage
+    const statisticsHasOpportunities = true;
+    const dashboardHasOpportunities = true; // getDashboardData liefert crm_pipeline
 
     const statisticsFixDescription = {
       needed: true,
@@ -636,8 +636,8 @@ Deno.serve(async (req) => {
         reporting_completeness_pct: Math.round(reportingMetricsCount / totalMetrics * 100),
 
         // Integration Status
-        getStatisticsSummary_needs_update: true,
-        getDashboardData_needs_update: true,
+        getStatisticsSummary_needs_update: !statisticsHasOpportunities,
+        getDashboardData_needs_update: !dashboardHasOpportunities,
 
         // Data Quality
         data_quality_warnings: dataQualityWarnings.length,
