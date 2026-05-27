@@ -379,6 +379,7 @@ Deno.serve(async (req) => {
       failed_tests: [],
       warnings: [],
       skipped: [],
+      industry_results: [],
     };
 
     // ── Test-Organisation ermitteln ─────────────────────────────────────────
