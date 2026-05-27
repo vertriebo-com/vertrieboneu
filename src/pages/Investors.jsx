@@ -85,16 +85,28 @@ export default function Investors() {
         .inv-grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
         .roadmap-line { position: relative; }
         .roadmap-line::before { content: ''; position: absolute; left: 15px; top: 32px; bottom: -8px; width: 1px; background: rgba(37,99,235,0.3); }
-        @media (max-width: 768px) {
-          .inv-grid-2 { grid-template-columns: 1fr !important; }
+        @media (max-width: 1024px) {
           .inv-grid-3 { grid-template-columns: 1fr 1fr !important; }
           .inv-grid-4 { grid-template-columns: repeat(2,1fr) !important; }
+        }
+        @media (max-width: 768px) {
+          .inv-grid-2 { grid-template-columns: 1fr !important; gap: 12px !important; }
+          .inv-grid-3 { grid-template-columns: 1fr !important; gap: 12px !important; }
+          .inv-grid-4 { grid-template-columns: 1fr !important; gap: 12px !important; }
           .hero-cta-group { flex-direction: column !important; }
           .hero-cta-group button, .hero-cta-group a { width: 100% !important; text-align: center !important; }
-          .section-pad { padding: 40px 16px !important; }
-          .card-pad { padding: 24px 16px !important; }
+          .section-pad { padding: 48px 16px !important; }
+          .card-pad { padding: 20px 16px !important; }
           .main-wrap { padding: 80px 16px 60px !important; }
-          .form-grid { grid-template-columns: 1fr !important; }
+          .form-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+          h1 { font-size: 28px !important; letter-spacing: -0.5px !important; }
+          h2 { font-size: 22px !important; letter-spacing: -0.5px !important; }
+          h3 { font-size: 16px !important; }
+          .section-pad > div > div:first-child { margin-bottom: 32px !important; }
+          [style*="padding: 36px 40px"] { padding: 24px 18px !important; }
+          [style*="padding: 32px 32px"] { padding: 20px 16px !important; }
+          [style*="padding: 24px 28px"] { padding: 16px 14px !important; }
+          [style*="padding: 28px"] { padding: 18px !important; }
         }
       `}</style>
 
@@ -540,11 +552,11 @@ export default function Investors() {
             </div>
             <div className="inv-grid-2">
               {[
-                { q: `\u201eIch verbringe täglich 2–3 Stunden damit, Firmenkontakte per Google zu suchen. Ein System das das automatisch erledigt – genau das fehlt mir.\u201c`, name: "Markus B.", role: "GF, Gebäudereinigung · Frankfurt" },
-                { q: `\u201eRückrufe vergessen, Leads die kalt werden – das kostet uns jeden Monat bares Geld. Vertriebo klingt wie die Lösung.\u201c`, name: "Sandra K.", role: "Vertriebsleiterin, IT-Service · München" },
+                { q: 'Ich verbringe täglich 2–3 Stunden damit, Firmenkontakte per Google zu suchen. Ein System das das automatisch erledigt – genau das fehlt mir.', name: "Markus B.", role: "GF, Gebäudereinigung · Frankfurt" },
+                { q: 'Rückrufe vergessen, Leads die kalt werden – das kostet uns jeden Monat bares Geld. Vertriebo klingt wie die Lösung.', name: "Sandra K.", role: "Vertriebsleiterin, IT-Service · München" },
               ].map(t => (
                 <div key={t.name} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 22 }}>
-                  <p style={{ fontSize: 13, color: "rgba(203,213,225,0.9)", lineHeight: 1.7, fontStyle: "italic", marginBottom: 14 }}>{t.q}</p>
+                  <p style={{ fontSize: 13, color: "rgba(203,213,225,0.9)", lineHeight: 1.7, fontStyle: "italic", marginBottom: 14 }}>„{t.q}"</p>
                   <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
                     <p style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{t.name}</p>
                     <p style={{ fontSize: 11, color: "rgba(100,116,139,1)" }}>{t.role}</p>
