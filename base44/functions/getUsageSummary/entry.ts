@@ -252,8 +252,10 @@ Deno.serve(async (req) => {
     }
 
     const isUnlimited = monthlyLimit === -1;
-    const monthlyRemaining = isUnlimited ? null : Math.max(0, monthlyLimit - monthlyUsed);
-    const isOverLimit = !isUnlimited && monthlyUsed >= monthlyLimit;
+    // monthly_remaining: 0 für unlimited (nie null – UI-Bars müssen immer eine Zahl bekommen)
+    const monthlyRemaining = isUnlimited ? 0 : Math.max(0, monthlyLimit - monthlyUsed);
+    const usagePercent = isUnlimited ? 0 : (monthlyLimit > 0 ? Math.round((monthlyUsed / monthlyLimit) * 100) : 0);
+    const isOverLimit = !isUnlimited && monthlyLimit > 0 && monthlyUsed >= monthlyLimit;
 
     // ── CRM-BESTAND ───────────────────────────────────────────────────────────
     const blacklist = await base44.entities.Blacklist.filter({ organization_id: orgId });
@@ -278,13 +280,14 @@ Deno.serve(async (req) => {
       period_month: periodMonth,
       plan_name: plan?.name || null,
       plan_status: planStatus,
-      monthly_limit: monthlyLimit,
-      monthly_used: monthlyUsed,
-      monthly_remaining: monthlyRemaining,
+      monthly_limit: monthlyLimit ?? 0,
+      monthly_used: monthlyUsed ?? 0,
+      monthly_remaining: monthlyRemaining ?? 0,
+      usage_percent: usagePercent,
       is_over_limit: isOverLimit,
       is_unlimited: isUnlimited,
       reset_date: resetDateFormatted,
-      crm_total: crmTotal,
+      crm_total: crmTotal ?? 0,
 
       // ── USAGE TRUTH POLICY (Phase 1) ─────────────────────────────────────
       usage_source_policy: {
@@ -355,12 +358,12 @@ Deno.serve(async (req) => {
       diagnostic_warnings: diagnosticWarnings,
 
       // ── WEITERE METRIKEN (aus UsageLog) ──────────────────────────────────
-      research_runs_used: researchRunsUsed,
-      ai_actions_used: usageLog?.ai_actions_used || 0,
-      manual_emails_logged: usageLog?.manual_emails_logged || 0,
-      max_research_runs: plan != null ? (plan.max_lead_generations_per_month ?? null) : null,
-      max_ai_actions: plan != null ? (plan.max_ai_scorings_per_month ?? null) : null,
-      max_emails_per_month: plan != null ? (plan.max_emails_per_month ?? null) : null,
+      research_runs_used: researchRunsUsed ?? 0,
+      ai_actions_used: usageLog?.ai_actions_used ?? 0,
+      manual_emails_logged: usageLog?.manual_emails_logged ?? 0,
+      max_research_runs: plan != null ? (plan.max_lead_generations_per_month ?? -1) : -1,
+      max_ai_actions: plan != null ? (plan.max_ai_scorings_per_month ?? 0) : 0,
+      max_emails_per_month: plan != null ? (plan.max_emails_per_month ?? 0) : 0,
 
       // Legacy-Feld für Abwärtskompatibilität (wird durch usage_source_policy ersetzt)
       explanation: {

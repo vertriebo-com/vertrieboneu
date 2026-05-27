@@ -94,18 +94,30 @@ Deno.serve(async (req) => {
       // getUsageSummary direkt simulieren (gleiche Logik wie die Funktion selbst)
       let summary = null;
       let summaryError = null;
+      let summarySkipped = false;
       try {
-        const res = await base44.functions.invoke('getUsageSummary', { org_id: orgId });
+        // Service-Role invoke: Audit läuft als Admin und muss alle Orgs prüfen können
+        const res = await base44.asServiceRole.functions.invoke('getUsageSummary', { org_id: orgId });
         summary = res?.data?.usage_summary || res?.usage_summary || null;
       } catch (e) {
         summaryError = e.message;
+        // 403 / 404 = Org nicht erreichbar → skip, kein echter UI-Fehler
+        if (e.message?.includes('403') || e.message?.includes('404') || e.message?.includes('Forbidden')) {
+          summarySkipped = true;
+        }
       }
 
-      // Wenn kein Plan → summary.plan_status = 'billing_plan_missing' ist normal für Preview/Test-Orgs
-      // Diese als "skip" behandeln, nicht als Fehler
-      const noPlan = !org.plan_id && (org.trial_stage === 'free_preview' || !summary);
+      if (summarySkipped) {
+        orgAuditResults.push({
+          org_id: orgId, org_name: org.name,
+          ui_ok: true, skipped: true, skip_reason: 'getUsageSummary nicht erreichbar (403/404)',
+          checks: [],
+        });
+        continue;
+      }
+
       if (!summary) {
-        // Nur echte Fehler zählen, nicht "Plan fehlt" für Preview/Test
+        // Nur echte Fehler zählen, nicht Test-Orgs / Preview-Orgs ohne Plan
         const isTestOrPreviewOrg = !org.plan_id || (org.name || '').toLowerCase().includes('test') || (org.name || '').toLowerCase().includes('e2e');
         if (!isTestOrPreviewOrg) {
           orgAuditResults.push({
@@ -169,8 +181,14 @@ Deno.serve(async (req) => {
       // Hier: Orgs MIT plan_id aber summary hat trotzdem null → echter Fehler.
       // Orgs OHNE plan_id die es bis hierher schaffen (z.B. trialing ohne Sync): als warning.
       const hasPlanId = !!org.plan_id;
+      // monthly_remaining darf bei unlimited=true = 0 sein (nicht null)
+      // is_unlimited selbst wird nicht als "null-Fehler" gewertet
       const coreFields = ['period_month', 'monthly_limit', 'monthly_used', 'monthly_remaining', 'is_over_limit', 'reset_date'];
-      const nullFields = coreFields.filter(f => summary[f] == null);
+      const nullFields = coreFields.filter(f => {
+        const v = summary[f];
+        if (f === 'monthly_remaining' && summary.is_unlimited) return false; // 0 ist korrekt für unlimited
+        return v == null;
+      });
       if (nullFields.length > 0 && hasPlanId) {
         checks.push({ check: 'no_null_core_fields', status: 'red', detail: `Null-Felder: ${nullFields.join(', ')} (Plan vorhanden, aber Summary unvollständig)` });
         orgOk = false;
