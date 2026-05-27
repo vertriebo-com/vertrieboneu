@@ -23,6 +23,16 @@
         "critical"
       ],
       "default": "info"
+    },
+    "status": {
+      "type": "string",
+      "title": "Status",
+      "enum": [
+        "open",
+        "reviewed",
+        "resolved"
+      ],
+      "default": "open"
     }
   },
   "required": [

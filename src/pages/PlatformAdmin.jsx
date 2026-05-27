@@ -13,7 +13,8 @@ import AgencyPanel from '@/components/platform-admin/AgencyPanel';
 import LeadScoringDiagnostics from '@/components/platform-admin/LeadScoringDiagnostics';
 import LeadEngineDryTest from '@/components/platform-admin/LeadEngineDryTest';
 import UsageBillingDiagnostics from '@/components/platform-admin/UsageBillingDiagnostics';
-import { FlaskConical, Activity, BarChart3, FileText } from 'lucide-react';
+import FeedbackPanel from '@/components/platform-admin/FeedbackPanel';
+import { FlaskConical, Activity, BarChart3, FileText, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -335,6 +336,9 @@ export default function PlatformAdmin() {
           <TabsList className="bg-white border border-slate-200 p-1 h-auto gap-1">
             <TabsTrigger value="orgs" className="gap-2 text-sm">
               <Building2 className="w-4 h-4" /> Organisationen
+            </TabsTrigger>
+            <TabsTrigger value="feedback" className="gap-2 text-sm">
+              <MessageSquare className="w-4 h-4" /> Feedback
             </TabsTrigger>
             <TabsTrigger value="diagnostics" className="gap-2 text-sm">
               <Activity className="w-4 h-4" /> Diagnose & Monitoring
@@ -1026,6 +1030,12 @@ export default function PlatformAdmin() {
             </DialogContent>
           </Dialog>
         )}
+          </TabsContent>
+
+          <TabsContent value="feedback">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <FeedbackPanel organizations={organizations} />
+            </div>
           </TabsContent>
 
           <TabsContent value="diagnostics">
