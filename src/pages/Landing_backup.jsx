@@ -359,6 +359,7 @@ export default function LandingBackup() {
             <a href="/datenschutz" style={{ color: "rgba(71,85,105,1)", fontSize: 13, textDecoration: "none" }}>Datenschutz</a>
             <a href="/agb" style={{ color: "rgba(71,85,105,1)", fontSize: 13, textDecoration: "none" }}>AGB</a>
             <a href="mailto:info@huwa-gebaeudedienste.de" style={{ color: "rgba(71,85,105,1)", fontSize: 13, textDecoration: "none" }}>Kontakt</a>
+            <a href="/investors" style={{ color: "rgba(71,85,105,1)", fontSize: 13, textDecoration: "none" }}>Investor Relations</a>
           </div>
           <p style={{ color: "rgba(51,65,85,1)", fontSize: 12 }}>Ein Produkt der Huwa Gebäudereinigung & Hausmeisterdienste</p>
         </div>

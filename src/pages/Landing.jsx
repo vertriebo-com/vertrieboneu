@@ -715,7 +715,7 @@ export default function Landing() {
       <footer style={{ background: "#020617", borderTop: "1px solid rgba(255,255,255,0.05)", padding: "36px 24px", textAlign: "center" }}>
         <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo" style={{ height: 90, width: "auto", objectFit: "contain", marginBottom: 14, opacity: 0.6 }} />
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 20, marginBottom: 12 }}>
-          {[["Impressum", "/impressum"], ["Datenschutz", "/datenschutz"], ["AGB", "/agb"], ["Preise & Pläne", "/start"], ["Kontakt", "mailto:info@huwa-gebaeudedienste.de"]].map(([label, href]) => (
+          {[["Impressum", "/impressum"], ["Datenschutz", "/datenschutz"], ["AGB", "/agb"], ["Preise & Pläne", "/start"], ["Kontakt", "mailto:info@huwa-gebaeudedienste.de"], ["Investor Relations", "/investors"]].map(([label, href]) => (
             <a key={label} href={href} style={{ color: "rgba(71,85,105,1)", fontSize: 12, textDecoration: "none" }}>{label}</a>
           ))}
         </div>

@@ -27,6 +27,7 @@ import Impressum from './pages/Impressum';
 import Datenschutz from './pages/Datenschutz';
 import AGB from './pages/AGB';
 import AccountSuspended from './pages/AccountSuspended';
+import Investors from './pages/Investors';
 import AnmeldenPage from './pages/AnmeldenPage';
 import RegisterPage from './pages/RegisterPage';
 import { useEffect, useState } from 'react';
@@ -71,6 +72,7 @@ const PublicApp = () => {
       <Route path="/account-suspended" element={<AccountSuspended />} />
       <Route path="/anmelden" element={<AnmeldenPage />} />
       <Route path="/registrieren" element={<RegisterPage />} />
+      <Route path="/investors" element={<Investors />} />
       {/* Everything else goes through the authenticated app */}
       <Route path="*" element={<AuthenticatedApp />} />
     </Routes>

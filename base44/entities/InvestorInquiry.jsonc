@@ -1,0 +1,70 @@
+{
+  "name": "InvestorInquiry",
+  "type": "object",
+  "x-acl": {
+    "create": "admin",
+    "read": "admin",
+    "update": "admin",
+    "delete": "admin"
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "Name"
+    },
+    "email": {
+      "type": "string",
+      "title": "E-Mail"
+    },
+    "company_name": {
+      "type": "string",
+      "title": "Unternehmen / Fonds"
+    },
+    "role": {
+      "type": "string",
+      "title": "Rolle",
+      "enum": [
+        "Investor",
+        "Business Angel",
+        "Strategischer Partner",
+        "Presse",
+        "Sonstiges"
+      ],
+      "default": "Investor"
+    },
+    "message": {
+      "type": "string",
+      "title": "Nachricht"
+    },
+    "consent_accepted": {
+      "type": "boolean",
+      "title": "Einwilligung akzeptiert",
+      "default": false
+    },
+    "status": {
+      "type": "string",
+      "title": "Status",
+      "enum": [
+        "new",
+        "contacted",
+        "in_talks",
+        "closed",
+        "archived"
+      ],
+      "default": "new"
+    },
+    "source_page": {
+      "type": "string",
+      "title": "Quellseite"
+    },
+    "internal_note": {
+      "type": "string",
+      "title": "Interne Notiz"
+    }
+  },
+  "required": [
+    "name",
+    "email",
+    "consent_accepted"
+  ]
+}

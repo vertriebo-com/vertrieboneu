@@ -15,6 +15,7 @@ import LeadEngineDryTest from '@/components/platform-admin/LeadEngineDryTest';
 import UsageBillingDiagnostics from '@/components/platform-admin/UsageBillingDiagnostics';
 import FeedbackPanel from '@/components/platform-admin/FeedbackPanel';
 import WaitlistLeadsPanel from '@/components/platform-admin/WaitlistLeadsPanel';
+import InvestorInquiriesPanel from '@/components/platform-admin/InvestorInquiriesPanel';
 import { FlaskConical, Activity, BarChart3, FileText, MessageSquare, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -343,6 +344,9 @@ export default function PlatformAdmin() {
             </TabsTrigger>
             <TabsTrigger value="waitlist" className="gap-2 text-sm">
               <UserPlus className="w-4 h-4" /> Interessenten
+            </TabsTrigger>
+            <TabsTrigger value="investors" className="gap-2 text-sm">
+              <DollarSign className="w-4 h-4" /> Investoren
             </TabsTrigger>
             <TabsTrigger value="diagnostics" className="gap-2 text-sm">
               <Activity className="w-4 h-4" /> Diagnose & Monitoring
@@ -1045,6 +1049,14 @@ export default function PlatformAdmin() {
           <TabsContent value="waitlist">
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
               <WaitlistLeadsPanel />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="investors">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Investor Relations</h2>
+              <p className="text-sm text-slate-500 mb-6">Anfragen von potenziellen Investoren, Business Angels und strategischen Partnern.</p>
+              <InvestorInquiriesPanel />
             </div>
           </TabsContent>
 
