@@ -5,48 +5,53 @@ import { ArrowRight, CheckCircle2, Star } from "lucide-react";
 // ─── APP MOCKUPS ────────────────────────────────────────────────────────────
 
 const LeadsMockup = () => (
-  <div style={{ background: "rgba(15,23,42,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(37,99,235,0.2)" }}>
-    <div style={{ background: "#0f172a", padding: "8px 12px", display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-      <div style={{ display: "flex", gap: 4 }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(239,68,68,0.5)" }} />
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(245,158,11,0.5)" }} />
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(34,197,94,0.5)" }} />
+  <div style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(37,99,235,0.25)" }}>
+    {/* Title bar */}
+    <div style={{ background: "#070e1f", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ display: "flex", gap: 5 }}>
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} />
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} />
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} />
       </div>
-      <div style={{ flex: 1, background: "rgba(255,255,255,0.05)", borderRadius: 4, padding: "2px 8px", fontSize: 9, color: "rgba(100,116,139,1)", textAlign: "center", fontFamily: "monospace" }}>app.vertriebo.com/leads</div>
+      <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 5, padding: "3px 10px", fontSize: 11, color: "rgba(148,163,184,1)", textAlign: "center", fontFamily: "monospace" }}>app.vertriebo.com/leads</div>
     </div>
-    <div style={{ display: "flex", height: 320 }}>
-      <div style={{ width: 40, background: "#020617", borderRight: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 10, gap: 6 }}>
+    <div style={{ display: "flex" }}>
+      {/* Sidebar */}
+      <div style={{ width: 52, background: "#070e1f", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 14, gap: 8 }}>
         {["📊", "👥", "📋", "✉️", "⚙️"].map((icon, i) => (
-          <div key={i} style={{ width: 28, height: 28, borderRadius: 7, background: i === 1 ? "rgba(37,99,235,0.3)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{icon}</div>
+          <div key={i} style={{ width: 36, height: 36, borderRadius: 9, background: i === 1 ? "rgba(37,99,235,0.35)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{icon}</div>
         ))}
       </div>
-      <div style={{ flex: 1, padding: 10, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <p style={{ fontSize: 10, fontWeight: 800, color: "white" }}>Leads</p>
-          <div style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", borderRadius: 5, padding: "2px 7px", fontSize: 8, fontWeight: 700, color: "white" }}>+ Recherche</div>
+      {/* Content */}
+      <div style={{ flex: 1, padding: 14, overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <p style={{ fontSize: 15, fontWeight: 800, color: "white" }}>Leads</p>
+          <div style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 700, color: "white" }}>+ Recherche</div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 5, marginBottom: 8 }}>
+        {/* KPI row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 7, marginBottom: 12 }}>
           {[{ l: "🔥 Heiß", v: "12", c: "#ef4444" }, { l: "📞 Heute", v: "8", c: "#f59e0b" }, { l: "✅ Offen", v: "47", c: "#22c55e" }].map(s => (
-            <div key={s.l} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 7, padding: "5px 6px", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <p style={{ fontSize: 6, color: "rgba(148,163,184,1)", marginBottom: 1 }}>{s.l}</p>
-              <p style={{ fontSize: 15, fontWeight: 900, color: s.c }}>{s.v}</p>
+            <div key={s.l} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 9, padding: "8px 8px", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <p style={{ fontSize: 10, color: "rgba(148,163,184,1)", marginBottom: 3 }}>{s.l}</p>
+              <p style={{ fontSize: 22, fontWeight: 900, color: s.c, lineHeight: 1 }}>{s.v}</p>
             </div>
           ))}
         </div>
+        {/* Lead rows */}
         {[
           { name: "Schmidt Gebäudedienste GmbH", city: "Frankfurt", score: 94, status: "Rückruf", statusColor: "#ef4444" },
           { name: "IT-Systemhaus Müller & Co.", city: "Darmstadt", score: 87, status: "Termin", statusColor: "#8b5cf6" },
           { name: "Hausmeisterdienst Koch KG", city: "Wiesbaden", score: 71, status: "Kontakt", statusColor: "#2563eb" },
           { name: "Facility Pro GmbH", city: "Offenbach", score: 65, status: "Neu", statusColor: "#64748b" },
         ].map((lead, i) => (
-          <div key={i} style={{ background: i === 0 ? "rgba(37,99,235,0.05)" : "rgba(255,255,255,0.02)", border: `1px solid rgba(255,255,255,${i === 0 ? "0.1" : "0.04"})`, borderRadius: 7, padding: "6px 8px", marginBottom: 5 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
-              <p style={{ fontSize: 8, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "65%" }}>{lead.name}</p>
-              <span style={{ fontSize: 6, fontWeight: 700, color: lead.statusColor, background: `${lead.statusColor}20`, padding: "1px 4px", borderRadius: 999 }}>{lead.status}</span>
+          <div key={i} style={{ background: i === 0 ? "rgba(37,99,235,0.07)" : "rgba(255,255,255,0.03)", border: `1px solid rgba(255,255,255,${i === 0 ? "0.12" : "0.05"})`, borderRadius: 9, padding: "9px 12px", marginBottom: 7 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "62%" }}>{lead.name}</p>
+              <span style={{ fontSize: 10, fontWeight: 700, color: lead.statusColor, background: `${lead.statusColor}22`, padding: "2px 8px", borderRadius: 999, border: `1px solid ${lead.statusColor}44` }}>{lead.status}</span>
             </div>
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span style={{ fontSize: 6, color: "rgba(100,116,139,1)" }}>{lead.city}</span>
-              <span style={{ fontSize: 6, color: "#60a5fa", fontWeight: 700, marginLeft: "auto" }}>Score {lead.score}</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 11, color: "rgba(100,116,139,1)" }}>📍 {lead.city}</span>
+              <span style={{ fontSize: 11, color: "#60a5fa", fontWeight: 700 }}>Score {lead.score}</span>
             </div>
           </div>
         ))}
@@ -56,26 +61,26 @@ const LeadsMockup = () => (
 );
 
 const DashboardMockup = () => (
-  <div style={{ background: "rgba(15,23,42,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.6)" }}>
-    <div style={{ background: "#0f172a", padding: "7px 12px", display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-      <div style={{ display: "flex", gap: 4 }}><div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgba(239,68,68,0.5)" }} /><div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgba(245,158,11,0.5)" }} /><div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgba(34,197,94,0.5)" }} /></div>
-      <div style={{ flex: 1, background: "rgba(255,255,255,0.05)", borderRadius: 4, padding: "2px 8px", fontSize: 8, color: "rgba(100,116,139,1)", textAlign: "center", fontFamily: "monospace" }}>app.vertriebo.com/dashboard</div>
+  <div style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
+    <div style={{ background: "#070e1f", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ display: "flex", gap: 5 }}><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} /><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} /><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} /></div>
+      <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 5, padding: "3px 10px", fontSize: 11, color: "rgba(148,163,184,1)", textAlign: "center", fontFamily: "monospace" }}>app.vertriebo.com/dashboard</div>
     </div>
-    <div style={{ padding: 10 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6, marginBottom: 8 }}>
-        {[{ t: "Heute", v: "6", s: "Prioritäten", c: "#60a5fa", bg: "rgba(37,99,235,0.08)", b: "rgba(37,99,235,0.2)" }, { t: "Offen", v: "47", s: "Leads", c: "#4ade80", bg: "rgba(34,197,94,0.08)", b: "rgba(34,197,94,0.2)" }, { t: "Monat", v: "€18k", s: "Pipeline", c: "#a78bfa", bg: "rgba(139,92,246,0.08)", b: "rgba(139,92,246,0.2)" }].map(item => (
-          <div key={item.t} style={{ background: item.bg, border: `1px solid ${item.b}`, borderRadius: 8, padding: "7px 5px", textAlign: "center" }}>
-            <p style={{ fontSize: 6, fontWeight: 700, color: item.c, textTransform: "uppercase", marginBottom: 1 }}>{item.t}</p>
-            <p style={{ fontSize: 17, fontWeight: 900, color: item.c, lineHeight: 1 }}>{item.v}</p>
-            <p style={{ fontSize: 6, color: "rgba(100,116,139,1)", marginTop: 1 }}>{item.s}</p>
+    <div style={{ padding: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 14 }}>
+        {[{ t: "Heute", v: "6", s: "Prioritäten", c: "#60a5fa", bg: "rgba(37,99,235,0.1)", b: "rgba(37,99,235,0.25)" }, { t: "Offen", v: "47", s: "Leads", c: "#4ade80", bg: "rgba(34,197,94,0.1)", b: "rgba(34,197,94,0.25)" }, { t: "Monat", v: "€18k", s: "Pipeline", c: "#a78bfa", bg: "rgba(139,92,246,0.1)", b: "rgba(139,92,246,0.25)" }].map(item => (
+          <div key={item.t} style={{ background: item.bg, border: `1px solid ${item.b}`, borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+            <p style={{ fontSize: 9, fontWeight: 700, color: item.c, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{item.t}</p>
+            <p style={{ fontSize: 24, fontWeight: 900, color: item.c, lineHeight: 1 }}>{item.v}</p>
+            <p style={{ fontSize: 9, color: "rgba(100,116,139,1)", marginTop: 4 }}>{item.s}</p>
           </div>
         ))}
       </div>
-      <p style={{ fontSize: 7, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5 }}>⭐ Tages-Prioritäten</p>
+      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 8 }}>⭐ Tages-Prioritäten</p>
       {[{ company: "Reinigung Bauer KG", prio: "🔥 Heiß", action: "Anrufen", time: "Heute 10 Uhr", color: "#ef4444" }, { company: "Facility Pro GmbH", prio: "📞 Rückruf", action: "Nachfassen", time: "Heute 14 Uhr", color: "#f59e0b" }, { company: "SHK Heinze & Söhne", prio: "✉ Angebot", action: "Senden", time: "Diese Woche", color: "#8b5cf6" }].map((item, i) => (
-        <div key={i} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 6, padding: "5px 7px", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.05)" }}>
-          <div><p style={{ fontSize: 8, fontWeight: 700, color: "white" }}>{item.company}</p><p style={{ fontSize: 6, color: "rgba(100,116,139,1)", marginTop: 1 }}>{item.time}</p></div>
-          <div style={{ textAlign: "right" }}><p style={{ fontSize: 6, fontWeight: 700, color: item.color, marginBottom: 1 }}>{item.prio}</p><div style={{ background: `${item.color}20`, border: `1px solid ${item.color}40`, borderRadius: 3, padding: "1px 4px", fontSize: 6, fontWeight: 700, color: item.color }}>{item.action}</div></div>
+        <div key={i} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 9, padding: "9px 12px", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <div><p style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{item.company}</p><p style={{ fontSize: 10, color: "rgba(100,116,139,1)", marginTop: 2 }}>{item.time}</p></div>
+          <div style={{ textAlign: "right" }}><p style={{ fontSize: 10, fontWeight: 700, color: item.color, marginBottom: 3 }}>{item.prio}</p><div style={{ background: `${item.color}22`, border: `1px solid ${item.color}44`, borderRadius: 5, padding: "2px 7px", fontSize: 10, fontWeight: 700, color: item.color }}>{item.action}</div></div>
         </div>
       ))}
     </div>
@@ -83,27 +88,27 @@ const DashboardMockup = () => (
 );
 
 const ResearchMockup = () => (
-  <div style={{ background: "rgba(15,23,42,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.6)" }}>
-    <div style={{ background: "#0f172a", padding: "7px 12px", display: "flex", alignItems: "center", gap: 6, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-      <div style={{ display: "flex", gap: 4 }}><div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgba(239,68,68,0.5)" }} /><div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgba(245,158,11,0.5)" }} /><div style={{ width: 7, height: 7, borderRadius: "50%", background: "rgba(34,197,94,0.5)" }} /></div>
-      <div style={{ flex: 1, background: "rgba(255,255,255,0.05)", borderRadius: 4, padding: "2px 8px", fontSize: 8, color: "rgba(100,116,139,1)", textAlign: "center", fontFamily: "monospace" }}>Recherche läuft…</div>
+  <div style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
+    <div style={{ background: "#070e1f", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ display: "flex", gap: 5 }}><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} /><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} /><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} /></div>
+      <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 5, padding: "3px 10px", fontSize: 11, color: "rgba(148,163,184,1)", textAlign: "center", fontFamily: "monospace" }}>Recherche läuft…</div>
     </div>
-    <div style={{ padding: 12 }}>
-      <div style={{ background: "rgba(37,99,235,0.08)", border: "1px solid rgba(37,99,235,0.2)", borderRadius: 9, padding: 10, marginBottom: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 6px #3b82f6" }} />
-          <p style={{ fontSize: 8, fontWeight: 700, color: "#93c5fd" }}>Vertriebo durchsucht Frankfurt Umgebung…</p>
+    <div style={{ padding: 16 }}>
+      <div style={{ background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.25)", borderRadius: 11, padding: 14, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 8px #3b82f6", flexShrink: 0 }} />
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#93c5fd" }}>Vertriebo durchsucht Frankfurt Umgebung…</p>
         </div>
-        <div style={{ background: "rgba(37,99,235,0.1)", borderRadius: 4, height: 4, overflow: "hidden" }}>
-          <div style={{ width: "68%", height: "100%", background: "linear-gradient(90deg,#2563eb,#7c3aed)", borderRadius: 4 }} />
+        <div style={{ background: "rgba(37,99,235,0.15)", borderRadius: 5, height: 6, overflow: "hidden", marginBottom: 8 }}>
+          <div style={{ width: "68%", height: "100%", background: "linear-gradient(90deg,#2563eb,#7c3aed)", borderRadius: 5 }} />
         </div>
-        <p style={{ fontSize: 7, color: "rgba(100,116,139,1)", marginTop: 4 }}>47 von 70 Orte durchsucht · 23 Treffer</p>
+        <p style={{ fontSize: 11, color: "rgba(148,163,184,1)" }}>47 von 70 Orte durchsucht · <span style={{ color: "#4ade80", fontWeight: 700 }}>23 Treffer</span></p>
       </div>
-      <p style={{ fontSize: 7, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5 }}>✨ Neue Leads gefunden</p>
-      {[{ name: "Reinigungsservice Weber", ort: "Frankfurt-Nord", score: 91 }, { name: "Hausmeister & Mehr GmbH", ort: "Offenbach", score: 84 }, { name: "Facility Max KG", ort: "Hanau", score: 76 }].map((l, i) => (
-        <div key={i} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 6, padding: "6px 8px", marginBottom: 4, border: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div><p style={{ fontSize: 8, fontWeight: 700, color: "white" }}>{l.name}</p><p style={{ fontSize: 6, color: "rgba(100,116,139,1)", marginTop: 1 }}>{l.ort}</p></div>
-          <p style={{ fontSize: 9, fontWeight: 900, color: i === 0 ? "#4ade80" : i === 1 ? "#60a5fa" : "#a78bfa" }}>Score {l.score}</p>
+      <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(203,213,225,1)", marginBottom: 10 }}>✨ Neue Leads gefunden</p>
+      {[{ name: "Reinigungsservice Weber", ort: "Frankfurt-Nord", score: 91, c: "#4ade80" }, { name: "Hausmeister & Mehr GmbH", ort: "Offenbach", score: 84, c: "#60a5fa" }, { name: "Facility Max KG", ort: "Hanau", score: 76, c: "#a78bfa" }].map((l, i) => (
+        <div key={i} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 9, padding: "10px 13px", marginBottom: 7, border: "1px solid rgba(255,255,255,0.07)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div><p style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{l.name}</p><p style={{ fontSize: 10, color: "rgba(100,116,139,1)", marginTop: 3 }}>📍 {l.ort}</p></div>
+          <p style={{ fontSize: 13, fontWeight: 900, color: l.c }}>Score {l.score}</p>
         </div>
       ))}
     </div>
@@ -124,10 +129,10 @@ const FEATURES = [
 ];
 
 const TESTIMONIALS = [
-  { text: "Früher hab ich Stunden mit Google verbracht um neue Kontakte zu finden. Mit Vertriebo dauert das 5 Minuten. Die KI-Priorisierung ist Gold wert.", name: "Marcus W.", role: "Geschäftsführer, Gebäudereinigung", city: "Frankfurt", emoji: "🏢" },
-  { text: "Endlich ein System das mitdenkt. Ich öffne morgens Vertriebo, sehe meine 5 wichtigsten Aufgaben und arbeite sie ab. Keine verpassten Rückrufe mehr.", name: "Sandra K.", role: "Vertriebsleiterin, IT-Service", city: "München", emoji: "💻" },
-  { text: "Das Suchgebiet-Feature ist fantastisch. In den kleinen Gemeinden rund um Frankfurt waren unsere besten Kunden – daran hatte ich nie gedacht!", name: "Thomas H.", role: "Inhaber, Facility Service", city: "Wiesbaden", emoji: "🏠" },
-  { text: "Die Kontakthistorie allein hat uns schon hunderte Euro gespart. Kein 'Haben wir da schon angerufen?' mehr. Alles steht drin, sofort abrufbar.", name: "Petra M.", role: "Teamleiterin, Catering", city: "Stuttgart", emoji: "🍽️" },
+  { text: "Ich verbringe täglich 2–3 Stunden damit, Firmenkontakte per Google zu suchen. Ein System das das automatisch erledigt und mir sagt wen ich anrufen soll – genau das fehlt mir.", name: "Markus B.", role: "Geschäftsführer, Gebäudereinigung", city: "Frankfurt am Main", emoji: "🏢", type: "pain" },
+  { text: "Rückrufe vergessen, Leads die kalt werden weil wir zu spät nachgefasst haben – das kostet uns jeden Monat bares Geld. Vertriebo klingt wie die Lösung die wir gesucht haben.", name: "Sandra K.", role: "Vertriebsleiterin, IT-Service", city: "München", emoji: "💻", type: "pain" },
+  { text: "Ich habe Excel-Listen, ein altes CRM und Sticky Notes. Aber nichts sagt mir morgens: Das sind deine 5 wichtigsten Anrufe heute. Genau das will ich.", name: "Thomas H.", role: "Inhaber, Facility & Hausmeisterservice", city: "Wiesbaden", emoji: "🏠", type: "pain" },
+  { text: "Als Dienstleister muss ich ständig neue Kunden akquirieren. Die Idee, dass ein System passende Firmen in meinem Umkreis automatisch findet und nach Potenzial bewertet – das ist genau richtig.", name: "Petra M.", role: "Geschäftsführerin, Catering & Events", city: "Stuttgart", emoji: "🍽️", type: "pain" },
 ];
 
 const COMPARE_ROWS = [
@@ -224,16 +229,9 @@ export default function Landing() {
               Vertriebo ist das erste aktive Vertriebssystem für lokale B2B-Dienstleister: Es findet automatisch passende Firmenkontakte, bewertet sie per KI und sagt Ihnen täglich, wen Sie als Nächstes anrufen sollten.
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
-              <div style={{ display: "flex" }}>
-                {["🏢", "🔨", "🌿", "💻", "🛡️"].map((e, i) => (
-                  <div key={i} style={{ width: 28, height: 28, borderRadius: "50%", background: `hsl(${220 + i * 20},70%,28%)`, border: "2px solid #020617", marginLeft: i > 0 ? -8 : 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{e}</div>
-                ))}
-              </div>
-              <div>
-                <div style={{ display: "flex", gap: 2, marginBottom: 2 }}>
-                  {[1,2,3,4,5].map(s => <Star key={s} size={10} fill="#f59e0b" color="#f59e0b" />)}
-                </div>
-                <p style={{ fontSize: 11, color: "rgba(148,163,184,1)", fontWeight: 600 }}>40+ Branchen nutzen Vertriebo bereits</p>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 999, background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", color: "#c4b5fd" }}>
+                <span style={{ fontSize: 14 }}>🚀</span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>Jetzt in der Beta-Phase – limitierte Plätze</span>
               </div>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
@@ -407,13 +405,20 @@ export default function Landing() {
       <section style={{ padding: "80px 24px", background: "#080e1e", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>
-            <p style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>Stimmen aus der Praxis</p>
-            <h2 style={{ fontSize: "clamp(24px,3.5vw,38px)", fontWeight: 900, lineHeight: 1.2, letterSpacing: -1 }}>Was Nutzer über Vertriebo sagen</h2>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", color: "#fbbf24", fontSize: 12, fontWeight: 700, marginBottom: 14 }}>
+              💬 Aus echten Gesprächen mit potenziellen Nutzern
+            </div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>Das sagen Vertriebsverantwortliche</p>
+            <h2 style={{ fontSize: "clamp(24px,3.5vw,38px)", fontWeight: 900, lineHeight: 1.2, letterSpacing: -1 }}>Wir kennen Ihr Problem – denn wir hören zu</h2>
+            <p style={{ fontSize: 14, color: "rgba(148,163,184,1)", marginTop: 12, maxWidth: 520, margin: "12px auto 0" }}>Diese Rückmeldungen haben wir in Interviews & Gesprächen mit lokalen B2B-Dienstleistern gesammelt. Sie waren der Antrieb für Vertriebo.</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 18 }}>
             {TESTIMONIALS.map((t, i) => (
               <div key={i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ display: "flex", gap: 2 }}>{[1,2,3,4,5].map(s => <Star key={s} size={12} fill="#f59e0b" color="#f59e0b" />)}</div>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)", width: "fit-content" }}>
+                  <span style={{ fontSize: 10 }}>💬</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#fbbf24" }}>Aus einem echten Gespräch</span>
+                </div>
                 <p style={{ fontSize: 13, color: "rgba(203,213,225,1)", lineHeight: 1.7, flex: 1, fontStyle: "italic" }}>„{t.text}"</p>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                   <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(37,99,235,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{t.emoji}</div>
