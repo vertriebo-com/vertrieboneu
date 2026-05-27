@@ -1,11 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useLeadsFilter } from "../hooks/useLeadsFilter";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, X, TrendingUp, Building2, Upload, Sparkles, Activity, Target, Info } from "lucide-react";
+import { Search, Filter, X, TrendingUp, Building2, Upload, Sparkles, Activity, Target } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,31 +41,39 @@ export default function Leads() {
   const [showOnboardingFailed, setShowOnboardingFailed] = useState(false);
 
   // ═ Effects
-  // Parse query parameters: new_run, search, onboarding_zero_leads, onboarding_failed, analyze
+  // Parse query parameters: status, temperature, new_run, search, onboarding_*, analyze
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+
+    // status=Neu|Kontakt|Rückruf|Termin|Angebot|Gewonnen|Verloren
+    const validStatuses = ["Neu", "Kontakt", "Rückruf", "Termin", "Angebot", "Gewonnen", "Verloren"];
+    const statusParam = params.get("status");
+    if (statusParam && validStatuses.includes(statusParam)) {
+      setStatusFilter(statusParam);
+    }
+
+    // temperature=hot|warm|cold → priorityFilter
+    const tempParam = params.get("temperature");
+    if (tempParam === "hot") setPriorityFilter("Hoch");
+    else if (tempParam === "warm") setPriorityFilter("Mittel");
+    else if (tempParam === "cold") setPriorityFilter("Niedrig");
+
+    // new_run: "latest" → nur sortBy=created, keine run_id-Filterung
+    //          echte UUID → research_run_id-Filter setzen
     const newRun = params.get("new_run");
-    // P0-FIX: "undefined" als String oder null → nicht setzen
-    setNewRunFilter(newRun && newRun !== "undefined" && newRun !== "null" ? newRun : null);
-    // Nach ResearchRun: automatisch auf "Neueste zuerst" sortieren
-    if (newRun && newRun !== "undefined" && newRun !== "null") {
+    if (!newRun || newRun === "undefined" || newRun === "null" || newRun === "latest") {
+      setNewRunFilter(null);
+      if (newRun === "latest") setSortBy("created");
+    } else {
+      setNewRunFilter(newRun);
       setSortBy("created");
     }
+
     const searchParam = params.get("search");
     setSearch(searchParam || "");
-    
-    // Onboarding-Zustände anzeigen
-    const onboardingZeroLeads = params.get("onboarding_zero_leads");
-    const onboardingFailed = params.get("onboarding_failed");
-    
-    if (onboardingZeroLeads === 'true') {
-      // Zeige Empty-State mit Alternativen
-      setShowOnboardingZeroLeads(true);
-    }
-    if (onboardingFailed === 'true') {
-      // Zeige Recovery-Message
-      setShowOnboardingFailed(true);
-    }
+
+    if (params.get("onboarding_zero_leads") === 'true') setShowOnboardingZeroLeads(true);
+    if (params.get("onboarding_failed") === 'true') setShowOnboardingFailed(true);
   }, [location.search]);
 
   

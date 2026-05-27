@@ -5,9 +5,8 @@ import { useLeadsFilter } from "../hooks/useLeadsFilter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import {
-  Building2, ArrowRight, PhoneCall, Star, Flame,
-  TrendingUp, Calendar, RefreshCw, Search, AlertCircle, Zap,
-  CheckCircle2
+  Building2, ArrowRight, Flame,
+  TrendingUp, Calendar, RefreshCw, Search, AlertCircle, Zap
 } from "lucide-react";
 import StatusBadge from "../components/StatusBadge";
 import { Button } from "@/components/ui/button";
