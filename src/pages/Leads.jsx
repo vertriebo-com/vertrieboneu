@@ -27,7 +27,7 @@ export default function Leads() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
   const [focusFilter, setFocusFilter] = useState(null);
-  const [sortBy, setSortBy] = useState("priority");
+  const [sortBy, setSortBy] = useState("created");
   const [showAdd, setShowAdd] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState("Alle");
   const [showArchived, setShowArchived] = useState(false);
@@ -47,6 +47,10 @@ export default function Leads() {
     const newRun = params.get("new_run");
     // P0-FIX: "undefined" als String oder null → nicht setzen
     setNewRunFilter(newRun && newRun !== "undefined" && newRun !== "null" ? newRun : null);
+    // Nach ResearchRun: automatisch auf "Neueste zuerst" sortieren
+    if (newRun && newRun !== "undefined" && newRun !== "null") {
+      setSortBy("created");
+    }
     const searchParam = params.get("search");
     setSearch(searchParam || "");
     
@@ -491,7 +495,7 @@ export default function Leads() {
         open={showResearch}
         orgId={orgId}
         onClose={() => setShowResearch(false)}
-        onSuccess={() => { refetch(); setNewRunFilter(null); setStatusFilter(null); setFocusFilter(null); }}
+        onSuccess={() => { setSortBy("created"); setNewRunFilter(null); setStatusFilter(null); setFocusFilter(null); refetch(); }}
       />
     </div>
   );
