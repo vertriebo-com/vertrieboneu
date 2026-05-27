@@ -4,7 +4,9 @@ import { ArrowRight, CheckCircle2, Star } from "lucide-react";
 
 // ─── PARTICLE BACKGROUND ────────────────────────────────────────────────────
 const Particles = () => {
-  const particles = useMemo(() => Array.from({ length: 50 }, (_, i) => ({
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  const particles = useMemo(() => Array.from({ length: 30 }, (_, i) => ({
     id: i,
     left: Math.random() * 100,
     top: Math.random() * 100,
@@ -14,6 +16,8 @@ const Particles = () => {
     delay: Math.random() * 6,
     colorA: i % 3 === 0 ? "96,165,250" : i % 3 === 1 ? "139,92,246" : "244,114,182",
   })), []);
+
+  if (isMobile) return null;
 
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
@@ -354,7 +358,7 @@ export default function Landing() {
   const inp = { width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 14, fontFamily: "inherit", outline: "none" };
 
   return (
-    <div style={{ background: "#020617", minHeight: "100vh", fontFamily: "'Inter', sans-serif", color: "white", overflowX: "hidden", position: "relative" }}>
+    <div style={{ background: "#020617", minHeight: "100vh", fontFamily: "'Inter', sans-serif", color: "white", overflowX: "hidden", maxWidth: "100vw", position: "relative" }}>
       <Particles />
       <style>{`
         @keyframes shimmer { 0% { background-position: 200% center; } 100% { background-position: -200% center; } }
@@ -371,6 +375,8 @@ export default function Landing() {
           .nav-btn-text { display: none !important; }
           .hero-mockup { transform: none !important; }
           .step-order-fix { order: unset !important; }
+          .mockup-hide-mobile { display: none !important; }
+          section, div { max-width: 100vw; }
         }
       `}</style>
 
@@ -394,18 +400,18 @@ export default function Landing() {
           <div style={{ position: "absolute", width: 500, height: 500, background: "rgba(124,58,237,0.1)", borderRadius: "50%", filter: "blur(100px)", bottom: -100, right: 0 }} />
           <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.025) 1px,transparent 1px)", backgroundSize: "40px 40px" }} />
         </div>
-        <div className="hero-grid" style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 20px 60px", position: "relative", zIndex: 1, width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
+        <div className="hero-grid" style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 16px 60px", position: "relative", zIndex: 1, width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center", boxSizing: "border-box" }}>
           <div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "rgba(37,99,235,0.12)", border: "1px solid rgba(37,99,235,0.3)", color: "#93c5fd", fontSize: 11, fontWeight: 700, marginBottom: 20 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 8px #3b82f6", display: "inline-block" }} /> Early Access – Jetzt Platz sichern
             </div>
-            <h1 style={{ fontSize: "clamp(32px,5vw,66px)", fontWeight: 900, lineHeight: 1.08, letterSpacing: -2, marginBottom: 18 }}>
+            <h1 style={{ fontSize: "clamp(28px,5vw,66px)", fontWeight: 900, lineHeight: 1.1, letterSpacing: -1, marginBottom: 18, wordBreak: "break-word" }}>
               Mehr Firmenkunden.<br />
               <span style={{ background: "linear-gradient(135deg,#60a5fa,#a78bfa,#f472b6)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", animation: "shimmer 5s linear infinite" }}>
                 Weniger Zeitverschwendung.
               </span>
             </h1>
-            <p style={{ fontSize: "clamp(14px,1.8vw,17px)", color: "rgba(148,163,184,1)", lineHeight: 1.7, marginBottom: 24 }}>
+            <p style={{ fontSize: "clamp(14px,1.8vw,17px)", color: "rgba(148,163,184,1)", lineHeight: 1.7, marginBottom: 24, wordBreak: "break-word" }}>
               Vertriebo findet automatisch passende Firmenkontakte, bewertet sie per KI und sagt Ihnen täglich, wen Sie als Nächstes anrufen sollten.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
@@ -424,7 +430,7 @@ export default function Landing() {
               ))}
             </div>
           </div>
-          <div style={{ display: "flex", justifyContent: "center", position: "relative" }}>
+          <div className="mockup-hide-mobile" style={{ display: "flex", justifyContent: "center", position: "relative" }}>
             <div style={{ position: "absolute", width: "70%", height: "70%", background: "rgba(37,99,235,0.12)", borderRadius: "50%", filter: "blur(60px)" }} />
             <div className="hero-mockup" style={{ position: "relative", zIndex: 1, transform: "perspective(1200px) rotateY(-5deg) rotateX(2deg)", width: "100%" }}>
               <LeadsMockup />
@@ -480,7 +486,7 @@ export default function Landing() {
 
           {/* Step 2 */}
           <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, alignItems: "center", marginBottom: 60 }}>
-            <div className="step-order-fix" style={{ order: 2 }}>
+            <div className="step-order-fix mockup-hide-mobile" style={{ order: 2 }}>
               <div style={{ position: "relative" }}>
                 <div style={{ position: "absolute", inset: "-20px", background: "rgba(124,58,237,0.08)", borderRadius: 24, filter: "blur(40px)" }} />
                 <div style={{ position: "relative", zIndex: 1 }}><ResearchMockup /></div>
@@ -512,7 +518,7 @@ export default function Landing() {
                 </div>
               ))}
             </div>
-            <div style={{ position: "relative" }}>
+            <div className="mockup-hide-mobile" style={{ position: "relative" }}>
               <div style={{ position: "absolute", inset: "-20px", background: "rgba(5,150,105,0.08)", borderRadius: 24, filter: "blur(40px)" }} />
               <div style={{ position: "relative", zIndex: 1 }}><DashboardMockup /></div>
             </div>
