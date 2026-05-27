@@ -41,17 +41,31 @@ const AppShell = ({ url, activeIdx = 1, children }) => (
         width: 52, background: "#070d1b",
         borderRight: "1px solid rgba(255,255,255,0.05)",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: 12, gap: 5, flexShrink: 0,
+        paddingTop: 10, gap: 4, flexShrink: 0,
       }}>
-        {/* Logo-Dot */}
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8, fontSize: 13 }}>V</div>
-        <SidebarIcon active={false}>📊</SidebarIcon>
-        <SidebarIcon active={activeIdx === 1}>👥</SidebarIcon>
-        <SidebarIcon active={activeIdx === 2}>📋</SidebarIcon>
-        <SidebarIcon active={false}>✉️</SidebarIcon>
+        {[
+          { icon: "📊", label: "Dashboard", idx: -1 },
+          { icon: "👥", label: "Leads", idx: 1 },
+          { icon: "📋", label: "Aufgaben", idx: 2 },
+          { icon: "✉️", label: "E-Mails", idx: -1 },
+          { icon: "📈", label: "Statistik", idx: -1 },
+        ].map((item, i) => (
+          <div key={i} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 9,
+              background: item.idx === activeIdx ? "rgba(37,99,235,0.3)" : "transparent",
+              border: item.idx === activeIdx ? "1px solid rgba(37,99,235,0.55)" : "1px solid transparent",
+              boxShadow: item.idx === activeIdx ? "0 0 14px rgba(37,99,235,0.25)" : "none",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15,
+            }}>{item.icon}</div>
+            <span style={{ fontSize: 7, color: item.idx === activeIdx ? "#93c5fd" : "rgba(71,85,105,1)", fontWeight: 600, marginTop: 2, marginBottom: 3 }}>{item.label}</span>
+          </div>
+        ))}
         <div style={{ flex: 1 }} />
-        <SidebarIcon active={false}>⚙️</SidebarIcon>
-        <div style={{ height: 10 }} />
+        <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", paddingBottom: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>⚙️</div>
+          <span style={{ fontSize: 7, color: "rgba(71,85,105,1)", fontWeight: 600, marginTop: 2 }}>Einst.</span>
+        </div>
       </div>
       {/* ─── Page Content (dunkel wie App-BG) ─── */}
       <div style={{ flex: 1, background: "#0f1a2e", overflow: "hidden", minHeight: 360 }}>
