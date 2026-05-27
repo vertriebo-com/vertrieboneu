@@ -298,13 +298,13 @@ Deno.serve(async (req) => {
     }
   }
 
-  // 5. ADD CONTACT
+  // 5. ADD CONTACT (max 3)
   if (include_leads) {
     const noContact = companies.filter(c =>
       !c.ansprechpartner &&
       (c.quality_tier === 'premium' || c.quality_tier === 'strong' || c.lead_temperature === 'hot')
     );
-    for (const company of noContact.slice(0, 10)) {
+    for (const company of noContact.slice(0, 3)) {
       const exclusionReason = isExcluded(company);
       if (exclusionReason) {
         excludedCounts[exclusionReason]++;
@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
     const needsReview = companies.filter(c =>
       c.provenance_json && c.provenance_json.includes('"review_status":"unreviewed"')
     );
-    for (const company of needsReview.slice(0, 5)) {
+    for (const company of needsReview.slice(0, 2)) {
       const exclusionReason = isExcluded(company);
       if (exclusionReason) {
         excludedCounts[exclusionReason]++;
@@ -365,20 +365,38 @@ Deno.serve(async (req) => {
     action.priority_score = scoreAction(action, company);
   }
 
+  // Prioritäts-Gewichtung: kritische Typen bekommen feste Bonus-Punkte
+  // damit add_contact/review_enrichment nie übergeordnete Actions verdrängen
+  const URGENCY_BONUS = { critical: 1000, high: 200, medium: 0, low: -50 };
+  for (const action of actions) {
+    action.priority_score += (URGENCY_BONUS[action.urgency] || 0);
+  }
+
   actions.sort((a, b) => b.priority_score - a.priority_score);
 
   // Deduplizierung: max 2 Actions pro Company (außer critical)
   const dedupedActions = [];
   const finalCompanyCount = {};
+  const typeCaps = { add_contact: 3, review_enrichment: 2 };
+  const typeCount = {};
+
   for (const action of actions) {
     const currentCount = finalCompanyCount[action.company_id] || 0;
     const isCritical = action.urgency === 'critical';
-    if (isCritical || currentCount < 2) {
-      dedupedActions.push(action);
-      finalCompanyCount[action.company_id] = currentCount + 1;
-    } else {
+    const cap = typeCaps[action.action_type];
+    const tCount = typeCount[action.action_type] || 0;
+
+    if (cap !== undefined && tCount >= cap) {
       excludedCounts.duplicate_action++;
+      continue;
     }
+    if (!isCritical && currentCount >= 2) {
+      excludedCounts.duplicate_action++;
+      continue;
+    }
+    dedupedActions.push(action);
+    finalCompanyCount[action.company_id] = currentCount + 1;
+    typeCount[action.action_type] = tCount + 1;
   }
 
   const limitedActions = dedupedActions.slice(0, limit);

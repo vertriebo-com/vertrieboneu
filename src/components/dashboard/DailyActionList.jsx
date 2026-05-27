@@ -100,11 +100,28 @@ const DEFAULT_CONFIG = {
   label: "Aktion",
 };
 
+const getActionUrl = (action) => {
+  const base = `/leads/${action.company_id}`;
+  if (action.task_id || action.action_type === 'schedule_task' || action.action_type === 'follow_up') {
+    return `${base}?tab=tasks`;
+  }
+  if (action.opportunity_id || action.action_type === 'update_opportunity_stage' || action.action_type === 'create_opportunity') {
+    return `${base}?tab=opportunities`;
+  }
+  if (action.action_type === 'add_contact') {
+    return `${base}?tab=contacts`;
+  }
+  if (action.action_type === 'review_enrichment') {
+    return `${base}?tab=company`;
+  }
+  return base;
+};
+
 export default function DailyActionList({ orgId }) {
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchActions = () => {
     if (!orgId) return;
     setLoading(true);
     base44.functions.invoke('getDailyActions', { org_id: orgId, limit: 6 })
@@ -113,6 +130,17 @@ export default function DailyActionList({ orgId }) {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchActions();
+  }, [orgId]);
+
+  // Refetch bei Rückkehr ins Dashboard (visibility change)
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchActions(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [orgId]);
 
   if (loading) {
@@ -150,7 +178,7 @@ export default function DailyActionList({ orgId }) {
         return (
           <Link
             key={action.id}
-            to={`/leads/${action.company_id}`}
+            to={getActionUrl(action)}
             className={`flex items-center gap-3 p-3 border rounded-lg hover:brightness-95 transition-all ${cfg.bg}`}
           >
             <Icon className={`w-4 h-4 shrink-0 ${cfg.iconColor}`} />
