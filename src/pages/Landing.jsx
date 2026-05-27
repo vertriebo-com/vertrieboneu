@@ -328,60 +328,63 @@ export default function Landing() {
         @keyframes spin { to { transform: rotate(360deg); } }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::placeholder { color: rgba(100,116,139,0.7) !important; }
-        @media (max-width: 768px) { .hero-grid { grid-template-columns: 1fr !important; } .feat-grid { grid-template-columns: 1fr !important; } .compare-grid { grid-template-columns: 1fr !important; } }
+        @media (max-width: 768px) {
+          .hero-grid { grid-template-columns: 1fr !important; }
+          .feat-grid { grid-template-columns: repeat(2,1fr) !important; }
+          .compare-grid { grid-template-columns: 1fr !important; }
+          .form-grid { grid-template-columns: 1fr !important; }
+          .stats-grid { grid-template-columns: repeat(2,1fr) !important; }
+          .nav-btn-text { display: none !important; }
+          .hero-mockup { transform: none !important; }
+          .step-order-fix { order: unset !important; }
+        }
       `}</style>
 
       {/* NAVBAR */}
-      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999, background: "rgba(2,6,23,0.92)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.07)", height: 62 }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 24px", height: "100%", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo" style={{ height: 180, width: "auto", objectFit: "contain" }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <button onClick={() => document.getElementById("wie-es-funktioniert")?.scrollIntoView({ behavior: "smooth" })} style={{ color: "rgba(148,163,184,1)", fontSize: 13, background: "none", border: "none", cursor: "pointer", fontWeight: 500, fontFamily: "inherit" }}>Funktionen</button>
-            <button onClick={scrollToForm} style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 18px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", boxShadow: "0 0 20px rgba(37,99,235,0.35)" }}>
-              Frühen Zugang sichern →
+      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999, background: "rgba(2,6,23,0.95)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(255,255,255,0.07)", height: 58 }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px", height: "100%", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo" style={{ height: 160, width: "auto", objectFit: "contain" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button onClick={() => document.getElementById("wie-es-funktioniert")?.scrollIntoView({ behavior: "smooth" })} className="nav-btn-text" style={{ color: "rgba(148,163,184,1)", fontSize: 13, background: "none", border: "none", cursor: "pointer", fontWeight: 500, fontFamily: "inherit" }}>Funktionen</button>
+            <button onClick={scrollToForm} style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", boxShadow: "0 0 20px rgba(37,99,235,0.35)" }}>
+              Jetzt sichern →
             </button>
           </div>
         </div>
       </nav>
 
       {/* HERO */}
-      <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 62, position: "relative", overflow: "hidden" }}>
+      <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 58, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
           <div style={{ position: "absolute", width: 700, height: 700, background: "rgba(37,99,235,0.12)", borderRadius: "50%", filter: "blur(120px)", top: -200, left: -100 }} />
           <div style={{ position: "absolute", width: 500, height: 500, background: "rgba(124,58,237,0.1)", borderRadius: "50%", filter: "blur(100px)", bottom: -100, right: 0 }} />
           <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.025) 1px,transparent 1px)", backgroundSize: "40px 40px" }} />
         </div>
-        <div className="hero-grid" style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 24px", position: "relative", zIndex: 1, width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignItems: "center" }}>
+        <div className="hero-grid" style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 20px 60px", position: "relative", zIndex: 1, width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
           <div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", borderRadius: 999, background: "rgba(37,99,235,0.12)", border: "1px solid rgba(37,99,235,0.3)", color: "#93c5fd", fontSize: 12, fontWeight: 700, marginBottom: 24 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "rgba(37,99,235,0.12)", border: "1px solid rgba(37,99,235,0.3)", color: "#93c5fd", fontSize: 11, fontWeight: 700, marginBottom: 20 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 8px #3b82f6", display: "inline-block" }} /> Early Access – Jetzt Platz sichern
             </div>
-            <h1 style={{ fontSize: "clamp(36px,5vw,66px)", fontWeight: 900, lineHeight: 1.08, letterSpacing: -2.5, marginBottom: 22 }}>
-              Mehr Firmenkunden.{" "}<br />
+            <h1 style={{ fontSize: "clamp(32px,5vw,66px)", fontWeight: 900, lineHeight: 1.08, letterSpacing: -2, marginBottom: 18 }}>
+              Mehr Firmenkunden.<br />
               <span style={{ background: "linear-gradient(135deg,#60a5fa,#a78bfa,#f472b6)", backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", animation: "shimmer 5s linear infinite" }}>
                 Weniger Zeitverschwendung.
               </span>
             </h1>
-            <p style={{ fontSize: "clamp(15px,1.8vw,18px)", color: "rgba(148,163,184,1)", lineHeight: 1.75, marginBottom: 32 }}>
-              Vertriebo ist das erste aktive Vertriebssystem für lokale B2B-Dienstleister: Es findet automatisch passende Firmenkontakte, bewertet sie per KI und sagt Ihnen täglich, wen Sie als Nächstes anrufen sollten.
+            <p style={{ fontSize: "clamp(14px,1.8vw,17px)", color: "rgba(148,163,184,1)", lineHeight: 1.7, marginBottom: 24 }}>
+              Vertriebo findet automatisch passende Firmenkontakte, bewertet sie per KI und sagt Ihnen täglich, wen Sie als Nächstes anrufen sollten.
             </p>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 999, background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", color: "#c4b5fd" }}>
-                <span style={{ fontSize: 14 }}>🚀</span>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>Jetzt in der Beta-Phase – limitierte Plätze</span>
-              </div>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
-              <button onClick={scrollToForm} style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "14px 26px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 40px rgba(37,99,235,0.5)", display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
+              <button onClick={scrollToForm} style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "13px 24px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 40px rgba(37,99,235,0.5)", display: "inline-flex", alignItems: "center", gap: 8, flex: "1 1 auto" }}>
                 Frühen Zugang sichern <ArrowRight size={16} />
               </button>
-              <button onClick={() => document.getElementById("wie-es-funktioniert")?.scrollIntoView({ behavior: "smooth" })} style={{ color: "rgba(148,163,184,1)", fontWeight: 600, fontSize: 14, padding: "14px 20px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              <button onClick={() => document.getElementById("wie-es-funktioniert")?.scrollIntoView({ behavior: "smooth" })} style={{ color: "rgba(148,163,184,1)", fontWeight: 600, fontSize: 14, padding: "13px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", flex: "0 0 auto" }}>
                 Wie es funktioniert ↓
               </button>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
               {["In 5 Min. startklar", "Keine Kreditkarte", "DSGVO-konform", "Monatlich kündbar"].map(c => (
-                <div key={c} style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 999, background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.15)" }}>
+                <div key={c} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 999, background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.15)" }}>
                   <CheckCircle2 size={10} color="#4ade80" /><span style={{ fontSize: 11, fontWeight: 600, color: "rgba(203,213,225,1)" }}>{c}</span>
                 </div>
               ))}
@@ -389,7 +392,7 @@ export default function Landing() {
           </div>
           <div style={{ display: "flex", justifyContent: "center", position: "relative" }}>
             <div style={{ position: "absolute", width: "70%", height: "70%", background: "rgba(37,99,235,0.12)", borderRadius: "50%", filter: "blur(60px)" }} />
-            <div style={{ position: "relative", zIndex: 1, transform: "perspective(1200px) rotateY(-5deg) rotateX(2deg)", width: "100%" }}>
+            <div className="hero-mockup" style={{ position: "relative", zIndex: 1, transform: "perspective(1200px) rotateY(-5deg) rotateX(2deg)", width: "100%" }}>
               <LeadsMockup />
             </div>
           </div>
@@ -397,20 +400,20 @@ export default function Landing() {
       </section>
 
       {/* STATS BAR */}
-      <section style={{ background: "#060d1f", borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "32px 24px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 0 }}>
-          {[{ v: "40+", l: "Branchen unterstützt", s: "Von Reinigung bis IT-Service" }, { v: "< 5 Min", l: "bis zum ersten Lead", s: "Kein langer Setup-Prozess" }, { v: "KI-Score", l: "für jeden Lead", s: "Priorität auf Knopfdruck" }, { v: "100%", l: "DSGVO-orientiert", s: "Made for Germany" }].map((s, i, arr) => (
-            <div key={i} style={{ textAlign: "center", padding: "12px 20px", borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-              <p style={{ fontSize: "clamp(22px,2.5vw,34px)", fontWeight: 900, background: "linear-gradient(135deg,#60a5fa,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", marginBottom: 4 }}>{s.v}</p>
-              <p style={{ fontSize: 12, fontWeight: 700, color: "white", marginBottom: 2 }}>{s.l}</p>
-              <p style={{ fontSize: 11, color: "rgba(100,116,139,1)" }}>{s.s}</p>
+      <section style={{ background: "#060d1f", borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "28px 20px" }}>
+        <div className="stats-grid" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0 }}>
+          {[{ v: "40+", l: "Branchen", s: "Von Reinigung bis IT-Service" }, { v: "< 5 Min", l: "bis zum ersten Lead", s: "Kein langer Setup" }, { v: "KI-Score", l: "für jeden Lead", s: "Priorität auf Knopfdruck" }, { v: "100%", l: "DSGVO", s: "Made for Germany" }].map((s, i, arr) => (
+            <div key={i} style={{ textAlign: "center", padding: "10px 12px", borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+              <p style={{ fontSize: "clamp(20px,2.5vw,32px)", fontWeight: 900, background: "linear-gradient(135deg,#60a5fa,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", marginBottom: 3 }}>{s.v}</p>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "white", marginBottom: 2 }}>{s.l}</p>
+              <p style={{ fontSize: 10, color: "rgba(100,116,139,1)" }}>{s.s}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* HOW IT WORKS */}
-      <section id="wie-es-funktioniert" style={{ padding: "88px 24px", background: "#020617" }}>
+      <section id="wie-es-funktioniert" style={{ padding: "64px 20px", background: "#020617" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 64 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>So funktioniert Vertriebo</p>
@@ -419,7 +422,7 @@ export default function Landing() {
           </div>
 
           {/* Step 1 */}
-          <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center", marginBottom: 72 }}>
+          <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, alignItems: "center", marginBottom: 60 }}>
             <div>
               <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(37,99,235,0.15)", border: "1px solid rgba(37,99,235,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: "#60a5fa", marginBottom: 16 }}>01</div>
               <h3 style={{ fontSize: "clamp(20px,2.5vw,28px)", fontWeight: 800, lineHeight: 1.25, marginBottom: 14, letterSpacing: -0.5 }}>Einrichten in 5 Minuten</h3>
@@ -442,14 +445,14 @@ export default function Landing() {
           </div>
 
           {/* Step 2 */}
-          <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center", marginBottom: 72 }}>
-            <div style={{ order: 2 }}>
+          <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, alignItems: "center", marginBottom: 60 }}>
+            <div className="step-order-fix" style={{ order: 2 }}>
               <div style={{ position: "relative" }}>
                 <div style={{ position: "absolute", inset: "-20px", background: "rgba(124,58,237,0.08)", borderRadius: 24, filter: "blur(40px)" }} />
                 <div style={{ position: "relative", zIndex: 1 }}><ResearchMockup /></div>
               </div>
             </div>
-            <div style={{ order: 1 }}>
+            <div className="step-order-fix" style={{ order: 1 }}>
               <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: "#a78bfa", marginBottom: 16 }}>02</div>
               <h3 style={{ fontSize: "clamp(20px,2.5vw,28px)", fontWeight: 800, lineHeight: 1.25, marginBottom: 14, letterSpacing: -0.5 }}>Vertriebo recherchiert für Sie</h3>
               <p style={{ fontSize: 14, color: "rgba(148,163,184,1)", lineHeight: 1.75, marginBottom: 18 }}>Mit einem Klick startet eine vollautomatische Firmenrecherche in Ihrem Gebiet. Die KI filtert unpassende Treffer heraus und bewertet jeden Lead nach Ihrem Profil.</p>
@@ -463,7 +466,7 @@ export default function Landing() {
           </div>
 
           {/* Step 3 */}
-          <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
+          <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, alignItems: "center" }}>
             <div>
               <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(5,150,105,0.15)", border: "1px solid rgba(5,150,105,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: "#34d399", marginBottom: 16 }}>03</div>
               <h3 style={{ fontSize: "clamp(20px,2.5vw,28px)", fontWeight: 800, lineHeight: 1.25, marginBottom: 14, letterSpacing: -0.5 }}>Ihre Tagesprioritäten auf einen Blick</h3>
@@ -484,14 +487,14 @@ export default function Landing() {
       </section>
 
       {/* FEATURES */}
-      <section style={{ padding: "88px 24px", background: "#080e1e", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <section style={{ padding: "64px 20px", background: "#080e1e", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 56 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>Was Vertriebo kann</p>
             <h2 style={{ fontSize: "clamp(26px,4vw,42px)", fontWeight: 900, lineHeight: 1.15, marginBottom: 14, letterSpacing: -1 }}>Alles was aktiver B2B-Vertrieb braucht</h2>
             <p style={{ fontSize: 15, color: "rgba(148,163,184,1)", maxWidth: 540, margin: "0 auto", lineHeight: 1.7 }}>Kein Feature-Overload. Nur das, was wirklich hilft – jeden Tag.</p>
           </div>
-          <div className="feat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
+          <div className="feat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
             {FEATURES.map((f, i) => (
               <div key={i} style={{ background: f.ac.bg, border: `1px solid ${f.ac.bd}`, borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", gap: 10, transition: "transform 0.2s", cursor: "default" }}
                 onMouseEnter={e => e.currentTarget.style.transform = "translateY(-4px)"}
@@ -510,7 +513,7 @@ export default function Landing() {
       </section>
 
       {/* VS COMPARISON */}
-      <section style={{ padding: "80px 24px", background: "#020617" }}>
+      <section style={{ padding: "60px 20px", background: "#020617" }}>
         <div style={{ maxWidth: 860, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>Warum Vertriebo?</p>
@@ -539,7 +542,7 @@ export default function Landing() {
       </section>
 
       {/* TESTIMONIALS */}
-      <section style={{ padding: "80px 24px", background: "#080e1e", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <section style={{ padding: "60px 20px", background: "#080e1e", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", color: "#fbbf24", fontSize: 12, fontWeight: 700, marginBottom: 14 }}>
@@ -568,7 +571,7 @@ export default function Landing() {
       </section>
 
       {/* INDUSTRIES */}
-      <section style={{ padding: "64px 24px", background: "#020617", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <section style={{ padding: "48px 20px", background: "#020617", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
           <h2 style={{ fontSize: "clamp(22px,3vw,34px)", fontWeight: 900, marginBottom: 12, letterSpacing: -0.5 }}>Für 40+ Dienstleistungsbranchen</h2>
           <p style={{ fontSize: 14, color: "rgba(148,163,184,1)", marginBottom: 28, lineHeight: 1.6 }}>Vertriebo kennt Ihre Branche und findet die richtigen Kunden – egal ob Gebäudereinigung, IT-Service oder Handwerk.</p>
@@ -581,7 +584,7 @@ export default function Landing() {
       </section>
 
       {/* FINAL CTA */}
-      <section style={{ padding: "80px 24px", background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(37,99,235,0.2), rgba(124,58,237,0.12), #020617)", borderTop: "1px solid rgba(255,255,255,0.06)", position: "relative", overflow: "hidden" }}>
+      <section style={{ padding: "60px 20px", background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(37,99,235,0.2), rgba(124,58,237,0.12), #020617)", borderTop: "1px solid rgba(255,255,255,0.06)", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.02) 1px,transparent 1px)", backgroundSize: "32px 32px", pointerEvents: "none" }} />
         <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
           <h2 style={{ fontSize: "clamp(26px,4.5vw,50px)", fontWeight: 900, lineHeight: 1.1, marginBottom: 16, letterSpacing: -1.5 }}>
@@ -597,7 +600,7 @@ export default function Landing() {
       </section>
 
       {/* WAITLIST FORM */}
-      <section id="waitlist-form" style={{ padding: "88px 24px", background: "#020617", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      <section id="waitlist-form" style={{ padding: "64px 20px", background: "#020617", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
         <div style={{ maxWidth: 580, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 36 }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#4ade80", fontSize: 12, fontWeight: 700, marginBottom: 18 }}>
@@ -607,7 +610,7 @@ export default function Landing() {
             <p style={{ fontSize: 14, color: "rgba(148,163,184,1)", lineHeight: 1.7 }}>Tragen Sie sich jetzt ein. Wir melden uns persönlich bei Ihnen – bevor Vertriebo öffentlich verfügbar wird.</p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+          <div className="form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
             {[{ icon: "🚀", text: "Erster Zugang vor dem offiziellen Launch" }, { icon: "💰", text: "Frühbucherkonditionen sichern" }, { icon: "🤝", text: "Persönliches Onboarding durch unser Team" }, { icon: "🎁", text: "Kostenloser Setup & Konfiguration" }].map(p => (
               <div key={p.icon} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10 }}>
                 <span style={{ fontSize: 15 }}>{p.icon}</span>
@@ -629,7 +632,7 @@ export default function Landing() {
             <form onSubmit={handleSubmit} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: 28, display: "flex", flexDirection: "column", gap: 13 }}>
               <input type="text" name="website_hidden" value={form.website_hidden} onChange={e => set("website_hidden", e.target.value)} style={{ display: "none" }} tabIndex={-1} autoComplete="off" />
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div className="form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Name</label>
                   <input type="text" placeholder="Max Mustermann" value={form.name} onChange={e => set("name", e.target.value)} style={inp} />
@@ -639,7 +642,7 @@ export default function Landing() {
                   <input type="email" placeholder="max@firma.de" value={form.email} onChange={e => set("email", e.target.value)} required style={inp} />
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div className="form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Firma</label>
                   <input type="text" placeholder="Muster GmbH" value={form.company_name} onChange={e => set("company_name", e.target.value)} style={inp} />
