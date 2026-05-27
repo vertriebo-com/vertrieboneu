@@ -2,7 +2,7 @@ import { base44 } from "@/api/base44Client";
 import { Link, useNavigate } from "react-router-dom";
 import LearningLoopBox from "@/components/dashboard/LearningLoopBox";
 import { useLeadsFilter } from "../hooks/useLeadsFilter";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import {
   Building2, ArrowRight, Flame,
@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import StatusBadge from "../components/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import moment from "moment";
 import "moment/locale/de";
 moment.locale("de");
@@ -68,8 +67,6 @@ export default function Dashboard() {
     }
     return () => window.removeEventListener('checkout-success', handleCheckoutSuccess);
   }, [activeOrg?.id]);
-
-  const queryClient = useQueryClient();
 
   const { data: dashboardData, isLoading, error, refetch } = useQuery({
     queryKey: ["dashboard-data", activeOrg?.id],
