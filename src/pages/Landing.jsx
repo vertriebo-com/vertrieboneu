@@ -2,117 +2,189 @@ import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { ArrowRight, CheckCircle2, Star } from "lucide-react";
 
-// ─── APP MOCKUPS ────────────────────────────────────────────────────────────
+// ─── APP MOCKUPS – 1:1 echtes App-Design ────────────────────────────────────
 
-const LeadsMockup = () => (
-  <div style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(37,99,235,0.25)" }}>
-    {/* Title bar */}
-    <div style={{ background: "#070e1f", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+// Gemeinsamer Browser-Chrome (wie die echte App)
+const MockupChrome = ({ url, children }) => (
+  <div style={{ borderRadius: 14, overflow: "hidden", boxShadow: "0 28px 70px rgba(0,0,0,0.55), 0 0 0 1px rgba(226,232,240,0.25)", background: "#f6f8fb", border: "1px solid #e2e8f0" }}>
+    {/* Titelleiste */}
+    <div style={{ background: "#f1f5f9", borderBottom: "1px solid #e2e8f0", padding: "8px 14px", display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ display: "flex", gap: 5 }}>
         <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} />
         <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} />
         <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} />
       </div>
-      <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 5, padding: "3px 10px", fontSize: 11, color: "rgba(148,163,184,1)", textAlign: "center", fontFamily: "monospace" }}>app.vertriebo.com/leads</div>
+      <div style={{ flex: 1, background: "white", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px", fontSize: 11, color: "#64748b", textAlign: "center", fontFamily: "monospace" }}>{url}</div>
     </div>
-    <div style={{ display: "flex" }}>
-      {/* Sidebar */}
-      <div style={{ width: 52, background: "#070e1f", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 14, gap: 8 }}>
-        {["📊", "👥", "📋", "✉️", "⚙️"].map((icon, i) => (
-          <div key={i} style={{ width: 36, height: 36, borderRadius: 9, background: i === 1 ? "rgba(37,99,235,0.35)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{icon}</div>
+    {/* Sidebar + Content wrapper */}
+    <div style={{ display: "flex", minHeight: 340 }}>
+      {/* Sidebar – wie echte App: dunkel */}
+      <div style={{ width: 48, background: "#0f172a", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 14, gap: 6, flexShrink: 0 }}>
+        {[{ e: "📊", a: false }, { e: "👥", a: true }, { e: "📋", a: false }, { e: "✉️", a: false }, { e: "⚙️", a: false }].map((item, i) => (
+          <div key={i} style={{ width: 32, height: 32, borderRadius: 8, background: item.a ? "rgba(37,99,235,0.4)" : "transparent", border: item.a ? "1px solid rgba(37,99,235,0.5)" : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{item.e}</div>
         ))}
       </div>
-      {/* Content */}
-      <div style={{ flex: 1, padding: 14, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <p style={{ fontSize: 15, fontWeight: 800, color: "white" }}>Leads</p>
-          <div style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", borderRadius: 7, padding: "5px 12px", fontSize: 11, fontWeight: 700, color: "white" }}>+ Recherche</div>
-        </div>
-        {/* KPI row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 7, marginBottom: 12 }}>
-          {[{ l: "🔥 Heiß", v: "12", c: "#ef4444" }, { l: "📞 Heute", v: "8", c: "#f59e0b" }, { l: "✅ Offen", v: "47", c: "#22c55e" }].map(s => (
-            <div key={s.l} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 9, padding: "8px 8px", border: "1px solid rgba(255,255,255,0.07)" }}>
-              <p style={{ fontSize: 10, color: "rgba(148,163,184,1)", marginBottom: 3 }}>{s.l}</p>
-              <p style={{ fontSize: 22, fontWeight: 900, color: s.c, lineHeight: 1 }}>{s.v}</p>
-            </div>
-          ))}
-        </div>
-        {/* Lead rows */}
-        {[
-          { name: "Schmidt Gebäudedienste GmbH", city: "Frankfurt", score: 94, status: "Rückruf", statusColor: "#ef4444" },
-          { name: "IT-Systemhaus Müller & Co.", city: "Darmstadt", score: 87, status: "Termin", statusColor: "#8b5cf6" },
-          { name: "Hausmeisterdienst Koch KG", city: "Wiesbaden", score: 71, status: "Kontakt", statusColor: "#2563eb" },
-          { name: "Facility Pro GmbH", city: "Offenbach", score: 65, status: "Neu", statusColor: "#64748b" },
-        ].map((lead, i) => (
-          <div key={i} style={{ background: i === 0 ? "rgba(37,99,235,0.07)" : "rgba(255,255,255,0.03)", border: `1px solid rgba(255,255,255,${i === 0 ? "0.12" : "0.05"})`, borderRadius: 9, padding: "9px 12px", marginBottom: 7 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "62%" }}>{lead.name}</p>
-              <span style={{ fontSize: 10, fontWeight: 700, color: lead.statusColor, background: `${lead.statusColor}22`, padding: "2px 8px", borderRadius: 999, border: `1px solid ${lead.statusColor}44` }}>{lead.status}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 11, color: "rgba(100,116,139,1)" }}>📍 {lead.city}</span>
-              <span style={{ fontSize: 11, color: "#60a5fa", fontWeight: 700 }}>Score {lead.score}</span>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Page content */}
+      <div style={{ flex: 1, background: "#f6f8fb", overflow: "hidden" }}>{children}</div>
     </div>
   </div>
 );
 
-const DashboardMockup = () => (
-  <div style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
-    <div style={{ background: "#070e1f", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-      <div style={{ display: "flex", gap: 5 }}><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} /><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} /><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} /></div>
-      <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 5, padding: "3px 10px", fontSize: 11, color: "rgba(148,163,184,1)", textAlign: "center", fontFamily: "monospace" }}>app.vertriebo.com/dashboard</div>
-    </div>
-    <div style={{ padding: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 14 }}>
-        {[{ t: "Heute", v: "6", s: "Prioritäten", c: "#60a5fa", bg: "rgba(37,99,235,0.1)", b: "rgba(37,99,235,0.25)" }, { t: "Offen", v: "47", s: "Leads", c: "#4ade80", bg: "rgba(34,197,94,0.1)", b: "rgba(34,197,94,0.25)" }, { t: "Monat", v: "€18k", s: "Pipeline", c: "#a78bfa", bg: "rgba(139,92,246,0.1)", b: "rgba(139,92,246,0.25)" }].map(item => (
-          <div key={item.t} style={{ background: item.bg, border: `1px solid ${item.b}`, borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-            <p style={{ fontSize: 9, fontWeight: 700, color: item.c, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{item.t}</p>
-            <p style={{ fontSize: 24, fontWeight: 900, color: item.c, lineHeight: 1 }}>{item.v}</p>
-            <p style={{ fontSize: 9, color: "rgba(100,116,139,1)", marginTop: 4 }}>{item.s}</p>
+// STATUS-BADGES wie echte App (LeadRow)
+const StatusBadge = ({ status }) => {
+  const map = {
+    "Rückruf":  { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+    "Termin":   { bg: "#f5f3ff", color: "#5b21b6", border: "#c4b5fd" },
+    "Angebot":  { bg: "#eef2ff", color: "#3730a3", border: "#a5b4fc" },
+    "Kontakt":  { bg: "#f0fdfa", color: "#0f766e", border: "#5eead4" },
+    "Neu":      { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+    "Gewonnen": { bg: "#f0fdf4", color: "#15803d", border: "#86efac" },
+  };
+  const s = map[status] || map["Neu"];
+  return (
+    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>{status}</span>
+  );
+};
+
+// TEMP-BADGE
+const TempBadge = ({ hot }) => hot ? (
+  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6, background: "#fff7ed", color: "#9a3412", border: "1px solid #fdba74" }}>🔥 Heiß</span>
+) : (
+  <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 6, background: "#fffbeb", color: "#92400e", border: "1px solid #fcd34d" }}>Warm</span>
+);
+
+// LEADS MOCKUP – exakt wie LeadRow (weißes BG, slate Farben)
+const LeadsMockup = () => (
+  <MockupChrome url="app.vertriebo.com/leads">
+    <div style={{ padding: "12px 14px" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div>
+          <p style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>Leads</p>
+          <p style={{ fontSize: 11, color: "#64748b", marginTop: 1 }}>47 Firmenkontakte · 3 Rückrufe offen</p>
+        </div>
+        <div style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", borderRadius: 8, padding: "6px 13px", fontSize: 11, fontWeight: 700, color: "white", boxShadow: "0 2px 8px rgba(37,99,235,0.35)" }}>✨ Recherche starten</div>
+      </div>
+      {/* Pipeline-Zeile */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, overflowX: "hidden" }}>
+        {[{ l: "Neu", n: 23, c: "#2563eb" }, { l: "Kontakt", n: 12, c: "#0d9488" }, { l: "Rückruf", n: 3, c: "#d97706" }, { l: "Termin", n: 5, c: "#7c3aed" }, { l: "Angebot", n: 4, c: "#4338ca" }].map(s => (
+          <div key={s.l} style={{ flex: 1, background: "white", border: "1px solid #e2e8f0", borderRadius: 7, padding: "5px 4px", textAlign: "center", borderTop: `2px solid ${s.c}` }}>
+            <p style={{ fontSize: 13, fontWeight: 800, color: s.c }}>{s.n}</p>
+            <p style={{ fontSize: 9, color: "#64748b", fontWeight: 600 }}>{s.l}</p>
           </div>
         ))}
       </div>
-      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 8 }}>⭐ Tages-Prioritäten</p>
-      {[{ company: "Reinigung Bauer KG", prio: "🔥 Heiß", action: "Anrufen", time: "Heute 10 Uhr", color: "#ef4444" }, { company: "Facility Pro GmbH", prio: "📞 Rückruf", action: "Nachfassen", time: "Heute 14 Uhr", color: "#f59e0b" }, { company: "SHK Heinze & Söhne", prio: "✉ Angebot", action: "Senden", time: "Diese Woche", color: "#8b5cf6" }].map((item, i) => (
-        <div key={i} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 9, padding: "9px 12px", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid rgba(255,255,255,0.07)" }}>
-          <div><p style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{item.company}</p><p style={{ fontSize: 10, color: "rgba(100,116,139,1)", marginTop: 2 }}>{item.time}</p></div>
-          <div style={{ textAlign: "right" }}><p style={{ fontSize: 10, fontWeight: 700, color: item.color, marginBottom: 3 }}>{item.prio}</p><div style={{ background: `${item.color}22`, border: `1px solid ${item.color}44`, borderRadius: 5, padding: "2px 7px", fontSize: 10, fontWeight: 700, color: item.color }}>{item.action}</div></div>
+      {/* Lead Rows – exakt wie LeadRow Desktop */}
+      {[
+        { name: "Schmidt Gebäudedienste GmbH", branche: "Gebäudereinigung", ort: "Frankfurt", score: 94, status: "Rückruf", hot: true },
+        { name: "IT-Systemhaus Müller & Co.", branche: "IT-Service", ort: "Darmstadt", score: 87, status: "Termin", hot: false },
+        { name: "Hausmeisterdienst Koch KG", branche: "Facility Service", ort: "Wiesbaden", score: 71, status: "Kontakt", hot: false },
+        { name: "Facility Pro GmbH", branche: "Gebäudeservice", ort: "Offenbach", score: 65, status: "Neu", hot: false },
+      ].map((lead, i) => (
+        <div key={i} style={{ background: "white", border: `1px solid ${i === 0 ? "#bfdbfe" : "#e2e8f0"}`, borderRadius: 10, padding: "9px 12px", marginBottom: 6, display: "flex", alignItems: "center", gap: 10, boxShadow: i === 0 ? "0 1px 6px rgba(37,99,235,0.1)" : "none" }}>
+          {/* Icon */}
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: lead.hot ? "#fff7ed" : "#eff6ff", border: `1px solid ${lead.hot ? "#fdba74" : "#bfdbfe"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>
+            {lead.hot ? "🔥" : "🏢"}
+          </div>
+          {/* Info */}
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lead.name}</p>
+            <p style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>{lead.branche} · 📍 {lead.ort}</p>
+          </div>
+          {/* Badges */}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+            {lead.hot && <TempBadge hot />}
+            <StatusBadge status={lead.status} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#2563eb", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "2px 7px" }}>{lead.score}</span>
+          </div>
         </div>
       ))}
     </div>
-  </div>
+  </MockupChrome>
 );
 
-const ResearchMockup = () => (
-  <div style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.7)" }}>
-    <div style={{ background: "#070e1f", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-      <div style={{ display: "flex", gap: 5 }}><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444" }} /><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b" }} /><div style={{ width: 10, height: 10, borderRadius: "50%", background: "#22c55e" }} /></div>
-      <div style={{ flex: 1, background: "rgba(255,255,255,0.06)", borderRadius: 5, padding: "3px 10px", fontSize: 11, color: "rgba(148,163,184,1)", textAlign: "center", fontFamily: "monospace" }}>Recherche läuft…</div>
-    </div>
-    <div style={{ padding: 16 }}>
-      <div style={{ background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.25)", borderRadius: 11, padding: 14, marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
-          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 8px #3b82f6", flexShrink: 0 }} />
-          <p style={{ fontSize: 12, fontWeight: 700, color: "#93c5fd" }}>Vertriebo durchsucht Frankfurt Umgebung…</p>
+// DASHBOARD MOCKUP – exakt wie DailyActionList + KPI-Karten
+const DashboardMockup = () => (
+  <MockupChrome url="app.vertriebo.com/dashboard">
+    <div style={{ padding: "12px 14px" }}>
+      <p style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", marginBottom: 2 }}>Guten Morgen 👋</p>
+      <p style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>Sie haben 6 Prioritäten für heute.</p>
+      {/* KPI Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 7, marginBottom: 12 }}>
+        {[
+          { t: "Heute", v: "6", s: "Prioritäten", bg: "#eff6ff", border: "#bfdbfe", c: "#1d4ed8" },
+          { t: "Leads", v: "47", s: "Offen", bg: "#f0fdf4", border: "#86efac", c: "#15803d" },
+          { t: "Pipeline", v: "€18k", s: "Monat", bg: "#f5f3ff", border: "#c4b5fd", c: "#6d28d9" },
+        ].map(item => (
+          <div key={item.t} style={{ background: item.bg, border: `1px solid ${item.border}`, borderRadius: 10, padding: "8px 6px", textAlign: "center" }}>
+            <p style={{ fontSize: 9, fontWeight: 700, color: item.c, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 }}>{item.t}</p>
+            <p style={{ fontSize: 20, fontWeight: 900, color: item.c, lineHeight: 1 }}>{item.v}</p>
+            <p style={{ fontSize: 9, color: "#64748b", marginTop: 3 }}>{item.s}</p>
+          </div>
+        ))}
+      </div>
+      {/* DailyActionList – exakt wie echte Komponente */}
+      <p style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 7, textTransform: "uppercase", letterSpacing: 0.5 }}>⭐ Heute wichtig</p>
+      {[
+        { company: "Reinigung Bauer KG", label: "Anrufen", reason: "🔥 Heiß · Score 94", bg: "#f0fdf4", border: "#86efac", ic: "#15803d", iconBg: "#dcfce7" },
+        { company: "Facility Pro GmbH", label: "Follow-up", reason: "Rückruf fällig · Heute 14 Uhr", bg: "#eff6ff", border: "#bfdbfe", ic: "#1d4ed8", iconBg: "#dbeafe" },
+        { company: "SHK Heinze & Söhne", label: "Opportunity", reason: "Angebot vorbereiten", bg: "#f5f3ff", border: "#c4b5fd", ic: "#6d28d9", iconBg: "#ede9fe" },
+        { company: "Koch Hausmeisterdienst", label: "E-Mail", reason: "Vorlage senden", bg: "#ecfeff", border: "#a5f3fc", ic: "#0e7490", iconBg: "#cffafe" },
+      ].map((item, i) => (
+        <div key={i} style={{ background: item.bg, border: `1px solid ${item.border}`, borderRadius: 9, padding: "8px 10px", marginBottom: 5, display: "flex", alignItems: "center", gap: 9 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: item.iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>📞</div>
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: item.ic, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.company}</p>
+            <p style={{ fontSize: 10, color: item.ic, opacity: 0.75, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><b>{item.label}</b> · {item.reason}</p>
+          </div>
+          <span style={{ fontSize: 12, color: item.ic, opacity: 0.5 }}>→</span>
         </div>
-        <div style={{ background: "rgba(37,99,235,0.15)", borderRadius: 5, height: 6, overflow: "hidden", marginBottom: 8 }}>
+      ))}
+    </div>
+  </MockupChrome>
+);
+
+// RESEARCH MOCKUP – wie ResearchDialog in der echten App
+const ResearchMockup = () => (
+  <MockupChrome url="app.vertriebo.com/leads">
+    <div style={{ padding: "12px 14px" }}>
+      <p style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", marginBottom: 2 }}>Leads recherchieren</p>
+      <p style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>Vertriebo durchsucht Ihr Suchgebiet automatisch.</p>
+      {/* Aktiver Recherche-Banner */}
+      <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 11, padding: "12px 14px", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 8px rgba(59,130,246,0.6)", flexShrink: 0 }} />
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#1d4ed8" }}>Frankfurt Umgebung wird durchsucht…</p>
+        </div>
+        <div style={{ background: "#dbeafe", borderRadius: 5, height: 7, overflow: "hidden", marginBottom: 7 }}>
           <div style={{ width: "68%", height: "100%", background: "linear-gradient(90deg,#2563eb,#7c3aed)", borderRadius: 5 }} />
         </div>
-        <p style={{ fontSize: 11, color: "rgba(148,163,184,1)" }}>47 von 70 Orte durchsucht · <span style={{ color: "#4ade80", fontWeight: 700 }}>23 Treffer</span></p>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <p style={{ fontSize: 11, color: "#3b82f6", fontWeight: 600 }}>47 von 70 Orte durchsucht</p>
+          <p style={{ fontSize: 11, color: "#15803d", fontWeight: 700 }}>✨ 23 Treffer</p>
+        </div>
       </div>
-      <p style={{ fontSize: 12, fontWeight: 700, color: "rgba(203,213,225,1)", marginBottom: 10 }}>✨ Neue Leads gefunden</p>
-      {[{ name: "Reinigungsservice Weber", ort: "Frankfurt-Nord", score: 91, c: "#4ade80" }, { name: "Hausmeister & Mehr GmbH", ort: "Offenbach", score: 84, c: "#60a5fa" }, { name: "Facility Max KG", ort: "Hanau", score: 76, c: "#a78bfa" }].map((l, i) => (
-        <div key={i} style={{ background: "rgba(255,255,255,0.04)", borderRadius: 9, padding: "10px 13px", marginBottom: 7, border: "1px solid rgba(255,255,255,0.07)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div><p style={{ fontSize: 12, fontWeight: 700, color: "white" }}>{l.name}</p><p style={{ fontSize: 10, color: "rgba(100,116,139,1)", marginTop: 3 }}>📍 {l.ort}</p></div>
-          <p style={{ fontSize: 13, fontWeight: 900, color: l.c }}>Score {l.score}</p>
+      {/* Neue Leads */}
+      <p style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginBottom: 7, textTransform: "uppercase", letterSpacing: 0.5 }}>✨ Neue Leads gefunden</p>
+      {[
+        { name: "Reinigungsservice Weber GmbH", ort: "Frankfurt-Nord", branche: "Gebäudereinigung", score: 91, scoreBg: "#f0fdf4", scoreBorder: "#86efac", scoreC: "#15803d" },
+        { name: "Hausmeister & Mehr GmbH", ort: "Offenbach", branche: "Facility Service", score: 84, scoreBg: "#eff6ff", scoreBorder: "#bfdbfe", scoreC: "#1d4ed8" },
+        { name: "Facility Max KG", ort: "Hanau", branche: "Hausmeisterdienst", score: 76, scoreBg: "#f5f3ff", scoreBorder: "#c4b5fd", scoreC: "#6d28d9" },
+      ].map((l, i) => (
+        <div key={i} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 10, padding: "9px 12px", marginBottom: 6, display: "flex", alignItems: "center", gap: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+          <div style={{ width: 30, height: 30, borderRadius: 7, background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>🏢</div>
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</p>
+            <p style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{l.branche} · 📍 {l.ort}</p>
+          </div>
+          <div style={{ background: l.scoreBg, border: `1px solid ${l.scoreBorder}`, borderRadius: 7, padding: "4px 9px", textAlign: "center", flexShrink: 0 }}>
+            <p style={{ fontSize: 9, color: l.scoreC, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3 }}>Score</p>
+            <p style={{ fontSize: 15, fontWeight: 900, color: l.scoreC, lineHeight: 1 }}>{l.score}</p>
+          </div>
         </div>
       ))}
     </div>
-  </div>
+  </MockupChrome>
 );
 
 // ─── SECTIONS ────────────────────────────────────────────────────────────────
