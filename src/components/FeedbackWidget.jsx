@@ -1,10 +1,16 @@
 /**
  * FeedbackWidget – Pilot-Feedback Floating Button
  * Nur für eingeloggte Nutzer. Speichert in SupportNote Entity.
+ *
+ * Wichtig: SupportNote verlangt aktuell exakt diese Pflichtfelder:
+ * - organization_id
+ * - created_by
+ * - note
+ * Optional: severity = info | warning | critical
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { MessageSquare, X, Send, Loader2, CheckCircle2 } from "lucide-react";
+import { MessageSquare, X, Send, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const CATEGORIES = [
@@ -21,6 +27,35 @@ const SEVERITIES = [
   { value: "high", label: "Hoch" },
 ];
 
+const SUPPORT_NOTE_SEVERITY = {
+  low: "info",
+  medium: "warning",
+  high: "critical",
+};
+
+function buildFeedbackNote({ category, severity, message, user, orgId }) {
+  const payload = {
+    type: "pilot_feedback",
+    category,
+    severity,
+    page_url: typeof window !== "undefined" ? window.location.href : null,
+    browser_info: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 200) : null,
+    submitted_at: new Date().toISOString(),
+    user_email: user?.email || null,
+    organization_id: orgId || null,
+    message,
+  };
+
+  return [
+    `[Pilot-Feedback] ${category} / ${severity}`,
+    "",
+    message,
+    "",
+    "--- Kontext ---",
+    JSON.stringify(payload, null, 2),
+  ].join("\n");
+}
+
 export default function FeedbackWidget({ user }) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState("bug");
@@ -28,32 +63,75 @@ export default function FeedbackWidget({ user }) {
   const [severity, setSeverity] = useState("medium");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState(null);
+  const [orgId, setOrgId] = useState(null);
+  const [orgLoading, setOrgLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user?.email) return;
+
+    let cancelled = false;
+
+    async function resolveOrg() {
+      setOrgLoading(true);
+      setError(null);
+      try {
+        const ownerOrgs = await base44.entities.Organization.filter({ owner_email: user.email });
+        if (!cancelled && ownerOrgs?.[0]?.id) {
+          setOrgId(ownerOrgs[0].id);
+          return;
+        }
+
+        const memberships = await base44.entities.OrganizationMember.filter({
+          user_email: user.email,
+          status: "active",
+        });
+        if (!cancelled && memberships?.[0]?.organization_id) {
+          setOrgId(memberships[0].organization_id);
+          return;
+        }
+
+        if (!cancelled) {
+          setOrgId(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error("[FeedbackWidget] Org resolve error:", e);
+          setError("Organisation konnte nicht geladen werden. Bitte Seite neu laden.");
+        }
+      } finally {
+        if (!cancelled) setOrgLoading(false);
+      }
+    }
+
+    resolveOrg();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.email]);
 
   // Nur für eingeloggte Nutzer rendern
   if (!user) return null;
 
   const handleSubmit = async () => {
     if (!message.trim()) return;
+    if (!orgId) {
+      setError("Kein Organisationskontext gefunden. Feedback konnte nicht gespeichert werden.");
+      return;
+    }
+
     setSubmitting(true);
+    setError(null);
+
     try {
       await base44.entities.SupportNote.create({
-        // SupportNote fields
-        subject: `[Pilot-Feedback] [${category}] ${message.slice(0, 60)}`,
-        content: message,
-        note_type: "feedback",
-        priority: severity,
-        status: "open",
-        // Kontext-Felder
-        author_email: user.email,
-        metadata: JSON.stringify({
-          category,
-          severity,
-          page_url: window.location.href,
-          browser_info: navigator.userAgent.slice(0, 200),
-          submitted_at: new Date().toISOString(),
-          user_email: user.email,
-        }),
+        organization_id: orgId,
+        created_by: user.email,
+        note: buildFeedbackNote({ category, severity, message: message.trim(), user, orgId }),
+        severity: SUPPORT_NOTE_SEVERITY[severity] || "warning",
       });
+
       setDone(true);
       setMessage("");
       setTimeout(() => {
@@ -61,8 +139,8 @@ export default function FeedbackWidget({ user }) {
         setOpen(false);
       }, 2000);
     } catch (e) {
-      // Fallback: wenn SupportNote fehl schlägt, nichts tun (kein kritischer Fehler)
       console.error("[FeedbackWidget] Submit error:", e);
+      setError(e?.message || "Feedback konnte nicht gespeichert werden.");
     } finally {
       setSubmitting(false);
     }
@@ -94,6 +172,7 @@ export default function FeedbackWidget({ user }) {
             <button
               onClick={() => setOpen(false)}
               className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              aria-label="Feedback schließen"
             >
               <X className="w-4 h-4" />
             </button>
@@ -114,6 +193,7 @@ export default function FeedbackWidget({ user }) {
                   {CATEGORIES.map(c => (
                     <button
                       key={c.value}
+                      type="button"
                       onClick={() => setCategory(c.value)}
                       className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
                         category === c.value
@@ -148,6 +228,7 @@ export default function FeedbackWidget({ user }) {
                   {SEVERITIES.map(s => (
                     <button
                       key={s.value}
+                      type="button"
                       onClick={() => setSeverity(s.value)}
                       className={`flex-1 text-xs py-1.5 rounded-lg border font-medium transition-all ${
                         severity === s.value
@@ -165,15 +246,22 @@ export default function FeedbackWidget({ user }) {
                 </div>
               </div>
 
+              {error && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
               {/* Submit */}
               <Button
                 onClick={handleSubmit}
-                disabled={!message.trim() || submitting}
+                disabled={!message.trim() || submitting || orgLoading}
                 className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9"
                 size="sm"
               >
-                {submitting ? (
-                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Wird gesendet…</>
+                {submitting || orgLoading ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {orgLoading ? "Wird vorbereitet…" : "Wird gesendet…"}</>
                 ) : (
                   <><Send className="w-3.5 h-3.5" /> Feedback senden</>
                 )}
