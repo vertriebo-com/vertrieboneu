@@ -14,7 +14,8 @@ import LeadScoringDiagnostics from '@/components/platform-admin/LeadScoringDiagn
 import LeadEngineDryTest from '@/components/platform-admin/LeadEngineDryTest';
 import UsageBillingDiagnostics from '@/components/platform-admin/UsageBillingDiagnostics';
 import FeedbackPanel from '@/components/platform-admin/FeedbackPanel';
-import { FlaskConical, Activity, BarChart3, FileText, MessageSquare } from 'lucide-react';
+import WaitlistLeadsPanel from '@/components/platform-admin/WaitlistLeadsPanel';
+import { FlaskConical, Activity, BarChart3, FileText, MessageSquare, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -339,6 +340,9 @@ export default function PlatformAdmin() {
             </TabsTrigger>
             <TabsTrigger value="feedback" className="gap-2 text-sm">
               <MessageSquare className="w-4 h-4" /> Feedback
+            </TabsTrigger>
+            <TabsTrigger value="waitlist" className="gap-2 text-sm">
+              <UserPlus className="w-4 h-4" /> Interessenten
             </TabsTrigger>
             <TabsTrigger value="diagnostics" className="gap-2 text-sm">
               <Activity className="w-4 h-4" /> Diagnose & Monitoring
@@ -1035,6 +1039,12 @@ export default function PlatformAdmin() {
           <TabsContent value="feedback">
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
               <FeedbackPanel organizations={organizations} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="waitlist">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <WaitlistLeadsPanel />
             </div>
           </TabsContent>
 

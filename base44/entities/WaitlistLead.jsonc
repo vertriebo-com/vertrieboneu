@@ -1,0 +1,76 @@
+{
+  "name": "WaitlistLead",
+  "type": "object",
+  "x-acl": {
+    "create": "admin",
+    "read": "admin",
+    "update": "admin",
+    "delete": "admin"
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "Name"
+    },
+    "email": {
+      "type": "string",
+      "title": "E-Mail"
+    },
+    "company_name": {
+      "type": "string",
+      "title": "Firma"
+    },
+    "phone": {
+      "type": "string",
+      "title": "Telefon"
+    },
+    "industry": {
+      "type": "string",
+      "title": "Branche"
+    },
+    "company_size": {
+      "type": "string",
+      "title": "Unternehmensgr\u00f6\u00dfe"
+    },
+    "message": {
+      "type": "string",
+      "title": "Nachricht"
+    },
+    "source_page": {
+      "type": "string",
+      "title": "Quellseite"
+    },
+    "utm_source": {
+      "type": "string",
+      "title": "UTM Source"
+    },
+    "utm_campaign": {
+      "type": "string",
+      "title": "UTM Campaign"
+    },
+    "consent_accepted": {
+      "type": "boolean",
+      "title": "Einwilligung akzeptiert",
+      "default": false
+    },
+    "status": {
+      "type": "string",
+      "title": "Status",
+      "enum": [
+        "new",
+        "contacted",
+        "invited",
+        "converted",
+        "archived"
+      ],
+      "default": "new"
+    },
+    "internal_note": {
+      "type": "string",
+      "title": "Interne Notiz"
+    }
+  },
+  "required": [
+    "email"
+  ]
+}

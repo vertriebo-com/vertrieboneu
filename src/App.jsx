@@ -21,6 +21,7 @@ import SettingsPage from './pages/SettingsPage';
 import CalendarView from './pages/CalendarView';
 import ExternalSourcesPage from './pages/ExternalSourcesPage';
 import Landing from './pages/Landing';
+import Start from './pages/Start';
 import Onboarding from './pages/Onboarding';
 import Impressum from './pages/Impressum';
 import Datenschutz from './pages/Datenschutz';
@@ -62,6 +63,7 @@ const PublicApp = () => {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/landing" element={<Landing />} />
+      <Route path="/start" element={<Start />} />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/impressum" element={<Impressum />} />
       <Route path="/datenschutz" element={<Datenschutz />} />
