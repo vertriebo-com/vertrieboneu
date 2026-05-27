@@ -3,7 +3,8 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useLeadsFilter } from "../hooks/useLeadsFilter";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, X, TrendingUp, Building2, Upload, Sparkles, Activity, Target } from "lucide-react";
+import { Search, Filter, X, TrendingUp, Building2, Upload, Sparkles, Activity, Target, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -270,9 +271,18 @@ export default function Leads() {
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <Button onClick={() => setShowResearch(true)} size="sm" className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-sm">
-                <Sparkles className="w-3.5 h-3.5" /> Firmen recherchieren
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button onClick={() => setShowResearch(true)} size="sm" className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-sm">
+                      <Sparkles className="w-3.5 h-3.5" /> Firmen recherchieren
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-xs">
+                    Vertriebo sucht automatisch passende Firmenkontakte in Ihrem Suchgebiet – basierend auf Ihrer Branche und Zielkunden. Die Recherche läuft im Hintergrund, Sie können den Dialog schließen.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         </div>
@@ -342,15 +352,28 @@ export default function Leads() {
 
           {/* Filter-Gruppe */}
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-36 bg-white border border-[#E2E8F0]"><SelectValue placeholder="Temperatur" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Alle">Alle Temperaturen</SelectItem>
-                <SelectItem value="Hoch">🔥 Heiß (Score ≥60)</SelectItem>
-                <SelectItem value="Mittel">Warm (30–59)</SelectItem>
-                <SelectItem value="Niedrig">Kalt (&lt;30)</SelectItem>
-              </SelectContent>
-            </Select>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                      <SelectTrigger className="w-36 bg-white border border-[#E2E8F0]"><SelectValue placeholder="Temperatur" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Alle">Alle Temperaturen</SelectItem>
+                        <SelectItem value="Hoch">🔥 Heiß (Score ≥60)</SelectItem>
+                        <SelectItem value="Mittel">Warm (30–59)</SelectItem>
+                        <SelectItem value="Niedrig">Kalt (&lt;30)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-xs">
+                  <strong>🔥 Heiß (≥60):</strong> Hoher KI-Score – sofort handeln.<br />
+                  <strong>Warm (30–59):</strong> Mittleres Potenzial – demnächst kontaktieren.<br />
+                  <strong>Kalt (&lt;30):</strong> Geringes Signal – niedriger Priorität.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Select value={statusFilter || "alle_status"} onValueChange={v => setStatusFilter(v === "alle_status" ? null : v)}>
               <SelectTrigger className="w-32 bg-white border border-[#E2E8F0]"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>

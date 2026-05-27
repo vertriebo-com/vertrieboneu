@@ -19,6 +19,7 @@ import {
   CalendarCheck } from
 "lucide-react";
 import { Button } from "@/components/ui/button";
+import FeedbackWidget from "./FeedbackWidget";
 
 const NAV_ITEMS = [
 { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -152,6 +153,7 @@ export default function Layout() {
       </div>
 
       <MobileBottomNav />
+      <FeedbackWidget user={user} />
     </div>);
 
 }

@@ -7,6 +7,7 @@ import {
   CreditCard, Mail, Brain, Search, Database,
   AlertTriangle, CheckCircle2, Clock, ExternalLink, Loader2, RefreshCw, Sparkles, ArrowRight, History, Info
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const BILLING_STATUS_CONFIG = {
   active:             { label: "Aktiv",              color: "bg-green-100 text-green-700 border-green-200",   icon: CheckCircle2 },
@@ -74,7 +75,19 @@ function MonthlyLeadQuotaCard({ usageSummary, plan, subscription }) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Monatskontingent · Leads</h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Monatskontingent · Leads</h3>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="w-3.5 h-3.5 text-slate-400 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-xs text-xs">
+                Das Kontingent zählt nur automatisch recherchierte Leads (via Vertriebo-Recherche). Manuell angelegte Firmenkontakte verbrauchen kein Kontingent. Nicht genutzte Leads verfallen am Monatsende – kein Rollover.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         <span className="text-[11px] font-medium text-slate-400">Wird am {resetDate} zurückgesetzt</span>
       </div>
 

@@ -248,6 +248,11 @@ function EmailEditor({ tpl, company, orgId, fromName, orgSettings, onBack, onDon
         <CalendarPlus className="w-4 h-4 text-blue-500 shrink-0 ml-auto" />
       </label>
 
+      {/* MVP-Transparenz-Hinweis */}
+      <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs text-slate-600 leading-relaxed">
+        <strong className="text-slate-700">Hinweis:</strong> Vertriebo versendet in dieser MVP-Version keine E-Mails automatisch. Der Text wird vorbereitet und kann über dein eigenes E-Mail-Programm versendet werden. Der Kontakt wird nur dokumentiert, wenn du auf „Als Kontakt dokumentieren" klickst.
+      </div>
+
       {/* Actions */}
       <div className="border-t border-slate-200 pt-4 space-y-2">
         <Button
