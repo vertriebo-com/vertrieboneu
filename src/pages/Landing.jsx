@@ -367,16 +367,25 @@ export default function Landing() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::placeholder { color: rgba(100,116,139,0.7) !important; }
         @media (max-width: 768px) {
-          .hero-grid { grid-template-columns: 1fr !important; }
-          .feat-grid { grid-template-columns: repeat(2,1fr) !important; }
+          .hero-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
+          .feat-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
           .compare-grid { grid-template-columns: 1fr !important; }
-          .form-grid { grid-template-columns: 1fr !important; }
+          .form-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
           .stats-grid { grid-template-columns: repeat(2,1fr) !important; }
           .nav-btn-text { display: none !important; }
           .hero-mockup { transform: none !important; }
           .step-order-fix { order: unset !important; }
           .mockup-hide-mobile { display: none !important; }
-          section, div { max-width: 100vw; }
+          .compare-table { font-size: 11px !important; }
+          .compare-table span { font-size: 9px !important; padding: 3px 6px !important; }
+          .mobile-pad { padding: 40px 16px !important; }
+          .hero-badge { font-size: 10px !important; padding: 5px 10px !important; }
+          .setup-box { padding: 16px !important; gap: 8px !important; }
+          .setup-box-item { padding: 8px 10px !important; }
+          .section-mb { margin-bottom: 40px !important; }
+          h2 { word-break: break-word; }
+          .hero-btns { flex-direction: column !important; }
+          .hero-btns button { width: 100% !important; text-align: center !important; justify-content: center !important; }
         }
       `}</style>
 
@@ -394,13 +403,13 @@ export default function Landing() {
       </nav>
 
       {/* HERO */}
-      <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", paddingTop: 58, position: "relative", overflow: "hidden" }}>
+      <section style={{ minHeight: "100svh", display: "flex", alignItems: "center", paddingTop: 58, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
           <div style={{ position: "absolute", width: 700, height: 700, background: "rgba(37,99,235,0.12)", borderRadius: "50%", filter: "blur(120px)", top: -200, left: -100 }} />
           <div style={{ position: "absolute", width: 500, height: 500, background: "rgba(124,58,237,0.1)", borderRadius: "50%", filter: "blur(100px)", bottom: -100, right: 0 }} />
           <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(rgba(255,255,255,0.025) 1px,transparent 1px)", backgroundSize: "40px 40px" }} />
         </div>
-        <div className="hero-grid" style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 16px 60px", position: "relative", zIndex: 1, width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center", boxSizing: "border-box" }}>
+        <div className="hero-grid" style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px 56px", position: "relative", zIndex: 1, width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center", boxSizing: "border-box" }}>
           <div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "rgba(37,99,235,0.12)", border: "1px solid rgba(37,99,235,0.3)", color: "#93c5fd", fontSize: 11, fontWeight: 700, marginBottom: 20 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 8px #3b82f6", display: "inline-block" }} /> Early Access – Jetzt Platz sichern
@@ -414,11 +423,11 @@ export default function Landing() {
             <p style={{ fontSize: "clamp(14px,1.8vw,17px)", color: "rgba(148,163,184,1)", lineHeight: 1.7, marginBottom: 24, wordBreak: "break-word" }}>
               Vertriebo findet automatisch passende Firmenkontakte, bewertet sie per KI und sagt Ihnen täglich, wen Sie als Nächstes anrufen sollten.
             </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
-              <button onClick={scrollToForm} style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "13px 24px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 40px rgba(37,99,235,0.5)", display: "inline-flex", alignItems: "center", gap: 8, flex: "1 1 auto" }}>
+            <div className="hero-btns" style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
+              <button onClick={scrollToForm} style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "13px 24px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 40px rgba(37,99,235,0.5)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, flex: "1 1 auto" }}>
                 Frühen Zugang sichern <ArrowRight size={16} />
               </button>
-              <button onClick={() => document.getElementById("wie-es-funktioniert")?.scrollIntoView({ behavior: "smooth" })} style={{ color: "rgba(148,163,184,1)", fontWeight: 600, fontSize: 14, padding: "13px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", flex: "0 0 auto" }}>
+              <button onClick={() => document.getElementById("wie-es-funktioniert")?.scrollIntoView({ behavior: "smooth" })} style={{ color: "rgba(148,163,184,1)", fontWeight: 600, fontSize: 14, padding: "13px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", flex: "0 0 auto", textAlign: "center" }}>
                 Wie es funktioniert ↓
               </button>
             </div>
@@ -442,18 +451,18 @@ export default function Landing() {
       {/* STATS BAR */}
       <section style={{ background: "#060d1f", borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "28px 20px" }}>
         <div className="stats-grid" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0 }}>
-          {[{ v: "40+", l: "Branchen", s: "Von Reinigung bis IT-Service" }, { v: "< 5 Min", l: "bis zum ersten Lead", s: "Kein langer Setup" }, { v: "KI-Score", l: "für jeden Lead", s: "Priorität auf Knopfdruck" }, { v: "100%", l: "DSGVO", s: "Made for Germany" }].map((s, i, arr) => (
-            <div key={i} style={{ textAlign: "center", padding: "10px 12px", borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-              <p style={{ fontSize: "clamp(20px,2.5vw,32px)", fontWeight: 900, background: "linear-gradient(135deg,#60a5fa,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", marginBottom: 3 }}>{s.v}</p>
-              <p style={{ fontSize: 11, fontWeight: 700, color: "white", marginBottom: 2 }}>{s.l}</p>
-              <p style={{ fontSize: 10, color: "rgba(100,116,139,1)" }}>{s.s}</p>
-            </div>
-          ))}
+        {[{ v: "40+", l: "Branchen", s: "Von Reinigung bis IT-Service" }, { v: "< 5 Min", l: "bis zum ersten Lead", s: "Kein langer Setup" }, { v: "KI-Score", l: "für jeden Lead", s: "Priorität auf Knopfdruck" }, { v: "100%", l: "DSGVO", s: "Made for Germany" }].map((s, i) => (
+          <div key={i} style={{ textAlign: "center", padding: "12px 8px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+            <p style={{ fontSize: "clamp(18px,2.5vw,32px)", fontWeight: 900, background: "linear-gradient(135deg,#60a5fa,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", marginBottom: 3 }}>{s.v}</p>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "white", marginBottom: 2 }}>{s.l}</p>
+            <p style={{ fontSize: 10, color: "rgba(100,116,139,1)" }}>{s.s}</p>
+          </div>
+        ))}
         </div>
       </section>
 
       {/* HOW IT WORKS */}
-      <section id="wie-es-funktioniert" style={{ padding: "64px 20px", background: "#020617" }}>
+      <section id="wie-es-funktioniert" className="mobile-pad" style={{ padding: "64px 20px", background: "#020617" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 64 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>So funktioniert Vertriebo</p>
@@ -474,9 +483,9 @@ export default function Landing() {
                 </div>
               ))}
             </div>
-            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: 28, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="setup-box" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 18, padding: 28, display: "flex", flexDirection: "column", gap: 12 }}>
               {[{ label: "Branche", value: "Gebäudereinigung", icon: "🏢" }, { label: "Suchgebiet", value: "Frankfurt · 25km Radius", icon: "📍" }, { label: "Zielkunde", value: "Bürogebäude, Hotels, Industrie", icon: "🎯" }, { label: "Status", value: "Bereit zum Starten ✓", icon: "✅" }].map((item, j) => (
-                <div key={j} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: j === 3 ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)", borderRadius: 10, border: `1px solid ${j === 3 ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)"}` }}>
+                <div key={j} className="setup-box-item" style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: j === 3 ? "rgba(34,197,94,0.06)" : "rgba(255,255,255,0.03)", borderRadius: 10, border: `1px solid ${j === 3 ? "rgba(34,197,94,0.15)" : "rgba(255,255,255,0.06)"}` }}>
                   <span style={{ fontSize: 16 }}>{item.icon}</span>
                   <div><p style={{ fontSize: 9, color: "rgba(100,116,139,1)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>{item.label}</p><p style={{ fontSize: 12, fontWeight: 700, color: j === 3 ? "#4ade80" : "white" }}>{item.value}</p></div>
                 </div>
@@ -527,7 +536,7 @@ export default function Landing() {
       </section>
 
       {/* FEATURES */}
-      <section style={{ padding: "64px 20px", background: "#080e1e", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <section className="mobile-pad" style={{ padding: "64px 20px", background: "#080e1e", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 56 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>Was Vertriebo kann</p>
@@ -536,15 +545,14 @@ export default function Landing() {
           </div>
           <div className="feat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
             {FEATURES.map((f, i) => (
-              <div key={i} style={{ background: f.ac.bg, border: `1px solid ${f.ac.bd}`, borderRadius: 16, padding: 20, display: "flex", flexDirection: "column", gap: 10, transition: "transform 0.2s", cursor: "default" }}
+              <div key={i} style={{ background: f.ac.bg, border: `1px solid ${f.ac.bd}`, borderRadius: 14, padding: 16, display: "flex", flexDirection: "row", gap: 12, alignItems: "flex-start", transition: "transform 0.2s", cursor: "default" }}
                 onMouseEnter={e => e.currentTarget.style.transform = "translateY(-4px)"}
                 onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
               >
-                <div style={{ fontSize: 24 }}>{f.icon}</div>
-                <h3 style={{ fontSize: 13, fontWeight: 800, color: "white", lineHeight: 1.35 }}>{f.title}</h3>
-                <p style={{ fontSize: 12, color: "rgba(148,163,184,1)", lineHeight: 1.6, flex: 1 }}>{f.desc}</p>
-                <div style={{ padding: "5px 8px", borderRadius: 7, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <p style={{ fontSize: 9, color: f.ac.ic, fontWeight: 600 }}>{f.detail}</p>
+                <div style={{ fontSize: 22, flexShrink: 0, marginTop: 2 }}>{f.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 800, color: "white", lineHeight: 1.35, marginBottom: 4 }}>{f.title}</h3>
+                  <p style={{ fontSize: 12, color: "rgba(148,163,184,1)", lineHeight: 1.55 }}>{f.desc}</p>
                 </div>
               </div>
             ))}
@@ -553,7 +561,7 @@ export default function Landing() {
       </section>
 
       {/* VS COMPARISON */}
-      <section style={{ padding: "60px 20px", background: "#020617" }}>
+      <section className="mobile-pad" style={{ padding: "60px 20px", background: "#020617" }}>
         <div style={{ maxWidth: 860, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "#60a5fa", textTransform: "uppercase", letterSpacing: 3, marginBottom: 12 }}>Warum Vertriebo?</p>
@@ -562,15 +570,15 @@ export default function Landing() {
               <span style={{ background: "linear-gradient(135deg,#60a5fa,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Vertriebo schon.</span>
             </h2>
           </div>
-          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "12px 20px" }}>
+          <div className="compare-table" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", background: "rgba(255,255,255,0.03)", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "10px 12px" }}>
               <div />
-              <div style={{ textAlign: "center" }}><span style={{ fontSize: 10, fontWeight: 800, color: "#93c5fd", background: "rgba(37,99,235,0.15)", border: "1px solid rgba(37,99,235,0.3)", borderRadius: 6, padding: "4px 10px" }}>⚡ Vertriebo</span></div>
-              <div style={{ textAlign: "center" }}><span style={{ fontSize: 10, fontWeight: 700, color: "rgba(100,116,139,1)" }}>Klassisches CRM</span></div>
-              <div style={{ textAlign: "center" }}><span style={{ fontSize: 10, fontWeight: 700, color: "rgba(100,116,139,1)" }}>Excel / Listen</span></div>
+              <div style={{ textAlign: "center" }}><span style={{ fontSize: 10, fontWeight: 800, color: "#93c5fd", background: "rgba(37,99,235,0.15)", border: "1px solid rgba(37,99,235,0.3)", borderRadius: 6, padding: "3px 6px" }}>⚡ Vertriebo</span></div>
+              <div style={{ textAlign: "center" }}><span style={{ fontSize: 9, fontWeight: 700, color: "rgba(100,116,139,1)" }}>CRM</span></div>
+              <div style={{ textAlign: "center" }}><span style={{ fontSize: 9, fontWeight: 700, color: "rgba(100,116,139,1)" }}>Excel</span></div>
             </div>
             {COMPARE_ROWS.map((row, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "11px 20px", borderBottom: i < COMPARE_ROWS.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", alignItems: "center" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "10px 12px", borderBottom: i < COMPARE_ROWS.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", alignItems: "center" }}>
                 <span style={{ fontSize: 12, color: "rgba(203,213,225,1)", fontWeight: 500 }}>{row.f}</span>
                 <div style={{ textAlign: "center" }}>{row.v ? <span style={{ fontSize: 15, color: "#4ade80" }}>✓</span> : <span style={{ color: "rgba(100,116,139,0.3)" }}>–</span>}</div>
                 <div style={{ textAlign: "center" }}>{row.c ? <span style={{ fontSize: 13, color: "rgba(148,163,184,0.5)" }}>✓</span> : <span style={{ color: "rgba(100,116,139,0.3)" }}>–</span>}</div>
@@ -582,7 +590,7 @@ export default function Landing() {
       </section>
 
       {/* TESTIMONIALS */}
-      <section style={{ padding: "60px 20px", background: "#080e1e", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <section className="mobile-pad" style={{ padding: "60px 20px", background: "#080e1e", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 48 }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", color: "#fbbf24", fontSize: 12, fontWeight: 700, marginBottom: 14 }}>
