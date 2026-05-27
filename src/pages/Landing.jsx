@@ -1,6 +1,38 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { ArrowRight, CheckCircle2, Star } from "lucide-react";
+
+// ─── PARTICLE BACKGROUND ────────────────────────────────────────────────────
+const Particles = () => {
+  const particles = useMemo(() => Array.from({ length: 50 }, (_, i) => ({
+    id: i,
+    left: Math.random() * 100,
+    top: Math.random() * 100,
+    size: 6 + Math.random() * 18,
+    opacity: 0.12 + Math.random() * 0.25,
+    duration: 12 + Math.random() * 16,
+    delay: Math.random() * 6,
+    colorA: i % 3 === 0 ? "96,165,250" : i % 3 === 1 ? "139,92,246" : "244,114,182",
+  })), []);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden" }}>
+      {particles.map(p => (
+        <div key={p.id} style={{
+          position: "absolute",
+          width: p.size, height: p.size,
+          background: `radial-gradient(circle, rgba(${p.colorA},${p.opacity}) 0%, rgba(${p.colorA},0) 70%)`,
+          borderRadius: "50%",
+          left: `${p.left}%`, top: `${p.top}%`,
+          animation: `particleFloat ${p.duration}s ease-in-out infinite`,
+          animationDelay: `${p.delay}s`,
+          filter: `blur(${p.size * 0.3}px)`,
+          boxShadow: `0 0 ${p.size * 3}px rgba(${p.colorA},${p.opacity * 0.8})`,
+        }} />
+      ))}
+    </div>
+  );
+};
 
 // ─── APP MOCKUPS – Dark Premium WOW Design ──────────────────────────────────
 
@@ -195,7 +227,7 @@ const ResearchMockup = () => (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <div>
           <p style={{ fontSize: 15, fontWeight: 800, color: "white", letterSpacing: -0.3 }}>Automatische Recherche</p>
-          <p style={{ fontSize: 10, color: "rgba(100,116,139,1)", marginTop: 1 }}>KI durchsucht Frankfurt · 25km</p>
+          <p style={{ fontSize: 10, color: "rgba(100,116,139,1)", marginTop: 1 }}>Vertriebo durchsucht Frankfurt · 25km</p>
         </div>
         <div style={{ background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: 20, padding: "3px 10px", fontSize: 9.5, fontWeight: 700, color: "#4ade80", display: "flex", alignItems: "center", gap: 4 }}>
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 6px #4ade80" }} /> Live
@@ -215,7 +247,7 @@ const ResearchMockup = () => (
           <div style={{ width: "68%", height: "100%", background: "linear-gradient(90deg,#2563eb,#7c3aed)", borderRadius: 5, boxShadow: "0 0 8px rgba(37,99,235,0.6)" }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <p style={{ fontSize: 10, color: "rgba(100,116,139,1)" }}>47 / 70 Orte durchsucht</p>
+          <p style={{ fontSize: 10, color: "rgba(100,116,139,1)" }}>47 / 70 Orte · Vertriebo aktiv</p>
           <p style={{ fontSize: 10, color: "rgba(100,116,139,1)" }}>68%</p>
         </div>
         {/* Mini-Statistik */}
@@ -255,14 +287,14 @@ const ResearchMockup = () => (
 // ─── SECTIONS ────────────────────────────────────────────────────────────────
 
 const FEATURES = [
-  { icon: "🔍", title: "Automatische Firmenkontakt-Recherche", desc: "Vertriebo durchsucht täglich Ihr Suchgebiet nach neuen B2B-Kontakten – vollautomatisch auf Basis Ihres Kundenprofils. Kein manuelles Googeln mehr.", detail: "Google Places · Alle Orte im Radius · Täglich aktuell", ac: { bg: "rgba(37,99,235,0.06)", bd: "rgba(37,99,235,0.18)", ic: "#60a5fa" } },
+  { icon: "🔍", title: "Automatische Firmenkontakt-Recherche", desc: "Vertriebo durchsucht täglich Ihr Suchgebiet nach neuen B2B-Kontakten – vollautomatisch auf Basis Ihres Kundenprofils. Kein manuelles Googeln mehr.", detail: "Vertriebo Suche · Alle Orte im Radius · Täglich aktuell", ac: { bg: "rgba(37,99,235,0.06)", bd: "rgba(37,99,235,0.18)", ic: "#60a5fa" } },
   { icon: "🔥", title: "KI-Lead-Scoring & Priorisierung", desc: "Die Vertriebo-KI bewertet jeden Lead 0–100. Heiße Leads landen automatisch oben – Sie kontaktieren immer zuerst den vielversprechendsten Ansprechpartner.", detail: "Score 0–100 · Hot/Warm/Cold · Täglich aktualisiert", ac: { bg: "rgba(239,68,68,0.05)", bd: "rgba(239,68,68,0.15)", ic: "#f87171" } },
   { icon: "📋", title: "Priorisierte Tagesliste", desc: "Jeden Morgen sehen Sie: Wer muss heute angerufen werden? Welche Angebote warten? Welche Follow-ups sind fällig? Einfach losarbeiten.", detail: "Auto-Sortierung · Rückruf-Erinnerungen · To-Do's", ac: { bg: "rgba(245,158,11,0.05)", bd: "rgba(245,158,11,0.15)", ic: "#fbbf24" } },
   { icon: "📞", title: "Vollständige Kontakthistorie", desc: "Alle Gespräche, E-Mails, Notizen und Aufgaben zu jeder Firma – chronologisch und übersichtlich. Auch nach Wochen wissen Sie sofort, was besprochen wurde.", detail: "Anruf-Log · Notizen · E-Mail-Verlauf · Aufgaben", ac: { bg: "rgba(16,185,129,0.05)", bd: "rgba(16,185,129,0.15)", ic: "#34d399" } },
   { icon: "✉️", title: "E-Mail-Vorlagen & Follow-ups", desc: "Professionelle E-Mail-Vorlagen mit Ihrem Branding. Automatische Follow-up-Erinnerungen damit kein Kontakt verloren geht.", detail: "Eigene Vorlagen · Automatische Erinnerungen · Brevo", ac: { bg: "rgba(139,92,246,0.05)", bd: "rgba(139,92,246,0.15)", ic: "#a78bfa" } },
   { icon: "📊", title: "Vertriebscontrolling", desc: "Sehen Sie wie Ihr Vertrieb läuft: Kontaktquote, Conversion-Rate, beste Branchen, ROI der Recherche. Alle Zahlen live, klar und ohne Excel.", detail: "Live-Dashboard · Konversionsrate · ROI-Tracking", ac: { bg: "rgba(99,102,241,0.05)", bd: "rgba(99,102,241,0.15)", ic: "#818cf8" } },
   { icon: "🧠", title: "System das mitlernt", desc: "Vertriebo analysiert Ihre Erfolge: Welche Zielgruppen konvertieren? Welche Suchkategorien bringen die besten Leads? Je mehr Sie nutzen, desto besser wird es.", detail: "Outcome-Feedback · Keyword-Lernen · Optimierung", ac: { bg: "rgba(249,115,22,0.05)", bd: "rgba(249,115,22,0.15)", ic: "#fb923c" } },
-  { icon: "🗺️", title: "Lückenlose Gebiets-Abdeckung", desc: "Nicht nur die Kreisstadt – Vertriebo durchsucht alle Orte und Gemeinden in Ihrem Radius. So entgehen Ihnen keine potenziellen Kunden.", detail: "LocationIndex · Alle PLZ · Grid-Suche", ac: { bg: "rgba(20,184,166,0.05)", bd: "rgba(20,184,166,0.15)", ic: "#2dd4bf" } },
+  { icon: "🗺️", title: "Lückenlose Gebiets-Abdeckung", desc: "Nicht nur die Kreisstadt – Vertriebo durchsucht alle Orte und Gemeinden in Ihrem Radius. So entgehen Ihnen keine potenziellen Kunden.", detail: "Vertriebo Flächensuche · Alle PLZ · Vollständige Abdeckung", ac: { bg: "rgba(20,184,166,0.05)", bd: "rgba(20,184,166,0.15)", ic: "#2dd4bf" } },
 ];
 
 const TESTIMONIALS = [
@@ -322,10 +354,12 @@ export default function Landing() {
   const inp = { width: "100%", padding: "11px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "white", fontSize: 14, fontFamily: "inherit", outline: "none" };
 
   return (
-    <div style={{ background: "#020617", minHeight: "100vh", fontFamily: "'Inter', sans-serif", color: "white", overflowX: "hidden" }}>
+    <div style={{ background: "#020617", minHeight: "100vh", fontFamily: "'Inter', sans-serif", color: "white", overflowX: "hidden", position: "relative" }}>
+      <Particles />
       <style>{`
         @keyframes shimmer { 0% { background-position: 200% center; } 100% { background-position: -200% center; } }
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes particleFloat { 0%, 100% { transform: translate(0, 0) scale(1); } 25% { transform: translate(60px, -90px) scale(1.3); } 50% { transform: translate(-50px, -120px) scale(1.1); } 75% { transform: translate(70px, -70px) scale(1.2); } }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::placeholder { color: rgba(100,116,139,0.7) !important; }
         @media (max-width: 768px) {
@@ -456,7 +490,7 @@ export default function Landing() {
               <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: "#a78bfa", marginBottom: 16 }}>02</div>
               <h3 style={{ fontSize: "clamp(20px,2.5vw,28px)", fontWeight: 800, lineHeight: 1.25, marginBottom: 14, letterSpacing: -0.5 }}>Vertriebo recherchiert für Sie</h3>
               <p style={{ fontSize: 14, color: "rgba(148,163,184,1)", lineHeight: 1.75, marginBottom: 18 }}>Mit einem Klick startet eine vollautomatische Firmenrecherche in Ihrem Gebiet. Die KI filtert unpassende Treffer heraus und bewertet jeden Lead nach Ihrem Profil.</p>
-              {["Automatische Google-Places-Suche", "KI-Filterung & Qualitätsbewertung", "Score 0–100 für jeden Lead"].map(b => (
+              {["Intelligente Vertriebo-Firmensuche", "KI-Filterung & Qualitätsbewertung", "Score 0–100 für jeden Lead"].map(b => (
                 <div key={b} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                   <div style={{ width: 18, height: 18, borderRadius: "50%", background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span style={{ fontSize: 9, color: "#a78bfa" }}>✓</span></div>
                   <span style={{ fontSize: 13, color: "rgba(203,213,225,1)", fontWeight: 500 }}>{b}</span>
