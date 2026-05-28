@@ -142,7 +142,7 @@ export default function LeadDetail() {
   const handleStatusChange = async (newStatus) => {
     if (!assertOrgMatch()) return;
     if (newStatus === "__sonstiges__") { setSonstigesNotiz(""); setShowSonstigesDialog(true); return; }
-    await base44.entities.Company.update(id, { status: newStatus });
+    await base44.functions.invoke("updateCompanySafe", { company_id: id, patch: { status: newStatus } });
     setCompany(prev => ({ ...prev, status: newStatus }));
     toast.success(`Status auf "${newStatus}" geändert`);
   };
@@ -154,7 +154,7 @@ export default function LeadDetail() {
       organization_id: orgId, company_id: id, typ: "Sonstiges", ergebnis: "Abgeschlossen",
       notiz: sonstigesNotiz, naechster_schritt: "Kunde meldet sich selbst", user_email: currentUser?.email,
     });
-    await base44.entities.Company.update(id, { last_contact_date: new Date().toISOString() });
+    await base44.functions.invoke("updateCompanySafe", { company_id: id, patch: { last_contact_date: new Date().toISOString() } });
     toast.success("Notiz gespeichert");
     setSonstigesSaving(false); setShowSonstigesDialog(false); setSonstigesNotiz(""); loadData();
   };
@@ -224,7 +224,7 @@ export default function LeadDetail() {
   const handleSaveNotizen = async () => {
     if (!assertOrgMatch()) return;
     setNotizenSaving(true);
-    await base44.entities.Company.update(id, { notizen });
+    await base44.functions.invoke("updateCompanySafe", { company_id: id, patch: { notizen } });
     setCompany(prev => ({ ...prev, notizen }));
     toast.success("Notiz gespeichert • " + moment().format("HH:mm"));
     setNotizenSaving(false);
@@ -233,7 +233,7 @@ export default function LeadDetail() {
   const toggleTask = async (task) => {
     const nowDone = !task.erledigt;
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, erledigt: nowDone } : t));
-    await base44.entities.Task.update(task.id, { erledigt: nowDone });
+    await base44.functions.invoke("updateTaskSafe", { task_id: task.id, patch: { erledigt: nowDone } });
     toast.success(nowDone ? "Aufgabe erledigt ✓" : "Aufgabe wieder geöffnet");
   };
 

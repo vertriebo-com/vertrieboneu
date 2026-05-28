@@ -71,7 +71,7 @@ export default function Tasks() {
       }, 1500);
       toast.success("Aufgabe erledigt ✓");
     }
-    await base44.entities.Task.update(task.id, { erledigt: nowDone });
+    await base44.functions.invoke("updateTaskSafe", { task_id: task.id, patch: { erledigt: nowDone } });
   };
 
   const isAdmin = user?.role === "admin";
