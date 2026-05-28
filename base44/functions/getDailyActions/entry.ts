@@ -28,13 +28,17 @@ Deno.serve(async (req) => {
   }
 
   const isPlatformAdmin = ["admin", "platform_owner", "platform_admin"].includes(user.role);
-  const orgs = await base44.entities.Organization.filter({ id: targetOrgId });
+  const orgs = await base44.asServiceRole.entities.Organization.filter({ id: targetOrgId });
   if (!orgs || orgs.length === 0) {
     return Response.json({ error: "Organization not found" }, { status: 404 });
   }
   const org = orgs[0];
   if (!isPlatformAdmin && org.owner_email !== user.email) {
-    return Response.json({ error: "Forbidden: Not your organization" }, { status: 403 });
+    // Auch aktive OrganizationMember dürfen zugreifen
+    const memberships = await base44.asServiceRole.entities.OrganizationMember.filter({ organization_id: targetOrgId, user_email: user.email, status: 'active' });
+    if (memberships.length === 0) {
+      return Response.json({ error: "Forbidden: Not your organization" }, { status: 403 });
+    }
   }
 
   // ── DATEN LADEN ──
