@@ -91,10 +91,6 @@ export default function LaunchCountdown() {
             <Unit value={time.seconds} label="Sekunden" />
           </div>
         )}
-
-        <p style={{ fontSize: 11, color: "rgba(71,85,105,1)", marginTop: 24 }}>
-          Countdown bis 27.06.2026 · 00:00 Uhr MESZ
-        </p>
       </div>
     </section>
   );
