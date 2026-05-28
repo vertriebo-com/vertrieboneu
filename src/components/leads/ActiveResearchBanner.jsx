@@ -82,6 +82,14 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
             leads_saved: running.leads_saved ?? 0,
             progress_percent: running.progress_percent ?? 5,
             message: running.current_step || 'Recherche läuft…',
+            // Coverage-Daten für UI
+            covered_locations_count: running.covered_locations_count ?? 0,
+            selected_locations_count: running.selected_locations_count ?? 0,
+            locations_searched_count: running.locations_searched_count ?? 0,
+            search_center_city: running.search_center_city || '',
+            search_radius_km: running.search_radius_km ?? null,
+            raw_hits: running.raw_hits ?? 0,
+            duplicates_skipped: running.duplicates_skipped ?? 0,
           });
 
           if ((running.leads_saved || 0) > lastLeadsSavedRef.current) {
@@ -156,6 +164,14 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
           progress_percent: data?.progress_percent ?? freshRun.progress_percent ?? 0,
           message: data?.current_step || freshRun.current_step || 'Recherche läuft…',
           research_run_id: freshRun.id,
+          // Coverage-Daten
+          covered_locations_count: freshRun.covered_locations_count ?? 0,
+          selected_locations_count: freshRun.selected_locations_count ?? 0,
+          locations_searched_count: freshRun.locations_searched_count ?? 0,
+          search_center_city: freshRun.search_center_city || '',
+          search_radius_km: freshRun.search_radius_km ?? null,
+          raw_hits: freshRun.raw_hits ?? 0,
+          duplicates_skipped: freshRun.duplicates_skipped ?? 0,
         });
 
       } else if (recentDone && recentDone.id !== dismissed) {
@@ -188,6 +204,13 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
   const isDone = ['completed', 'partial', 'failed'].includes(activeRun.status);
   const isRunning = activeRun.status === 'running' || activeRun.status === 'queued';
 
+  // Coverage-Daten auslesen
+  const locationsSearched = activeRun.locations_searched_count ?? 0;
+  const locationsTotal = activeRun.selected_locations_count ?? 0;
+  const coveredTotal = activeRun.covered_locations_count ?? 0;
+  const hasLocationCoverage = locationsTotal > 0;
+  const cityLabel = activeRun.search_center_city ? `${activeRun.search_center_city}${activeRun.search_radius_km ? ` · ${activeRun.search_radius_km} km` : ''}` : null;
+
   return (
     <div className={`rounded-xl border p-3 ${isDone ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
       <div className="flex items-center justify-between gap-3">
@@ -197,13 +220,39 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
           ) : (
             <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
           )}
-          <div className="min-w-0">
-            <div className={`text-sm font-semibold truncate ${isDone ? 'text-green-900' : 'text-blue-900'}`}>
+          <div className="min-w-0 flex-1">
+            <div className={`text-sm font-semibold ${isDone ? 'text-green-900' : 'text-blue-900'}`}>
               {isRunning ? 'Recherche läuft im Hintergrund' : 'Recherche abgeschlossen'}
+              {cityLabel && isRunning && (
+                <span className="font-normal text-blue-700 ml-1">· {cityLabel}</span>
+              )}
             </div>
-            <div className={`text-xs mt-0.5 truncate ${isDone ? 'text-green-700' : 'text-blue-600'}`}>
+            <div className={`text-xs mt-0.5 ${isDone ? 'text-green-700' : 'text-blue-600'}`}>
               {activeRun.message}
             </div>
+
+            {/* Coverage-Zeile: Orte erkannt / durchsucht */}
+            {isRunning && hasLocationCoverage && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5">
+                <span className="text-xs text-blue-700 font-medium">
+                  🗺️ {locationsSearched} / {locationsTotal} Orte geprüft
+                  {coveredTotal > locationsTotal && (
+                    <span className="text-blue-500 font-normal ml-1">({coveredTotal} im Gebiet)</span>
+                  )}
+                </span>
+                {activeRun.leads_saved > 0 && (
+                  <span className="text-xs text-green-700 font-medium">✅ {activeRun.leads_saved} Treffer</span>
+                )}
+                {activeRun.raw_hits > 0 && (
+                  <span className="text-xs text-slate-500">{activeRun.raw_hits} geprüfte Profile</span>
+                )}
+              </div>
+            )}
+            {isRunning && !hasLocationCoverage && (
+              <div className="text-xs text-blue-500 mt-1">
+                Vertriebo durchsucht automatisch Nachbarorte im Umkreis.
+              </div>
+            )}
           </div>
         </div>
 
@@ -218,13 +267,22 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
       </div>
 
       {isRunning && (
-        <div className="mt-2.5">
+        <div className="mt-2">
           <div className="w-full bg-blue-100 rounded-full h-1.5">
             <div
               className="bg-blue-500 h-1.5 rounded-full transition-all duration-700"
               style={{ width: `${Math.max(5, activeRun.progress_percent)}%` }}
             />
           </div>
+          {/* Orte-Fortschrittsbalken (nur wenn LocationIndex aktiv) */}
+          {hasLocationCoverage && locationsTotal > 0 && (
+            <div className="w-full bg-blue-50 rounded-full h-1 mt-1">
+              <div
+                className="bg-blue-300 h-1 rounded-full transition-all duration-700"
+                style={{ width: `${Math.min(100, Math.round((locationsSearched / locationsTotal) * 100))}%` }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

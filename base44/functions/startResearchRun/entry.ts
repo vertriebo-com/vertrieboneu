@@ -645,18 +645,89 @@ Deno.serve(async (req) => {
     }
 
     // ── Koordinaten auflösen ─────────────────────────────────────────────────
+    // VERBESSERUNG: Erst LocationIndex prüfen für Eingaben wie "35708 Haiger", "Haiger", "35708"
+    // Nur wenn kein Treffer: Google Places als Fallback
     let cityCoords = null;
     const savedLat = parseFloat(settings.service_area_lat || settings.lead_lat || '0');
     const savedLng = parseFloat(settings.service_area_lng || settings.lead_lng || '0');
     if (savedLat && savedLng && Math.abs(savedLat) > 0.001) {
       cityCoords = { lat: savedLat, lng: savedLng };
+      console.info(`[startResearchRun] Koordinaten aus Settings: ${savedLat},${savedLng}`);
     } else {
-      if (!GOOGLE_PLACES_API_KEY) return Response.json({ error: 'GOOGLE_PLACES_API_KEY fehlt', success: false }, { status: 500 });
-      const geoRes = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(city + ' Deutschland')}&key=${GOOGLE_PLACES_API_KEY}&language=de`);
-      const geoData = await geoRes.json();
-      const loc = geoData.results?.[0]?.geometry?.location;
-      if (!loc) return Response.json({ error: `Stadt "${city}" nicht gefunden.`, success: false }, { status: 400 });
-      cityCoords = { lat: loc.lat, lng: loc.lng };
+      // ── LocationIndex-basierter Resolver ────────────────────────────────────
+      // Erkennt: "35708 Haiger", "Haiger", "35708", "Frankfurt am Main" etc.
+      let resolvedFromLocationIndex = false;
+      try {
+        const cityInput = city.trim();
+        // Extraktion: PLZ (5-stellig) und Stadtname trennen
+        const plzMatch = cityInput.match(/\b(\d{5})\b/);
+        const plzPart = plzMatch ? plzMatch[1] : null;
+        // Stadtname = alles ohne PLZ, bereinigt
+        const cityPart = cityInput.replace(/\d{5}/, '').replace(/[,\-]/g, ' ').trim();
+
+        function normLoc(s) {
+          return String(s || '').toLowerCase()
+            .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+            .replace(/[^a-z0-9 ]/g,'').trim();
+        }
+
+        // LocationIndex in Batches laden (bis wir Treffer finden)
+        const PAGE_SIZE_RESOLVE = 2000;
+        let bestMatch = null;
+        let bestScore = 0;
+
+        for (let pg = 0; pg < 5 && !bestMatch; pg++) {
+          const batch = await base44.asServiceRole.entities.LocationIndex.list('-quality_score', PAGE_SIZE_RESOLVE, pg * PAGE_SIZE_RESOLVE);
+          if (!batch.length) break;
+
+          for (const r of batch) {
+            if (!(r.is_active === true || r.is_active === 'true')) continue;
+            if (!r.lat || !r.lng || r.lat === 0 || r.lng === 0) continue;
+            if (r.location_type === 'special_postal_recipient') continue;
+
+            let score = 0;
+            // PLZ-Treffer (exakt)
+            if (plzPart && r.postal_code === plzPart) score += 100;
+            // Stadtname-Treffer (normalisiert)
+            const normCity = normLoc(cityPart || cityInput);
+            const normR = normLoc(r.city || '');
+            const normN = normLoc(r.normalized_name || r.city || '');
+            if (normCity && normR && normR === normCity) score += 80;
+            else if (normCity && normN && normN === normCity) score += 75;
+            else if (normCity && normR && normR.startsWith(normCity)) score += 40;
+            else if (normCity && normCity.length > 3 && normR && normR.includes(normCity)) score += 20;
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestMatch = r;
+              // PLZ+Stadt-Exakttreffer → sofort nehmen
+              if (score >= 170) break;
+            }
+          }
+          // Wenn guter Treffer gefunden, kein weiteres Paging nötig
+          if (bestScore >= 80) break;
+        }
+
+        if (bestMatch && bestScore >= 40) {
+          cityCoords = { lat: bestMatch.lat, lng: bestMatch.lng };
+          resolvedFromLocationIndex = true;
+          console.info(`[startResearchRun] LocationIndex-Resolver: "${city}" → "${bestMatch.city}" (${bestMatch.postal_code}) score=${bestScore} coords=${bestMatch.lat},${bestMatch.lng}`);
+        }
+      } catch (resolveErr) {
+        console.warn(`[startResearchRun] LocationIndex-Resolver Fehler (non-blocking): ${resolveErr?.message}`);
+      }
+
+      // ── Google Places Fallback (nur wenn LocationIndex kein Ergebnis) ────────
+      if (!cityCoords) {
+        if (!GOOGLE_PLACES_API_KEY) return Response.json({ error: 'GOOGLE_PLACES_API_KEY fehlt', success: false }, { status: 500 });
+        console.info(`[startResearchRun] Google Geocoding Fallback für: "${city}"`);
+        const geoRes = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(city + ' Deutschland')}&key=${GOOGLE_PLACES_API_KEY}&language=de`);
+        const geoData = await geoRes.json();
+        const loc = geoData.results?.[0]?.geometry?.location;
+        if (!loc) return Response.json({ error: `Stadt "${city}" nicht gefunden.`, success: false }, { status: 400 });
+        cityCoords = { lat: loc.lat, lng: loc.lng };
+        console.info(`[startResearchRun] Google Geocoding: "${city}" → ${loc.lat},${loc.lng}`);
+      }
     }
 
     // ── Zusatzorte ───────────────────────────────────────────────────────────

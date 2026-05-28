@@ -1515,9 +1515,20 @@ Deno.serve(async (req) => {
     console.info(`[processResearchRun] Batch ${batchIndex}/${totalBatches} done: newSaved=${newLeadsSavedThisBatch} totalSaved=${totalLeadsSaved} done=${isDone}`);
 
     const newStatus = isDone ? 'completed' : 'running';
-    const newStep = isDone
-      ? (totalLeadsSaved > 0 ? `${totalLeadsSaved} neue Firmenkontakte gefunden` : 'Keine neuen Kontakte gefunden')
-      : `Suche läuft… ${totalLeadsSaved} Kontakte bisher gefunden`;
+
+    // Verbesserter current_step mit Orts-Zähler: "Haiger Umgebung läuft… 23 / 47 Orte"
+    const cityLabel = city ? `${city} Umgebung` : 'Suchgebiet';
+    let newStep;
+    if (isDone) {
+      newStep = totalLeadsSaved > 0
+        ? `${totalLeadsSaved} neue Firmenkontakte gefunden`
+        : 'Keine neuen Kontakte gefunden';
+    } else if (selectedLocationsCount > 0) {
+      // LocationIndex aktiv → Orte-Zähler anzeigen
+      newStep = `${cityLabel} läuft… ${cumulativeLocationsSearched} / ${selectedLocationsCount} Orte · ${totalLeadsSaved} Kontakte`;
+    } else {
+      newStep = `${cityLabel} wird durchsucht… ${totalLeadsSaved} Kontakte bisher`;
+    }
 
     // ── Punkt 4: Erweiterte Coverage-Diagnostik ────────────────────────────
     const cumulativeLocationsSearched = (freshRun.locations_searched_count || 0) + locationsSearchedSet.size;

@@ -143,6 +143,42 @@ function RunDetailPanel({ run, orgName }) {
         </div>
       </div>
 
+      {/* Coverage / Gebietsabdeckung */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Gebietsabdeckung (LocationIndex)</p>
+        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200 space-y-1.5">
+          <Row label="Coverage-Modus" value={run.coverage_mode || 'grid_only'} />
+          <Row label="Orte im Suchgebiet" value={run.covered_locations_count ?? '—'} />
+          <Row label="Ausgewählte Orte (Plan-Limit)" value={run.selected_locations_count ?? '—'} />
+          <Row label="Tatsächlich durchsucht" value={
+            (run.selected_locations_count > 0)
+              ? `${run.locations_searched_count ?? 0} / ${run.selected_locations_count} (${Math.round(((run.locations_searched_count ?? 0) / run.selected_locations_count) * 100)}%)`
+              : (run.locations_searched_count ?? '—')
+          } />
+          <Row label="Suchpunkte gesamt" value={run.search_points_used_count ?? '—'} />
+          <Row label="Suchzentrum" value={[run.search_center_city, run.search_radius_km ? `${run.search_radius_km} km` : null].filter(Boolean).join(' · ') || '—'} />
+          <Row label="Abdeckung vollständig" value={run.coverage_complete ? '✅ Ja' : run.coverage_mode === 'grid_only' ? 'Grid-Modus' : '⏳ Nein'} />
+          {run.chain_skipped_count > 0 && (
+            <Row label="Ketten übersprungen" value={run.chain_skipped_count} />
+          )}
+        </div>
+        {/* Fortschrittsbalken für Orte */}
+        {(run.selected_locations_count > 0) && (
+          <div className="mt-2">
+            <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+              <span>Orte-Fortschritt</span>
+              <span>{run.locations_searched_count ?? 0} / {run.selected_locations_count}</span>
+            </div>
+            <div className="w-full bg-blue-100 rounded-full h-2">
+              <div
+                className="bg-blue-500 h-2 rounded-full"
+                style={{ width: `${Math.min(100, Math.round(((run.locations_searched_count ?? 0) / run.selected_locations_count) * 100))}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Taxonomie */}
       <div>
         <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Taxonomie</p>
