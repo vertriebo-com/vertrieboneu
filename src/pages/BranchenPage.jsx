@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2, MapPin, Building2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import SEOFooter from "@/components/SEOFooter";
 
 const CITIES_SEO = [
   "Frankfurt am Main", "München", "Berlin", "Hamburg", "Köln", "Düsseldorf",
@@ -191,14 +192,7 @@ export default function BranchenPage() {
         </>
       )}
 
-      <footer style={{ background: "#020617", borderTop: "1px solid rgba(255,255,255,0.05)", padding: "28px 20px", textAlign: "center" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16, marginBottom: 10 }}>
-          {[["Impressum", "/impressum"], ["Datenschutz", "/datenschutz"], ["AGB", "/agb"], ["Kontakt", "/kontakt"]].map(([l, h]) => (
-            <a key={l} href={h} style={{ color: "rgba(71,85,105,1)", fontSize: 12, textDecoration: "none" }}>{l}</a>
-          ))}
-        </div>
-        <p style={{ color: "rgba(51,65,85,1)", fontSize: 11 }}>© 2026 Vertriebo · Ein Produkt der Huwa Gebäudereinigung & Hausmeisterdienste</p>
-      </footer>
+      <SEOFooter />
     </div>
   );
 }

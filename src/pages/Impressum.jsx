@@ -1,6 +1,8 @@
+import SEOFooter from "@/components/SEOFooter";
+
 export default function Impressum() {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50" style={{ background: "#020617", color: "white" }}>
       <div className="max-w-3xl mx-auto px-6 py-16">
         <a href="/" className="text-sm text-blue-600 hover:underline mb-8 inline-block">← Zurück zur Startseite</a>
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Impressum</h1>
@@ -87,9 +89,10 @@ export default function Impressum() {
             </p>
           </section>
 
-          <p className="text-xs text-slate-400 pt-4 border-t border-slate-200">Stand: Mai 2026 · Vertriebo – ein Produkt der Huwa Gebäudereinigung & Hausmeisterdienste</p>
+          <p className="text-xs text-slate-400 pt-4 border-t border-slate-200" style={{ color: "rgba(71,85,105,1)" }}>Stand: Mai 2026 · Vertriebo – ein Produkt der Huwa Gebäudereinigung & Hausmeisterdienste</p>
         </div>
       </div>
+      <SEOFooter />
     </div>
   );
 }

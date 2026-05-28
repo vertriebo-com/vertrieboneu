@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2, MapPin } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import SEOFooter from "@/components/SEOFooter";
 
 const CITY_DATA = {
   "frankfurt-am-main": { name: "Frankfurt am Main", state: "Hessen", region: "Rhein-Main-Gebiet" },
