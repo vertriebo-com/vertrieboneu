@@ -163,7 +163,11 @@ export default function Dashboard() {
             {greeting}{displayName ? `, ${displayName}` : ""} 👋
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {moment().locale("de").format("dddd, D. MMMM YYYY")}
+            {(() => {
+              const raw = moment().locale("de").format("dddd, D. MMMM YYYY");
+              // "donnerstag, 28. mai 2026" → "Donnerstag, 28. Mai 2026"
+              return raw.replace(/(^|\s|,\s*)([a-zäöüß])/g, (m, pre, ch) => pre + ch.toUpperCase());
+            })()}
           </p>
         </div>
         <button

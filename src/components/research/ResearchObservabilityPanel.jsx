@@ -103,6 +103,36 @@ function formatRuntime(seconds) {
 
 // ── Single Run Detail ─────────────────────────────────────────────────────
 
+// Hilfsfunktion: snake_case → lesbarer Label
+function humanizeId(id) {
+  if (!id) return '';
+  return id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// coverage_mode → lesbarer Text
+function humanizeCoverageMode(mode) {
+  const map = {
+    location_index_plus_grid: 'Ortsindex + Raster',
+    grid_only: 'Nur Raster',
+    location_index_only: 'Nur Ortsindex',
+  };
+  return map[mode] || humanizeId(mode);
+}
+
+// zero_result_cause → lesbarer Text
+function humanizeZeroResultCause(cause) {
+  const map = {
+    no_queries_built: 'Keine Suchanfragen generiert',
+    no_google_results: 'Keine Google-Treffer',
+    all_duplicates: 'Alle Treffer waren Duplikate',
+    no_match_score: 'Kein Treffer erfüllte Mindest-Score',
+    all_queries_exhausted: 'Alle Suchanfragen abgearbeitet',
+    no_geo_coords: 'Keine Geo-Koordinaten gefunden',
+    taxonomy_profile_missing: 'Branchenprofil fehlt',
+  };
+  return map[cause] || humanizeId(cause);
+}
+
 function RunDetail({ detail }) {
   const { research_run: run, funnel, quality, coverage, chain_skips, diagnostics } = detail;
   const rawHits = funnel.raw_hits_count || 0;
@@ -115,7 +145,7 @@ function RunDetail({ detail }) {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <StatusPill status={run.status} />
-              {run.industry_id && <span className="text-xs text-slate-600 font-medium">{run.industry_id}</span>}
+              {run.industry_id && <span className="text-xs text-slate-600 font-medium">{run.industry_label || humanizeId(run.industry_id)}</span>}
               {run.city && <span className="text-xs text-slate-500">· {run.city} {run.radius_km ? `(${run.radius_km} km)` : ''}</span>}
             </div>
             <div className="mt-2 flex flex-wrap gap-3">
@@ -247,7 +277,7 @@ function RunDetail({ detail }) {
               )}
               {coverage.coverage_mode && (
                 <div className="bg-slate-50 rounded-lg p-2">
-                  <p className="font-bold text-slate-700 text-[11px]">{coverage.coverage_mode.replace(/_/g, ' ')}</p>
+                  <p className="font-bold text-slate-700 text-[11px]">{humanizeCoverageMode(coverage.coverage_mode)}</p>
                   <p className="text-slate-500">Modus</p>
                 </div>
               )}
@@ -290,7 +320,7 @@ function RunDetail({ detail }) {
             {run.zero_result_cause && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="font-semibold text-amber-900 text-xs mb-0.5">Ursache: Kein Ergebnis</p>
-                <p className="text-amber-800 text-xs">{run.zero_result_cause.replace(/_/g, ' ')}</p>
+                <p className="text-amber-800 text-xs">{humanizeZeroResultCause(run.zero_result_cause)}</p>
               </div>
             )}
             {run.stop_reason && (
@@ -323,6 +353,7 @@ function RunDetail({ detail }) {
 
 function RunListRow({ run, onSelect }) {
   const rawHits = run.raw_hits || 0;
+  const industryLabel = run.industry_label || humanizeId(run.industry_id);
   return (
     <button
       onClick={() => onSelect(run.id)}
@@ -332,19 +363,19 @@ function RunListRow({ run, onSelect }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
             <StatusPill status={run.status} />
-            {run.industry_id && <span className="text-xs font-semibold text-slate-700">{run.industry_id}</span>}
-            {run.city && <span className="text-xs text-slate-500">{run.city}{run.radius_km ? ` · ${run.radius_km}km` : ''}</span>}
+            {industryLabel && <span className="text-xs font-semibold text-slate-700">{industryLabel}</span>}
+            {run.city && <span className="text-xs text-slate-500">{run.city}{run.radius_km ? ` · ${run.radius_km} km` : ''}</span>}
           </div>
           {/* Kompakter Funnel-Text */}
           <p className="text-sm font-bold text-slate-900">
-            {run.leads_saved} Kontakte gespeichert
-            {rawHits > 0 && <span className="font-normal text-slate-500"> von {rawHits.toLocaleString('de-DE')} geprüft</span>}
+            {run.leads_saved} neue Leads gespeichert
           </p>
           <div className="flex flex-wrap gap-2 mt-1 text-[11px] text-slate-500">
-            {run.duplicates_skipped > 0 && <span>{run.duplicates_skipped} Duplikate</span>}
-            {run.outside_radius_count > 0 && <span>{run.outside_radius_count} außerhalb Radius</span>}
-            {run.chain_skipped_count > 0 && <span>{run.chain_skipped_count} Ketten übersprungen</span>}
-            {run.no_match_count > 0 && <span>{run.no_match_count} kein Match</span>}
+            {rawHits > 0 && <span>{rawHits.toLocaleString('de-DE')} Firmenprofile geprüft</span>}
+            {run.duplicates_skipped > 0 && <span>{run.duplicates_skipped} Duplikate übersprungen</span>}
+            {run.outside_radius_count > 0 && <span>{run.outside_radius_count} außerhalb Suchgebiet</span>}
+            {run.chain_skipped_count > 0 && <span>{run.chain_skipped_count} Ketten/Filialen übersprungen</span>}
+            {run.no_match_count > 0 && <span>{run.no_match_count} kein Zielkunden-Match</span>}
           </div>
         </div>
         <div className="text-right shrink-0">

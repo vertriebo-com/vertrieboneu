@@ -209,7 +209,27 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
   const locationsTotal = activeRun.selected_locations_count ?? 0;
   const coveredTotal = activeRun.covered_locations_count ?? 0;
   const hasLocationCoverage = locationsTotal > 0;
-  const cityLabel = activeRun.search_center_city ? `${activeRun.search_center_city}${activeRun.search_radius_km ? ` · ${activeRun.search_radius_km} km` : ''}` : null;
+  const city = activeRun.search_center_city || '';
+  const radius = activeRun.search_radius_km;
+
+  // Subline-Text für laufende Recherche
+  const subline = city
+    ? `Vertriebo durchsucht ${city}${radius ? ` und relevante Nachbarorte im Umkreis von ${radius} km` : ' und relevante Nachbarorte'}.`
+    : 'Vertriebo durchsucht Ihr Suchgebiet und relevante Nachbarorte.';
+
+  // Coverage-Zeile zusammenbauen
+  const coverageParts = [];
+  if (coveredTotal > 0) coverageParts.push(`${coveredTotal} Orte erkannt`);
+  if (hasLocationCoverage) coverageParts.push(`${locationsSearched} / ${locationsTotal} geprüft`);
+  if (activeRun.leads_saved > 0) coverageParts.push(`${activeRun.leads_saved} neue Leads`);
+  if (activeRun.duplicates_skipped > 0) coverageParts.push(`${activeRun.duplicates_skipped} Duplikate`);
+  if (activeRun.raw_hits > 0) coverageParts.push(`${activeRun.raw_hits.toLocaleString('de-DE')} Profile geprüft`);
+
+  // Abschluss-Text
+  const doneLeads = activeRun.leads_saved || 0;
+  const doneText = doneLeads > 0
+    ? `${doneLeads} neue Leads gespeichert`
+    : 'Keine neuen Leads gefunden';
 
   return (
     <div className={`rounded-xl border p-3 ${isDone ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
@@ -222,41 +242,27 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
           )}
           <div className="min-w-0 flex-1">
             <div className={`text-sm font-semibold ${isDone ? 'text-green-900' : 'text-blue-900'}`}>
-              {isRunning ? 'Recherche läuft im Hintergrund' : 'Recherche abgeschlossen'}
-              {cityLabel && isRunning && (
-                <span className="font-normal text-blue-700 ml-1">· {cityLabel}</span>
-              )}
+              {isRunning ? 'Automatische Gebietsrecherche läuft' : 'Recherche abgeschlossen'}
             </div>
             <div className={`text-xs mt-0.5 ${isDone ? 'text-green-700' : 'text-blue-600'}`}>
-              {activeRun.message}
+              {isRunning ? subline : doneText}
             </div>
 
-            {/* Coverage-Details */}
-            {isRunning && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5">
-                {hasLocationCoverage && (
-                  <>
-                    <span className="text-xs text-blue-600 font-medium">
-                      🗺️ Orte erkannt: {coveredTotal}
-                    </span>
-                    <span className="text-xs text-blue-700 font-medium">
-                      Geprüft: {locationsSearched} / {locationsTotal}
-                    </span>
-                  </>
-                )}
-                {!hasLocationCoverage && (
-                  <span className="text-xs text-blue-500">
-                    Vertriebo durchsucht automatisch Nachbarorte im Umkreis.
-                  </span>
-                )}
-                {activeRun.leads_saved > 0 && (
-                  <span className="text-xs text-green-700 font-medium">✅ Neue Leads: {activeRun.leads_saved}</span>
+            {/* Coverage-Details während laufender Recherche */}
+            {isRunning && coverageParts.length > 0 && (
+              <div className="text-xs text-blue-700 font-medium mt-1.5">
+                {coverageParts.join(' · ')}
+              </div>
+            )}
+
+            {/* Abschluss-Details */}
+            {isDone && (
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-green-700">
+                {activeRun.raw_hits > 0 && (
+                  <span>{activeRun.raw_hits.toLocaleString('de-DE')} Firmenprofile geprüft</span>
                 )}
                 {activeRun.duplicates_skipped > 0 && (
-                  <span className="text-xs text-slate-500">Duplikate: {activeRun.duplicates_skipped}</span>
-                )}
-                {activeRun.raw_hits > 0 && (
-                  <span className="text-xs text-slate-400">Treffer geprüft: {activeRun.raw_hits}</span>
+                  <span>{activeRun.duplicates_skipped} Duplikate übersprungen</span>
                 )}
               </div>
             )}
@@ -281,7 +287,6 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
               style={{ width: `${Math.max(5, activeRun.progress_percent)}%` }}
             />
           </div>
-          {/* Orte-Fortschrittsbalken (nur wenn LocationIndex aktiv) */}
           {hasLocationCoverage && locationsTotal > 0 && (
             <div className="w-full bg-blue-50 rounded-full h-1 mt-1">
               <div
