@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, Brain, Flame, Thermometer, TrendingUp } from "lucide-react";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 import SEOFooter from "@/components/SEOFooter";
 
 export default function KiLeadScoring() {
@@ -8,9 +8,12 @@ export default function KiLeadScoring() {
         <a href="/">
           <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo" style={{ height: 120, objectFit: "contain" }} />
         </a>
-        <a href="/#waitlist-form" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>
-          Kostenlos starten →
-        </a>
+        <div style={{ display: "flex", gap: 10 }}>
+          <a href="/preise" style={{ color: "rgba(148,163,184,1)", fontWeight: 600, fontSize: 13, padding: "9px 14px", borderRadius: 9, textDecoration: "none", border: "1px solid rgba(255,255,255,0.1)" }}>Preise</a>
+          <a href="/kontakt" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>
+            Demo anfragen →
+          </a>
+        </div>
       </nav>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "16px 20px 0" }}>
@@ -33,12 +36,16 @@ export default function KiLeadScoring() {
         <p style={{ fontSize: "clamp(15px,2vw,18px)", color: "rgba(148,163,184,1)", lineHeight: 1.8, marginBottom: 32, maxWidth: 720 }}>
           Nicht jeder Firmenkontakt ist gleich wertvoll. Vertriebos KI bewertet jeden Lead automatisch mit einem Score von 0 bis 100 — damit Sie immer wissen, wen Sie zuerst anrufen sollten. Keine Zeitverschwendung mehr mit unqualifizierten Kontakten.
         </p>
-        <a href="/#waitlist-form" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 15, padding: "13px 24px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 30px rgba(37,99,235,0.4)" }}>
-          Jetzt KI-Scoring nutzen <ArrowRight size={16} />
-        </a>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+          <a href="/kontakt" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 15, padding: "13px 24px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 30px rgba(37,99,235,0.4)" }}>
+            Jetzt KI-Scoring nutzen <ArrowRight size={16} />
+          </a>
+          <a href="/preise" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "white", fontWeight: 600, fontSize: 14, padding: "13px 20px", borderRadius: 12, textDecoration: "none" }}>
+            Preise ansehen
+          </a>
+        </div>
       </section>
 
-      {/* SCORE KARTEN */}
       <section style={{ background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "56px 20px" }}>
           <h2 style={{ fontSize: "clamp(22px,3vw,34px)", fontWeight: 800, marginBottom: 32, letterSpacing: -0.5 }}>Die 3 Temperaturen: Heiß, Warm, Kalt</h2>
@@ -58,7 +65,6 @@ export default function KiLeadScoring() {
         </div>
       </section>
 
-      {/* WIE SCORING FUNKTIONIERT */}
       <section style={{ maxWidth: 900, margin: "0 auto", padding: "56px 20px" }}>
         <h2 style={{ fontSize: "clamp(22px,3vw,34px)", fontWeight: 800, marginBottom: 14, letterSpacing: -0.5 }}>Wie berechnet die KI den Score?</h2>
         <p style={{ fontSize: 15, color: "rgba(148,163,184,1)", lineHeight: 1.8, marginBottom: 28 }}>
@@ -71,7 +77,7 @@ export default function KiLeadScoring() {
             { label: "Relevanz-Keywords im Namen", desc: "Enthält der Firmenname typische Schlüsselbegriffe?", weight: "Mittel" },
             { label: "Google-Bewertungen & Präsenz", desc: "Ist das Unternehmen aktiv und gut etabliert?", weight: "Niedrig" },
             { label: "Negative Signale prüfen", desc: "Kein Privatunternehmen, keine Kleinstbetriebe, keine Franchise-Ketten.", weight: "Sehr hoch" },
-            { label: "Entfernung zum Suchzentrum", desc: "Wie weit ist die Firma vom Ihrem Standort entfernt?", weight: "Niedrig" },
+            { label: "Entfernung zum Suchzentrum", desc: "Wie weit ist die Firma von Ihrem Standort entfernt?", weight: "Niedrig" },
           ].map((s, i) => (
             <div key={i} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, padding: "14px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10 }}>
               <div style={{ flex: 1 }}>
@@ -91,7 +97,6 @@ export default function KiLeadScoring() {
         </div>
       </section>
 
-      {/* LERNEN */}
       <section style={{ background: "rgba(124,58,237,0.05)", borderTop: "1px solid rgba(124,58,237,0.12)", borderBottom: "1px solid rgba(124,58,237,0.12)" }}>
         <div style={{ maxWidth: 900, margin: "0 auto", padding: "56px 20px" }}>
           <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -113,6 +118,28 @@ export default function KiLeadScoring() {
         </div>
       </section>
 
+      {/* WEITERLESEN */}
+      <section style={{ maxWidth: 900, margin: "0 auto", padding: "48px 20px" }}>
+        <h2 style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 800, marginBottom: 20, letterSpacing: -0.5 }}>Mehr zum Thema</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+          {[
+            { icon: "🔍", title: "Automatisierte Recherche", desc: "Wie Vertriebo die Leads findet, die dann gescort werden", href: "/automatisierte-recherche" },
+            { icon: "📚", title: "Was ist B2B Leadgenerierung?", desc: "Grundlagen und der komplette Prozess", href: "/was-ist-leadgenerierung" },
+            { icon: "💰", title: "Preise & Pläne", desc: "KI-Scoring in allen Tarifen enthalten", href: "/preise" },
+          ].map((c, i) => (
+            <a key={i} href={c.href} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "18px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, textDecoration: "none", transition: "border-color 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(124,58,237,0.4)"}
+              onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"}
+            >
+              <span style={{ fontSize: 22 }}>{c.icon}</span>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "white" }}>{c.title}</p>
+              <p style={{ fontSize: 12, color: "rgba(100,116,139,1)", lineHeight: 1.5 }}>{c.desc}</p>
+              <span style={{ fontSize: 12, color: "#a78bfa", marginTop: 4 }}>Jetzt lesen →</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
       <section style={{ background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(37,99,235,0.2), #020617)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "56px 20px", textAlign: "center" }}>
         <h2 style={{ fontSize: "clamp(22px,4vw,40px)", fontWeight: 900, marginBottom: 14, letterSpacing: -1 }}>
           Hören Sie auf zu raten — lassen Sie die KI priorisieren
@@ -120,9 +147,14 @@ export default function KiLeadScoring() {
         <p style={{ fontSize: 15, color: "rgba(148,163,184,1)", marginBottom: 28, maxWidth: 500, margin: "0 auto 28px" }}>
           Vertriebo zeigt Ihnen jeden Morgen genau: Das sind Ihre 5 wichtigsten Anrufe heute.
         </p>
-        <a href="/#waitlist-form" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 40px rgba(37,99,235,0.5)" }}>
-          Frühen Zugang sichern <ArrowRight size={16} />
-        </a>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center" }}>
+          <a href="/kontakt" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 40px rgba(37,99,235,0.5)" }}>
+            Demo anfragen <ArrowRight size={16} />
+          </a>
+          <a href="/preise" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)", color: "white", fontWeight: 700, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none" }}>
+            Preise ansehen
+          </a>
+        </div>
         <p style={{ fontSize: 12, color: "rgba(71,85,105,1)", marginTop: 14 }}>Keine Kreditkarte · DSGVO-konform · Sofort einsatzbereit</p>
       </section>
 

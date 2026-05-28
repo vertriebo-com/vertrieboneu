@@ -8,9 +8,12 @@ export default function AutomatisierteRecherche() {
         <a href="/">
           <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo" style={{ height: 120, objectFit: "contain" }} />
         </a>
-        <a href="/#waitlist-form" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>
-          Kostenlos starten →
-        </a>
+        <div style={{ display: "flex", gap: 10 }}>
+          <a href="/preise" style={{ color: "rgba(148,163,184,1)", fontWeight: 600, fontSize: 13, padding: "9px 14px", borderRadius: 9, textDecoration: "none", border: "1px solid rgba(255,255,255,0.1)" }}>Preise</a>
+          <a href="/kontakt" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>
+            Demo anfragen →
+          </a>
+        </div>
       </nav>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "16px 20px 0" }}>
@@ -34,9 +37,14 @@ export default function AutomatisierteRecherche() {
         <p style={{ fontSize: "clamp(15px,2vw,18px)", color: "rgba(148,163,184,1)", lineHeight: 1.8, marginBottom: 32, maxWidth: 720 }}>
           Vertriebo durchsucht automatisch alle Orte und Gemeinden in Ihrem Suchgebiet nach passenden Firmenkontakten — vollständig, täglich aktuell und ohne manuellen Aufwand. Kein Googeln mehr, kein Adressbuch, keine veralteten Listen.
         </p>
-        <a href="/#waitlist-form" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 15, padding: "13px 24px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 30px rgba(37,99,235,0.4)" }}>
-          Jetzt kostenlos testen <ArrowRight size={16} />
-        </a>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+          <a href="/kontakt" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 15, padding: "13px 24px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 30px rgba(37,99,235,0.4)" }}>
+            Jetzt Demo anfragen <ArrowRight size={16} />
+          </a>
+          <a href="/preise" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "white", fontWeight: 600, fontSize: 14, padding: "13px 20px", borderRadius: 12, textDecoration: "none" }}>
+            Preise ansehen
+          </a>
+        </div>
       </section>
 
       <section style={{ background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -51,7 +59,7 @@ export default function AutomatisierteRecherche() {
               { step: "05", title: "Leads in Ihrer Pipeline", desc: "Die gespeicherten Firmenkontakte erscheinen sofort in Ihrer Leadliste — priorisiert nach KI-Score, mit Kontaktdaten, bereit zum Anrufen.", color: "#f87171" },
             ].map((s, i) => (
               <div key={i} style={{ display: "flex", gap: 20, paddingBottom: i < 4 ? 32 : 0, marginBottom: i < 4 ? 32 : 0, borderBottom: i < 4 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-                <div style={{ width: 44, height: 44, borderRadius: "50%", background: `rgba(37,99,235,0.12)`, border: `1px solid rgba(37,99,235,0.3)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: s.color, flexShrink: 0 }}>{s.step}</div>
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(37,99,235,0.12)", border: "1px solid rgba(37,99,235,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: s.color, flexShrink: 0 }}>{s.step}</div>
                 <div>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: "white", marginBottom: 6 }}>{s.title}</h3>
                   <p style={{ fontSize: 14, color: "rgba(148,163,184,1)", lineHeight: 1.7 }}>{s.desc}</p>
@@ -80,6 +88,30 @@ export default function AutomatisierteRecherche() {
         </div>
       </section>
 
+      {/* WEITERLESEN */}
+      <section style={{ background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ maxWidth: 900, margin: "0 auto", padding: "48px 20px" }}>
+          <h2 style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 800, marginBottom: 20, letterSpacing: -0.5 }}>Das gehört auch dazu</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+            {[
+              { icon: "🤖", title: "KI-Lead-Scoring", desc: "Wie die KI jeden Lead 0–100 bewertet", href: "/ki-lead-scoring" },
+              { icon: "📚", title: "Was ist B2B Leadgenerierung?", desc: "Grundlagen und Hintergründe", href: "/was-ist-leadgenerierung" },
+              { icon: "🏭", title: "Alle Branchen", desc: "Verfügbare Branchenprofile ansehen", href: "/branchen" },
+            ].map((c, i) => (
+              <a key={i} href={c.href} style={{ display: "flex", flexDirection: "column", gap: 8, padding: "18px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, textDecoration: "none", transition: "border-color 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(37,99,235,0.4)"}
+                onMouseLeave={e => e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"}
+              >
+                <span style={{ fontSize: 22 }}>{c.icon}</span>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "white" }}>{c.title}</p>
+                <p style={{ fontSize: 12, color: "rgba(100,116,139,1)", lineHeight: 1.5 }}>{c.desc}</p>
+                <span style={{ fontSize: 12, color: "#60a5fa", marginTop: 4 }}>Jetzt lesen →</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section style={{ background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(37,99,235,0.2), #020617)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "56px 20px", textAlign: "center" }}>
         <h2 style={{ fontSize: "clamp(22px,4vw,40px)", fontWeight: 900, marginBottom: 14, letterSpacing: -1 }}>
           Starten Sie heute mit automatischer Firmenrecherche
@@ -87,9 +119,14 @@ export default function AutomatisierteRecherche() {
         <p style={{ fontSize: 15, color: "rgba(148,163,184,1)", marginBottom: 28, maxWidth: 500, margin: "0 auto 28px" }}>
           Kein manuelles Googeln mehr. Vertriebo findet täglich neue Firmenkontakte in Ihrem Gebiet.
         </p>
-        <a href="/#waitlist-form" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 40px rgba(37,99,235,0.5)" }}>
-          Frühen Zugang sichern <ArrowRight size={16} />
-        </a>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center" }}>
+          <a href="/kontakt" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 40px rgba(37,99,235,0.5)" }}>
+            Demo anfragen <ArrowRight size={16} />
+          </a>
+          <a href="/preise" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)", color: "white", fontWeight: 700, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none" }}>
+            Preise ansehen
+          </a>
+        </div>
         <p style={{ fontSize: 12, color: "rgba(71,85,105,1)", marginTop: 14 }}>Keine Kreditkarte · DSGVO-konform · In 5 Minuten startklar</p>
       </section>
 

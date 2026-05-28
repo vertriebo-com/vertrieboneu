@@ -8,9 +8,14 @@ export default function UeberVertriebo() {
         <a href="/">
           <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo" style={{ height: 120, objectFit: "contain" }} />
         </a>
-        <a href="/#waitlist-form" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>
-          Kostenlos starten →
-        </a>
+        <div style={{ display: "flex", gap: 10 }}>
+          <a href="/kontakt" style={{ color: "rgba(148,163,184,1)", fontWeight: 600, fontSize: 13, padding: "9px 14px", borderRadius: 9, textDecoration: "none", border: "1px solid rgba(255,255,255,0.1)" }}>
+            Kontakt
+          </a>
+          <a href="/preise" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>
+            Preise →
+          </a>
+        </div>
       </nav>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "16px 20px 0" }}>
@@ -74,6 +79,14 @@ export default function UeberVertriebo() {
             </div>
           ))}
         </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 32 }}>
+          <a href="/preise" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 14, padding: "12px 22px", borderRadius: 11, textDecoration: "none" }}>
+            Preise & Pläne <ArrowRight size={14} />
+          </a>
+          <a href="/branchen" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "white", fontWeight: 700, fontSize: 14, padding: "12px 22px", borderRadius: 11, textDecoration: "none" }}>
+            Alle Branchen
+          </a>
+        </div>
       </section>
 
       <section style={{ background: "rgba(255,255,255,0.02)", borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -81,30 +94,56 @@ export default function UeberVertriebo() {
           <h2 style={{ fontSize: "clamp(22px,3vw,34px)", fontWeight: 800, marginBottom: 24, letterSpacing: -0.5 }}>Kontakt & Unternehmen</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
             {[
-              { icon: "🏢", title: "Unternehmen", lines: ["Huwa Gebäudereinigung &", "Hausmeisterdienste", "Mittelweg 24", "56566 Neuwied"] },
-              { icon: "📞", title: "Kontakt", lines: ["Telefon: 02601/9131820", "E-Mail: info@huwa-gebaeudedienste.de", "Web: vertriebo.de"] },
-              { icon: "⚖️", title: "Rechtliches", lines: ["Inhaber: Huwa", "Gebäudereinigung & HMD", "Eingetragen in Neuwied", "DDG-konform"] },
+              { icon: "🏢", title: "Unternehmen", lines: [
+                  { text: "Huwa Gebäudereinigung & Hausmeisterdienste" },
+                  { text: "Mittelweg 24, 56566 Neuwied" },
+                ]
+              },
+              { icon: "📞", title: "Kontakt", lines: [
+                  { text: "02601 / 9131820", href: "tel:026019131820" },
+                  { text: "info@huwa-gebaeudedienste.de", href: "mailto:info@huwa-gebaeudedienste.de" },
+                  { text: "vertriebo.de", href: "/" },
+                ]
+              },
+              { icon: "⚖️", title: "Rechtliches", lines: [
+                  { text: "Impressum", href: "/impressum" },
+                  { text: "Datenschutzerklärung", href: "/datenschutz" },
+                  { text: "AGB", href: "/agb" },
+                ]
+              },
             ].map((c, i) => (
               <div key={i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "20px 18px" }}>
                 <p style={{ fontSize: 24, marginBottom: 10 }}>{c.icon}</p>
-                <p style={{ fontSize: 13, fontWeight: 700, color: "white", marginBottom: 8 }}>{c.title}</p>
-                {c.lines.map((l, j) => (
-                  <p key={j} style={{ fontSize: 13, color: "rgba(148,163,184,1)", lineHeight: 1.7 }}>{l}</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "white", marginBottom: 10 }}>{c.title}</p>
+                {c.lines.map((l, j) => l.href ? (
+                  <a key={j} href={l.href} style={{ display: "block", fontSize: 13, color: "#60a5fa", lineHeight: 1.9, textDecoration: "none" }}>{l.text}</a>
+                ) : (
+                  <p key={j} style={{ fontSize: 13, color: "rgba(148,163,184,1)", lineHeight: 1.7 }}>{l.text}</p>
                 ))}
               </div>
             ))}
+          </div>
+          <div style={{ marginTop: 24 }}>
+            <a href="/kontakt" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(37,99,235,0.1)", border: "1px solid rgba(37,99,235,0.25)", color: "#93c5fd", fontWeight: 700, fontSize: 14, padding: "12px 22px", borderRadius: 11, textDecoration: "none" }}>
+              Kontaktformular öffnen <ArrowRight size={14} />
+            </a>
           </div>
         </div>
       </section>
 
       <section style={{ background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(37,99,235,0.2), #020617)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "56px 20px", textAlign: "center" }}>
         <h2 style={{ fontSize: "clamp(22px,4vw,40px)", fontWeight: 900, marginBottom: 14, letterSpacing: -1 }}>Werden Sie Teil von Vertriebo</h2>
-        <p style={{ fontSize: 15, color: "rgba(148,163,184,1)", marginBottom: 28, maxWidth: 500, margin: "0 auto 28px" }}>
+        <p style={{ fontSize: 15, color: "rgba(148,163,184,1)", marginBottom: 32, maxWidth: 500, margin: "0 auto 32px" }}>
           Sichern Sie sich frühen Zugang und starten Sie noch heute mit automatisierter B2B-Leadgenerierung.
         </p>
-        <a href="/#waitlist-form" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 40px rgba(37,99,235,0.5)" }}>
-          Frühen Zugang sichern <ArrowRight size={16} />
-        </a>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center" }}>
+          <a href="/preise" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 40px rgba(37,99,235,0.5)" }}>
+            Preise ansehen <ArrowRight size={16} />
+          </a>
+          <a href="/kontakt" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)", color: "white", fontWeight: 700, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none" }}>
+            Demo anfragen
+          </a>
+        </div>
       </section>
 
       <SEOFooter />
