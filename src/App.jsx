@@ -30,6 +30,15 @@ import AccountSuspended from './pages/AccountSuspended';
 import Investors from './pages/Investors';
 import AnmeldenPage from './pages/AnmeldenPage';
 import RegisterPage from './pages/RegisterPage';
+import WasIstB2BLeadgenerierung from './pages/WasIstB2BLeadgenerierung';
+import AutomatisierteRecherche from './pages/AutomatisierteRecherche';
+import KiLeadScoring from './pages/KiLeadScoring';
+import BranchenUebersicht from './pages/BranchenUebersicht';
+import BranchenPage from './pages/BranchenPage';
+import BranchenStadtPage from './pages/BranchenStadtPage';
+import UeberVertriebo from './pages/UeberVertriebo';
+import Kontakt from './pages/Kontakt';
+import Preise from './pages/Preise';
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
@@ -73,6 +82,15 @@ const PublicApp = () => {
       <Route path="/anmelden" element={<AnmeldenPage />} />
       <Route path="/registrieren" element={<RegisterPage />} />
       <Route path="/investors" element={<Investors />} />
+      <Route path="/was-ist-leadgenerierung" element={<WasIstB2BLeadgenerierung />} />
+      <Route path="/automatisierte-recherche" element={<AutomatisierteRecherche />} />
+      <Route path="/ki-lead-scoring" element={<KiLeadScoring />} />
+      <Route path="/branchen" element={<BranchenUebersicht />} />
+      <Route path="/branchen/:industryId" element={<BranchenPage />} />
+      <Route path="/branchen/:industryId/:citySlug" element={<BranchenStadtPage />} />
+      <Route path="/ueber-uns" element={<UeberVertriebo />} />
+      <Route path="/kontakt" element={<Kontakt />} />
+      <Route path="/preise" element={<Preise />} />
       {/* Everything else goes through the authenticated app */}
       <Route path="*" element={<AuthenticatedApp />} />
     </Routes>
