@@ -1501,16 +1501,24 @@ Deno.serve(async (req) => {
       ? (rawHitsThisBatch === 0 ? 'no_google_results' : dupSkippedThisBatch > 0 ? 'all_duplicates' : 'no_match_score')
       : null;
 
-    // ── Coverage-Diagnostik (IMMER ZUERST berechnen, bevor progress + current_step) ──
-    const cumulativeLocationsSearched = (freshRun.locations_searched_count || 0) + locationsSearchedSet.size;
+    // ── Coverage-Diagnostik: Deduplizierung via searched_locations_json ─────────
+    // Verhindert Doppelzählung wenn derselbe Ort in mehreren Batches vorkommt.
+    const previousSearchedLocations = (() => {
+      try { return new Set(JSON.parse(freshRun.searched_locations_json || '[]')); } catch { return new Set(); }
+    })();
+    for (const loc of locationsSearchedSet) previousSearchedLocations.add(loc);
+    const uniqueSearchedLocations = previousSearchedLocations; // alias für Klarheit
+
     const selectedLocationsCount = freshRun.selected_locations_count || coveredLocations.length || 0;
     const coveredLocationsTotal = freshRun.covered_locations_count || coveredLocations.length || 0;
+    // Klemmen: nie mehr als selectedLocationsCount (verhindert Überlauf)
+    const cumulativeLocationsSearched = Math.min(uniqueSearchedLocations.size, selectedLocationsCount || uniqueSearchedLocations.size);
     const locationsRemainingCount = Math.max(0, selectedLocationsCount - cumulativeLocationsSearched);
     const coverageComplete = selectedLocationsCount > 0
       ? cumulativeLocationsSearched >= selectedLocationsCount
       : true; // grid_only mode
 
-    console.info(`[processResearchRun] Coverage: searched=${cumulativeLocationsSearched}/${selectedLocationsCount} (total in area: ${coveredLocationsTotal}) remaining=${locationsRemainingCount} complete=${coverageComplete}`);
+    console.info(`[processResearchRun] Coverage: unique=${uniqueSearchedLocations.size} clamped=${cumulativeLocationsSearched}/${selectedLocationsCount} (total in area: ${coveredLocationsTotal}) remaining=${locationsRemainingCount} complete=${coverageComplete}`);
 
     // ── Progress kombiniert: 60% Orts-Abdeckung + 40% Lead-Ziel ─────────────
     let progressPercent;
@@ -1576,6 +1584,8 @@ Deno.serve(async (req) => {
       locations_searched_count: cumulativeLocationsSearched,
       locations_remaining_count: locationsRemainingCount,
       coverage_complete: coverageComplete,
+      // Persistente Dedupe-Liste der geprüften Orte (max 500 Einträge)
+      searched_locations_json: JSON.stringify([...uniqueSearchedLocations].slice(-500)),
       search_points_used_count: (freshRun.search_points_used_count || 0) + pointsToSearch.length,
       // seen_place_ids: Dedupe-Persistenz
       seen_place_ids: JSON.stringify([...seenPlaceIds].slice(-500)),

@@ -223,9 +223,9 @@
     },
     "locations_searched_count": {
       "type": "number",
-      "title": "Tats\u00e4chlich durchsuchte Orte",
+      "title": "Tats\u00e4chlich durchsuchte Orte (dedupliziert)",
       "default": 0,
-      "description": "Anzahl Orte aus LocationIndex die aktiv als Suchzentrum genutzt wurden"
+      "description": "Eindeutige Orte aus LocationIndex die als Suchzentrum genutzt wurden \u2013 via searched_locations_json dedupliziert"
     },
     "locations_remaining_count": {
       "type": "number",
@@ -238,6 +238,11 @@
       "title": "Ortsabdeckung vollst\u00e4ndig",
       "default": false,
       "description": "true wenn locations_searched_count >= selected_locations_count oder target_count erreicht"
+    },
+    "searched_locations_json": {
+      "type": "string",
+      "title": "Gepr\u00fcfte Orte (JSON-Array, Dedupe-Liste)",
+      "description": "Persistente Set-Quelle f\u00fcr locations_searched_count \u2013 verhindert Doppelz\u00e4hlung \u00fcber Batches hinweg. Max 500 Eintr\u00e4ge."
     },
     "search_points_used_count": {
       "type": "number",
