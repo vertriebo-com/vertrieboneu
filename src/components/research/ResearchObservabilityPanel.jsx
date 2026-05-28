@@ -103,10 +103,60 @@ function formatRuntime(seconds) {
 
 // ── Single Run Detail ─────────────────────────────────────────────────────
 
-// Hilfsfunktion: snake_case → lesbarer Label
+// Feste Branchen-Label-Map
+const INDUSTRY_LABELS = {
+  gebaeudereinigung: "Gebäudereinigung",
+  facility_service: "Facility Service / Hausmeisterdienst",
+  hausmeisterdienst: "Hausmeisterdienst",
+  entruempelung: "Entrümpelung",
+  gartenbau: "Gartenbau / Gartenpflege",
+  sicherheitsdienst: "Sicherheitsdienst",
+  wachdienst: "Wachdienst / Sicherheit",
+  it_service: "IT-Service",
+  software_entwicklung: "Softwareentwicklung",
+  cloud_services: "Cloud-Dienste",
+  netzwerk_infrastruktur: "Netzwerk & Infrastruktur",
+  drucker_service: "Drucker & Kopierer Service",
+  handwerk: "Handwerk",
+  shk: "SHK / Sanitär / Heizung / Klima",
+  elektro_gebaeudetechnik: "Elektro / Gebäudetechnik",
+  maler_renovierung: "Maler / Renovierung",
+  immobilien: "Immobilien",
+  gebaeudemanagement: "Gebäudemanagement",
+  reinigungstechnik: "Reinigungstechnik",
+  textilreinigung: "Textilreinigung",
+  schaedlingsbekaempfung: "Schädlingsbekämpfung",
+  winterdienst: "Winterdienst / Schneeräumung",
+  catering: "Catering & Events",
+  eventservice: "Eventservice",
+  messebau: "Messebau",
+  spedition_logistik: "Spedition & Logistik",
+  umzugsunternehmen: "Umzugsunternehmen",
+  lager_fulfillment: "Lager & Fulfillment",
+  personal_zeitarbeit: "Personal & Zeitarbeit",
+  schulungen_weiterbildung: "Schulungen & Weiterbildung",
+  buchhaltung_steuernahe_dienste: "Buchhaltung & Steuerberatung",
+  marketing_webdesign_werbung: "Marketing / Webdesign / Werbung",
+  fuhrparkservice_fahrzeugpflege: "Fuhrparkservice & Fahrzeugpflege",
+  pflege_betreuung: "Pflege & Betreuung",
+  gesundheit_medizin: "Gesundheit & Medizin",
+  industrieservice: "Industrieservice",
+  kfz_service: "Kfz-Service & Werkstatt",
+  detektei: "Detektei",
+  brandschutz: "Brandschutz",
+  arbeitssicherheit: "Arbeitssicherheit",
+  telekommunikation: "Telekommunikation",
+};
+
+// Hilfsfunktion: snake_case → lesbarer Label (Fallback)
 function humanizeId(id) {
   if (!id) return '';
   return id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Haupt-Label-Funktion: Label vom Backend > feste Map > humanizeId
+function formatIndustryLabel(id, label) {
+  return label || INDUSTRY_LABELS[id] || humanizeId(id);
 }
 
 // coverage_mode → lesbarer Text
@@ -145,7 +195,7 @@ function RunDetail({ detail }) {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <StatusPill status={run.status} />
-              {run.industry_id && <span className="text-xs text-slate-600 font-medium">{run.industry_label || humanizeId(run.industry_id)}</span>}
+              {run.industry_id && <span className="text-xs text-slate-600 font-medium">{formatIndustryLabel(run.industry_id, run.industry_label)}</span>}
               {run.city && <span className="text-xs text-slate-500">· {run.city} {run.radius_km ? `(${run.radius_km} km)` : ''}</span>}
             </div>
             <div className="mt-2 flex flex-wrap gap-3">
@@ -353,7 +403,7 @@ function RunDetail({ detail }) {
 
 function RunListRow({ run, onSelect }) {
   const rawHits = run.raw_hits || 0;
-  const industryLabel = run.industry_label || humanizeId(run.industry_id);
+  const industryLabel = formatIndustryLabel(run.industry_id, run.industry_label);
   return (
     <button
       onClick={() => onSelect(run.id)}
