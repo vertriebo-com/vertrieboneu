@@ -1496,15 +1496,37 @@ Deno.serve(async (req) => {
     // ── Fortschritt + Update ─────────────────────────────────────────────────
     const totalLeadsSaved = currentLeadsSaved + newLeadsSavedThisBatch;
     const nextBatchIndex = batchIndex + 1;
-    const progressPercent = Math.min(95, Math.round((nextBatchIndex / totalBatches) * 90) + 5);
     const isDone = nextBatchIndex >= totalBatches || totalLeadsSaved >= batchTarget;
     const zeroResultCause = isDone && totalLeadsSaved === 0
       ? (rawHitsThisBatch === 0 ? 'no_google_results' : dupSkippedThisBatch > 0 ? 'all_duplicates' : 'no_match_score')
       : null;
 
+    // ── Coverage-Diagnostik (IMMER ZUERST berechnen, bevor progress + current_step) ──
+    const cumulativeLocationsSearched = (freshRun.locations_searched_count || 0) + locationsSearchedSet.size;
+    const selectedLocationsCount = freshRun.selected_locations_count || coveredLocations.length || 0;
+    const coveredLocationsTotal = freshRun.covered_locations_count || coveredLocations.length || 0;
+    const locationsRemainingCount = Math.max(0, selectedLocationsCount - cumulativeLocationsSearched);
+    const coverageComplete = selectedLocationsCount > 0
+      ? cumulativeLocationsSearched >= selectedLocationsCount
+      : true; // grid_only mode
+
+    console.info(`[processResearchRun] Coverage: searched=${cumulativeLocationsSearched}/${selectedLocationsCount} (total in area: ${coveredLocationsTotal}) remaining=${locationsRemainingCount} complete=${coverageComplete}`);
+
+    // ── Progress kombiniert: 60% Orts-Abdeckung + 40% Lead-Ziel ─────────────
+    let progressPercent;
+    if (isDone) {
+      progressPercent = 100;
+    } else if (selectedLocationsCount > 0) {
+      // LocationIndex aktiv: kombinierter Fortschritt
+      const coverageProgress = Math.min(1, cumulativeLocationsSearched / selectedLocationsCount);
+      const leadProgress = Math.min(1, totalLeadsSaved / Math.max(1, batchTarget));
+      progressPercent = Math.max(5, Math.min(95, Math.round((coverageProgress * 0.6 + leadProgress * 0.4) * 100)));
+    } else {
+      // Grid-only Fallback: Batch-basiert
+      progressPercent = Math.min(95, Math.round((nextBatchIndex / totalBatches) * 90) + 5);
+    }
+
     // UsageLog wird direkt nach Company.create pro Lead erhöht (nicht atomar, MVP)
-    // Serial-Run-Lock muss aktiv bleiben um Race Conditions zu verhindern
-    // Keine Batch-Aktualisierung nötig
     if (trialStage === 'free_preview' && newLeadsSavedThisBatch > 0) {
       const orgs = await base44.asServiceRole.entities.Organization.filter({ id: organization_id });
       if (orgs[0]) {
@@ -1512,61 +1534,53 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.info(`[processResearchRun] Batch ${batchIndex}/${totalBatches} done: newSaved=${newLeadsSavedThisBatch} totalSaved=${totalLeadsSaved} done=${isDone}`);
+    console.info(`[processResearchRun] Batch ${batchIndex}/${totalBatches} done: newSaved=${newLeadsSavedThisBatch} totalSaved=${totalLeadsSaved} progress=${progressPercent}% done=${isDone}`);
 
     const newStatus = isDone ? 'completed' : 'running';
 
-    // Verbesserter current_step mit Orts-Zähler: "Haiger Umgebung läuft… 23 / 47 Orte"
-    const cityLabel = city ? `${city} Umgebung` : 'Suchgebiet';
+    // ── current_step: Orts-Zähler aus echten DB-Werten ────────────────────────
+    const cityDisplayLabel = city ? `${city} Umgebung` : 'Suchgebiet';
     let newStep;
     if (isDone) {
       newStep = totalLeadsSaved > 0
         ? `${totalLeadsSaved} neue Firmenkontakte gefunden`
         : 'Keine neuen Kontakte gefunden';
     } else if (selectedLocationsCount > 0) {
-      // LocationIndex aktiv → Orte-Zähler anzeigen
-      newStep = `${cityLabel} läuft… ${cumulativeLocationsSearched} / ${selectedLocationsCount} Orte · ${totalLeadsSaved} Kontakte`;
+      newStep = `${cityDisplayLabel} läuft… ${cumulativeLocationsSearched} / ${selectedLocationsCount} Orte geprüft`;
     } else {
-      newStep = `${cityLabel} wird durchsucht… ${totalLeadsSaved} Kontakte bisher`;
+      newStep = `${cityDisplayLabel} wird durchsucht… ${totalLeadsSaved} Kontakte bisher`;
     }
 
-    // ── Punkt 4: Erweiterte Coverage-Diagnostik ────────────────────────────
-    const cumulativeLocationsSearched = (freshRun.locations_searched_count || 0) + locationsSearchedSet.size;
-    const selectedLocationsCount = freshRun.selected_locations_count || coveredLocations.length || 0;
-    const locationsRemainingCount = Math.max(0, selectedLocationsCount - cumulativeLocationsSearched);
-    const coverageComplete = selectedLocationsCount > 0
-      ? cumulativeLocationsSearched >= selectedLocationsCount
-      : true; // grid_only mode: kein Location-Index → immer "complete"
-
-    console.info(`[processResearchRun] Coverage: searched=${cumulativeLocationsSearched}/${selectedLocationsCount} remaining=${locationsRemainingCount} complete=${coverageComplete}`);
-
-    // Chain-Skip-Diagnostik akkumulieren (aus freshRun lesen für korrekte Summierung)
+    // Chain-Skip-Diagnostik akkumulieren
     const prevChainSkipped = freshRun.chain_skipped_count || 0;
     const prevChainExamples = (() => { try { return JSON.parse(freshRun.chain_skipped_examples_json || '[]'); } catch { return []; } })();
     const newChainSkippedTotal = prevChainSkipped + chainSkippedThisBatch;
-    // Beispiele zusammenführen, max 10 gesamt
     const allChainExamples = [...prevChainExamples, ...chainSkippedExamplesThisBatch].slice(0, 10);
 
+    // ── DB-Update: alle Coverage-Felder dauerhaft speichern ──────────────────
     await base44.asServiceRole.entities.ResearchRun.update(research_run_id, {
-      status: newStatus, leads_saved: totalLeadsSaved,
+      status: newStatus,
+      leads_saved: totalLeadsSaved,
       duplicates_skipped: (run.duplicates_skipped || 0) + dupSkippedThisBatch,
       no_match_count: (run.no_match_count || 0) + noMatchThisBatch,
       outside_radius_count: (run.outside_radius_count || 0) + outsideRadiusThisBatch,
       raw_hits: (run.raw_hits || 0) + rawHitsThisBatch,
       chain_skipped_count: newChainSkippedTotal,
       chain_skipped_examples_json: JSON.stringify(allChainExamples),
-      progress_percent: isDone ? 100 : progressPercent,
-      batch_index: nextBatchIndex, total_batches: totalBatches,
+      // ── Fortschritt (echte Werte, nicht lokal) ──
+      progress_percent: progressPercent,
       current_step: newStep,
-      seen_place_ids: JSON.stringify([...seenPlaceIds].slice(-500)),
-      charged_lead_generation: totalLeadsSaved > 0,
-      // Punkt 4: Vollständige Coverage-Diagnostik
+      batch_index: nextBatchIndex,
+      total_batches: totalBatches,
+      // ── Coverage-Felder dauerhaft (werden vom Banner direkt gelesen) ──────
       locations_searched_count: cumulativeLocationsSearched,
       locations_remaining_count: locationsRemainingCount,
       coverage_complete: coverageComplete,
       search_points_used_count: (freshRun.search_points_used_count || 0) + pointsToSearch.length,
-      // VITAL: Lock muss AKTIV bleiben solange Run nicht completed ist
-      // Sonst ruft Banner nochmal auf bevor Status-Update committed ist
+      // seen_place_ids: Dedupe-Persistenz
+      seen_place_ids: JSON.stringify([...seenPlaceIds].slice(-500)),
+      charged_lead_generation: totalLeadsSaved > 0,
+      // VITAL: Lock aktiv halten bis Run completed
       processing_lock_until: isDone ? null : new Date(Date.now() + LOCK_DURATION_MS).toISOString(),
       processing_by: isDone ? null : workerKey,
       ...(isDone ? { finished_at: new Date().toISOString() } : {}),

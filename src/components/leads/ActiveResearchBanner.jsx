@@ -231,26 +231,33 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
               {activeRun.message}
             </div>
 
-            {/* Coverage-Zeile: Orte erkannt / durchsucht */}
-            {isRunning && hasLocationCoverage && (
+            {/* Coverage-Details */}
+            {isRunning && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5">
-                <span className="text-xs text-blue-700 font-medium">
-                  🗺️ {locationsSearched} / {locationsTotal} Orte geprüft
-                  {coveredTotal > locationsTotal && (
-                    <span className="text-blue-500 font-normal ml-1">({coveredTotal} im Gebiet)</span>
-                  )}
-                </span>
+                {hasLocationCoverage && (
+                  <>
+                    <span className="text-xs text-blue-600 font-medium">
+                      🗺️ Orte erkannt: {coveredTotal}
+                    </span>
+                    <span className="text-xs text-blue-700 font-medium">
+                      Geprüft: {locationsSearched} / {locationsTotal}
+                    </span>
+                  </>
+                )}
+                {!hasLocationCoverage && (
+                  <span className="text-xs text-blue-500">
+                    Vertriebo durchsucht automatisch Nachbarorte im Umkreis.
+                  </span>
+                )}
                 {activeRun.leads_saved > 0 && (
-                  <span className="text-xs text-green-700 font-medium">✅ {activeRun.leads_saved} Treffer</span>
+                  <span className="text-xs text-green-700 font-medium">✅ Neue Leads: {activeRun.leads_saved}</span>
+                )}
+                {activeRun.duplicates_skipped > 0 && (
+                  <span className="text-xs text-slate-500">Duplikate: {activeRun.duplicates_skipped}</span>
                 )}
                 {activeRun.raw_hits > 0 && (
-                  <span className="text-xs text-slate-500">{activeRun.raw_hits} geprüfte Profile</span>
+                  <span className="text-xs text-slate-400">Treffer geprüft: {activeRun.raw_hits}</span>
                 )}
-              </div>
-            )}
-            {isRunning && !hasLocationCoverage && (
-              <div className="text-xs text-blue-500 mt-1">
-                Vertriebo durchsucht automatisch Nachbarorte im Umkreis.
               </div>
             )}
           </div>
