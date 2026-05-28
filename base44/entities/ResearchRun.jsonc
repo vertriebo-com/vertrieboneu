@@ -1,6 +1,12 @@
 {
   "name": "ResearchRun",
   "type": "object",
+  "x-acl": {
+    "create": "user",
+    "read": "user",
+    "update": "user",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",
@@ -193,13 +199,11 @@
     "processing_lock_until": {
       "type": "string",
       "format": "date-time",
-      "title": "Verarbeitungs-Lock bis",
-      "description": "Atomarer Lock: Wenn gesetzt und in der Zukunft, verarbeitet kein anderer Worker diesen Run"
+      "title": "Verarbeitungs-Lock bis"
     },
     "processing_by": {
       "type": "string",
-      "title": "Verarbeitet von (Worker-Key)",
-      "description": "Eindeutiger Worker-Key des aktiven Verarbeiters"
+      "title": "Verarbeitet von (Worker-Key)"
     },
     "coverage_mode": {
       "type": "string",
@@ -208,58 +212,48 @@
         "location_index_plus_grid",
         "grid_only",
         "location_index_only"
-      ],
-      "description": "Welche Suchpunkt-Strategie verwendet wurde"
+      ]
     },
     "covered_locations_count": {
       "type": "number",
-      "title": "Anzahl Orte im Suchgebiet (LocationIndex)",
-      "description": "Gesamtzahl aktiver Orte im Radius laut LocationIndex"
+      "title": "Anzahl Orte im Suchgebiet (LocationIndex)"
     },
     "selected_locations_count": {
       "type": "number",
-      "title": "Ausgew\u00e4hlte Orte f\u00fcr Recherche (Plan-Limit)",
-      "description": "Anzahl Orte die laut Plan-Limit tats\u00e4chlich durchsucht werden"
+      "title": "Ausgew\u00e4hlte Orte f\u00fcr Recherche (Plan-Limit)"
     },
     "locations_searched_count": {
       "type": "number",
       "title": "Tats\u00e4chlich durchsuchte Orte (dedupliziert)",
-      "default": 0,
-      "description": "Eindeutige Orte aus LocationIndex die als Suchzentrum genutzt wurden \u2013 via searched_locations_json dedupliziert"
+      "default": 0
     },
     "locations_remaining_count": {
       "type": "number",
       "title": "Verbleibende Orte",
-      "default": 0,
-      "description": "selected_locations_count - locations_searched_count (sinkt pro Batch)"
+      "default": 0
     },
     "coverage_complete": {
       "type": "boolean",
       "title": "Ortsabdeckung vollst\u00e4ndig",
-      "default": false,
-      "description": "true wenn locations_searched_count >= selected_locations_count oder target_count erreicht"
+      "default": false
     },
     "searched_locations_json": {
       "type": "string",
-      "title": "Gepr\u00fcfte Orte (JSON-Array, Dedupe-Liste)",
-      "description": "Persistente Set-Quelle f\u00fcr locations_searched_count \u2013 verhindert Doppelz\u00e4hlung \u00fcber Batches hinweg. Max 500 Eintr\u00e4ge."
+      "title": "Gepr\u00fcfte Orte (JSON-Array, Dedupe-Liste)"
     },
     "search_points_used_count": {
       "type": "number",
       "title": "Verwendete Suchpunkte gesamt",
-      "default": 0,
-      "description": "Gesamt-Anzahl Koordinaten-Punkte die f\u00fcr Google-API-Calls genutzt wurden (Grid + LocationIndex)"
+      "default": 0
     },
     "chain_skipped_count": {
       "type": "number",
       "title": "Chain-Filter: \u00dcbersprungene Treffer",
-      "default": 0,
-      "description": "Anzahl Google-Places-Kandidaten die wegen isLikelyChain \u00fcbersprungen wurden"
+      "default": 0
     },
     "chain_skipped_examples_json": {
       "type": "string",
-      "title": "Chain-Filter: \u00dcbersprungene Beispiele (JSON)",
-      "description": "Max 10 Beispiele: name, reason, source_query, would_match_target_customer, recommended_policy"
+      "title": "Chain-Filter: \u00dcbersprungene Beispiele (JSON)"
     }
   },
   "required": [

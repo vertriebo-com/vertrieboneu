@@ -1,6 +1,12 @@
 {
   "name": "OrgLearnedSignals",
   "type": "object",
+  "x-acl": {
+    "create": "user",
+    "read": "user",
+    "update": "user",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",
@@ -29,7 +35,7 @@
     },
     "total_outcomes_analyzed": {
       "type": "number",
-      "title": "Analyseierte Outcomes"
+      "title": "Analysierte Outcomes"
     },
     "version": {
       "type": "number",

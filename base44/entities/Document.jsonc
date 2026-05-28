@@ -1,6 +1,12 @@
 {
   "name": "Document",
   "type": "object",
+  "x-acl": {
+    "create": "user",
+    "read": "user",
+    "update": "user",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",
@@ -8,18 +14,15 @@
     },
     "company_id": {
       "type": "string",
-      "title": "Firma ID",
-      "description": "Optional: Zuordnung zu einer spezifischen Company/Lead. Wenn gesetzt, ist das Dokument ein Lead-spezifischer Anhang."
+      "title": "Firma ID"
     },
     "contact_id": {
       "type": "string",
-      "title": "Kontakt ID",
-      "description": "Optional: Zuordnung zu einem spezifischen Kontakt."
+      "title": "Kontakt ID"
     },
     "opportunity_id": {
       "type": "string",
-      "title": "Opportunity ID",
-      "description": "Optional: F\u00fcr sp\u00e4tere Opportunity-Zuordnung vorbereitet. Noch nicht aktiv."
+      "title": "Opportunity ID"
     },
     "titel": {
       "type": "string",
@@ -59,8 +62,7 @@
         "email_attachment",
         "other"
       ],
-      "default": "other",
-      "description": "Semantischer Typ f\u00fcr sp\u00e4tere Filterung/Verarbeitung."
+      "default": "other"
     },
     "source_type": {
       "type": "string",
@@ -72,8 +74,7 @@
         "email",
         "unknown"
       ],
-      "default": "manual",
-      "description": "Wie dieses Dokument erstellt wurde."
+      "default": "manual"
     }
   },
   "required": [

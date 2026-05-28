@@ -1,6 +1,12 @@
 {
   "name": "Organization",
   "type": "object",
+  "x-acl": {
+    "create": "user",
+    "read": "user",
+    "update": "user",
+    "delete": "admin"
+  },
   "properties": {
     "name": {
       "type": "string",
@@ -189,18 +195,15 @@
     "agency_enabled": {
       "type": "boolean",
       "title": "Agency-Zugang aktiv (nur Admin)",
-      "description": "Nur PlatformAdmin darf dieses Feld setzen. Schaltet Agency-Features frei.",
       "default": false
     },
     "custom_monthly_lead_limit": {
       "type": "number",
-      "title": "Individuelles Lead-Limit/Monat (nur Admin)",
-      "description": "-1 = Unlimited (nur bewusst durch Admin). Wenn gesetzt, \u00fcberschreibt den Plan-Wert. Null/nicht gesetzt = Plan-Wert gilt."
+      "title": "Individuelles Lead-Limit/Monat (nur Admin)"
     },
     "agency_contract_notes": {
       "type": "string",
-      "title": "Agentur-Kontrakt-Notizen (intern)",
-      "description": "Interne Konditionsnotizen: Preis, Limits, Laufzeit, Sondervereinbarungen. Nur f\u00fcr Admins sichtbar."
+      "title": "Agentur-Kontrakt-Notizen (intern)"
     },
     "agency_valid_from": {
       "type": "string",

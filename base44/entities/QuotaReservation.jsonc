@@ -1,6 +1,12 @@
 {
   "name": "QuotaReservation",
   "type": "object",
+  "x-acl": {
+    "create": "admin",
+    "read": "user",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",
@@ -12,7 +18,7 @@
     },
     "slot_number": {
       "type": "number",
-      "title": "Slot-Nummer (1-based, z.B. 300 bei 300er Limit)"
+      "title": "Slot-Nummer (1-based)"
     },
     "research_run_id": {
       "type": "string",
@@ -40,12 +46,12 @@
     "committed_at": {
       "type": "string",
       "format": "date-time",
-      "title": "Commit am (nach Company.create)"
+      "title": "Commit am"
     },
     "released_at": {
       "type": "string",
       "format": "date-time",
-      "title": "Freigegeben am (bei Fallback)"
+      "title": "Freigegeben am"
     }
   },
   "required": [
@@ -61,7 +67,7 @@
         "period_month",
         "slot_number"
       ],
-      "description": "Verhindert doppelte Reservierungen desselben Slots. Atomar enforced by Base44 DB \u2192 garantiert dass nur EIN Worker slot_number=300 erstellen kann."
+      "description": "Verhindert doppelte Reservierungen desselben Slots."
     }
   ],
   "indexes": [
@@ -70,15 +76,13 @@
       "fields": [
         "organization_id",
         "period_month"
-      ],
-      "description": "Optimiert Filterung nach Organisation + Periode f\u00fcr COUNT-Queries"
+      ]
     },
     {
       "name": "idx_status",
       "fields": [
         "status"
-      ],
-      "description": "Optimiert Filterung nach Status (reserved/committed/released)"
+      ]
     }
   ]
 }

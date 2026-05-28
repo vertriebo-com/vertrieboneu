@@ -1,11 +1,16 @@
 {
   "name": "TaxonomyEntry",
   "type": "object",
+  "x-acl": {
+    "create": "admin",
+    "read": "public",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "industry_id": {
       "type": "string",
-      "title": "Branchen-ID (kanonisch)",
-      "description": "Eindeutiger Bezeichner z.B. gebaeudereinigung"
+      "title": "Branchen-ID (kanonisch)"
     },
     "label": {
       "type": "string",

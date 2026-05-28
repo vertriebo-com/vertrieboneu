@@ -2,7 +2,7 @@
   "name": "InvestorInquiry",
   "type": "object",
   "x-acl": {
-    "create": "admin",
+    "create": "public",
     "read": "admin",
     "update": "admin",
     "delete": "admin"

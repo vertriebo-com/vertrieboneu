@@ -1,16 +1,20 @@
 {
   "name": "AgencyRequest",
   "type": "object",
+  "x-acl": {
+    "create": "public",
+    "read": "admin",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",
-      "title": "Organisation ID",
-      "description": "Organisation des Anfragenden (null wenn nicht eingeloggt)"
+      "title": "Organisation ID"
     },
     "user_id": {
       "type": "string",
-      "title": "Benutzer ID",
-      "description": "Benutzer-ID des Anfragenden (null wenn nicht eingeloggt)"
+      "title": "Benutzer ID"
     },
     "plan": {
       "type": "string",
@@ -26,38 +30,31 @@
       "enum": [
         "pricing_page",
         "public_pricing_page"
-      ],
-      "description": "pricing_page = eingeloggt, public_pricing_page = nicht eingeloggt"
+      ]
     },
     "name": {
       "type": "string",
-      "title": "Name",
-      "description": "Vollst\u00e4ndiger Name des Anfragenden"
+      "title": "Name"
     },
     "company_name": {
       "type": "string",
-      "title": "Agentur / Unternehmen",
-      "description": "Name der Agentur oder des Unternehmens"
+      "title": "Agentur / Unternehmen"
     },
     "email": {
       "type": "string",
-      "title": "E-Mail",
-      "description": "E-Mail-Adresse des Anfragenden"
+      "title": "E-Mail"
     },
     "phone": {
       "type": "string",
-      "title": "Telefon",
-      "description": "Telefonnummer des Anfragenden"
+      "title": "Telefon"
     },
     "estimated_client_organizations": {
       "type": "number",
-      "title": "Gesch\u00e4tzte Kundenorganisationen",
-      "description": "Anzahl der typischerweise betreuten Kundenprojekte"
+      "title": "Gesch\u00e4tzte Kundenorganisationen"
     },
     "message": {
       "type": "string",
-      "title": "Nachricht",
-      "description": "Weitere Informationen oder Anforderungen"
+      "title": "Nachricht"
     },
     "status": {
       "type": "string",
@@ -77,8 +74,7 @@
     },
     "ip_source": {
       "type": "string",
-      "title": "IP-Quelle",
-      "description": "IP-Adresse oder Quelle des Anfragenden (f\u00fcr Spam-Tracking)"
+      "title": "IP-Quelle"
     }
   },
   "required": [

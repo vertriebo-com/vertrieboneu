@@ -104,8 +104,7 @@
         "lost",
         "archived"
       ],
-      "default": "lead",
-      "description": "Trennt die grunds\u00e4tzliche CRM-Rolle: lead = noch kein Kontakt/qualifiziert, qualified = qualifizierter Lead im Sales-Prozess, customer = gewonnener Kunde, lost = verloren/abgebrochen, archived = inaktiv/archiviert. Erg\u00e4nzt status (Prozesspipeline) und lead_temperature (KI-Score) ohne diese zu ersetzen."
+      "default": "lead"
     },
     "lifecycle_stage_changed_at": {
       "type": "string",
@@ -270,8 +269,7 @@
     },
     "google_place_id": {
       "type": "string",
-      "title": "Google Place ID",
-      "description": "Eindeutige Google Place ID \u2013 verhindert Duplikate bei parallelen Batch-L\u00e4ufen"
+      "title": "Google Place ID"
     },
     "source_provider": {
       "type": "string",
@@ -286,18 +284,15 @@
     },
     "matched_location_city": {
       "type": "string",
-      "title": "Gefundener Ort (LocationIndex)",
-      "description": "Stadt aus LocationIndex, die als Suchzentrum f\u00fcr diesen Lead verwendet wurde"
+      "title": "Gefundener Ort (LocationIndex)"
     },
     "matched_location_postal_code": {
       "type": "string",
-      "title": "Gefundene PLZ (LocationIndex)",
-      "description": "PLZ aus LocationIndex, die als Suchzentrum f\u00fcr diesen Lead verwendet wurde"
+      "title": "Gefundene PLZ (LocationIndex)"
     },
     "matched_location_distance_km": {
       "type": "number",
-      "title": "Entfernung zum LocationIndex-Suchzentrum (km)",
-      "description": "Distanz zwischen gefundenem Lead und dem verwendeten LocationIndex-Ort"
+      "title": "Entfernung zum LocationIndex-Suchzentrum (km)"
     },
     "search_coverage_source": {
       "type": "string",
@@ -306,8 +301,7 @@
         "location_index",
         "grid",
         "additional_location"
-      ],
-      "description": "Welche Suchpunktstrategie diesen Lead gefunden hat"
+      ]
     },
     "quality_tier": {
       "type": "string",
@@ -317,8 +311,7 @@
         "strong",
         "good",
         "weak"
-      ],
-      "description": "Evidence-basierte Qualit\u00e4tseinstufung: premium \u226585+3 Evidenzen, strong 75-84+2, good 65-74+2, weak sonst"
+      ]
     },
     "quality_confidence": {
       "type": "string",
@@ -327,18 +320,15 @@
         "high",
         "medium",
         "low"
-      ],
-      "description": "Konfidenz der Qualit\u00e4tseinstufung: high = starke Evidenz, low = nur Basis-Signale"
+      ]
     },
     "save_reason_code": {
       "type": "string",
-      "title": "Speicher-Begr\u00fcndung",
-      "description": "Kurzer Code warum dieser Lead gespeichert wurde, z.B. tc_match+phone+website"
+      "title": "Speicher-Begr\u00fcndung"
     },
     "provenance_json": {
       "type": "string",
-      "title": "Provenance JSON (Datenherkunft pro Feld)",
-      "description": "\u00dcbergangsfeld: JSON-Objekt mit Herkunft, Confidence und Review-Status pro Kontaktfeld. Struktur: { fields: { phone: { source_type, source_function, confidence, review_status, updated_at, updated_by }, email: {...}, website: {...}, contact_person: {...}, address: {...} } }. Supabase-ready: Future table lead_provenance(organization_id, company_id, field_name, source_type, confidence, review_status, created_at, created_by)."
+      "title": "Provenance JSON (Datenherkunft pro Feld)"
     }
   },
   "required": [

@@ -1,11 +1,16 @@
 {
   "name": "LocationIndex",
   "type": "object",
+  "x-acl": {
+    "create": "admin",
+    "read": "user",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "country_code": {
       "type": "string",
-      "title": "L\u00e4ndercode",
-      "description": "ISO 3166-1 alpha-2 (z.B. DE)"
+      "title": "L\u00e4ndercode"
     },
     "postal_code": {
       "type": "string",
@@ -21,7 +26,7 @@
     },
     "state_code": {
       "type": "string",
-      "title": "Bundesland-K\u00fcrzel (z.B. RP)"
+      "title": "Bundesland-K\u00fcrzel"
     },
     "district": {
       "type": "string",
@@ -60,8 +65,7 @@
         "district_only",
         "special_postal_recipient"
       ],
-      "default": "postal_code_city",
-      "description": "special_postal_recipient = Firmen-/Gro\u00dfempf\u00e4nger-PLZ, niemals als Suchort verwenden"
+      "default": "postal_code_city"
     },
     "source": {
       "type": "string",
@@ -83,7 +87,7 @@
     },
     "normalized_name": {
       "type": "string",
-      "title": "Normalisierter Ortsname (Kleinbuchstaben, bereinigt)"
+      "title": "Normalisierter Ortsname"
     },
     "quality_score": {
       "type": "number",
@@ -93,13 +97,11 @@
     "is_active": {
       "type": "boolean",
       "title": "Aktiv (f\u00fcr Suche nutzbar)",
-      "default": true,
-      "description": "false = inaktiv/special recipient, niemals f\u00fcr resolveCoverageLocations verwenden"
+      "default": true
     },
     "filter_reasons": {
       "type": "string",
-      "title": "Filter-Gr\u00fcnde (JSON-Array)",
-      "description": "Warum wurde dieser Eintrag als inaktiv/sonderfall markiert"
+      "title": "Filter-Gr\u00fcnde (JSON-Array)"
     }
   },
   "required": [

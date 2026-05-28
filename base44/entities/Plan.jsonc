@@ -1,6 +1,12 @@
 {
   "name": "Plan",
   "type": "object",
+  "x-acl": {
+    "create": "admin",
+    "read": "public",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "name": {
       "type": "string",
@@ -8,7 +14,7 @@
     },
     "plan_code": {
       "type": "string",
-      "title": "Plan-Code (maschinenlesbar, z.B. starter, professional, gold, agency)"
+      "title": "Plan-Code (maschinenlesbar)"
     },
     "plan_type": {
       "type": "string",
@@ -37,7 +43,7 @@
     },
     "allow_self_service": {
       "type": "boolean",
-      "title": "Self-Service buchbar (false = nur auf Anfrage)",
+      "title": "Self-Service buchbar",
       "default": true
     },
     "stripe_price_id": {

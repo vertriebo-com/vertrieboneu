@@ -1,6 +1,12 @@
 {
   "name": "BillingEventLog",
   "type": "object",
+  "x-acl": {
+    "create": "admin",
+    "read": "admin",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",

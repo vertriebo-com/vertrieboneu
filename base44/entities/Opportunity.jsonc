@@ -16,17 +16,15 @@
     "company_id": {
       "type": "string",
       "title": "Firma ID",
-      "description": "Pflicht. Zugeh\u00f6rige Company. Muss gleiche organization_id haben."
+      "description": "Pflicht. Zugeh\u00f6rige Company."
     },
     "primary_contact_id": {
       "type": "string",
-      "title": "Prim\u00e4rer Ansprechpartner ID",
-      "description": "Optional. Verweis auf Contact.id. Muss gleiche company_id + organization_id haben."
+      "title": "Prim\u00e4rer Ansprechpartner ID"
     },
     "title": {
       "type": "string",
-      "title": "Titel",
-      "description": "Kurzbezeichnung des Verkaufsfalls, z.B. 'Angebot Reinigung Q3 2026'"
+      "title": "Titel"
     },
     "stage": {
       "type": "string",
@@ -41,8 +39,7 @@
         "won",
         "lost"
       ],
-      "default": "new",
-      "description": "Sales-Pipeline-Stage. Unabh\u00e4ngig von Company.lifecycle_stage."
+      "default": "new"
     },
     "status": {
       "type": "string",
@@ -53,24 +50,20 @@
         "lost",
         "archived"
       ],
-      "default": "open",
-      "description": "Grob-Status. Won/Lost = Endzust\u00e4nde. Wird aus stage abgeleitet."
+      "default": "open"
     },
     "value": {
       "type": "number",
-      "title": "Auftragswert (EUR)",
-      "description": "Gesch\u00e4tzter oder tats\u00e4chlicher Auftragswert in EUR."
+      "title": "Auftragswert (EUR)"
     },
     "probability": {
       "type": "number",
-      "title": "Abschluss-Wahrscheinlichkeit (%)",
-      "description": "0-100. F\u00fcr Forecast: value * probability / 100."
+      "title": "Abschluss-Wahrscheinlichkeit (%)"
     },
     "expected_close_date": {
       "type": "string",
       "format": "date-time",
-      "title": "Geplanter Abschluss",
-      "description": "Geplantes Abschluss-Datum."
+      "title": "Geplanter Abschluss"
     },
     "source_type": {
       "type": "string",
@@ -86,18 +79,15 @@
     },
     "source_research_run_id": {
       "type": "string",
-      "title": "Recherche-Lauf ID",
-      "description": "Falls aus ResearchRun erstellt. F\u00fcr Conversion Lead\u2192Opportunity\u2192Won."
+      "title": "Recherche-Lauf ID"
     },
     "won_lost_reason": {
       "type": "string",
-      "title": "Grund (Won/Lost)",
-      "description": "Warum gewonnen oder verloren? F\u00fcr Learning Loop."
+      "title": "Grund (Won/Lost)"
     },
     "notes": {
       "type": "string",
-      "title": "Notizen",
-      "description": "Interne Notizen zum Deal."
+      "title": "Notizen"
     },
     "assigned_to": {
       "type": "string",
@@ -119,8 +109,7 @@
     "closed_at": {
       "type": "string",
       "format": "date-time",
-      "title": "Abgeschlossen am",
-      "description": "Wird bei won oder lost gesetzt."
+      "title": "Abgeschlossen am"
     },
     "won_at": {
       "type": "string",

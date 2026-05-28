@@ -1,6 +1,12 @@
 {
   "name": "ActivityLog",
   "type": "object",
+  "x-acl": {
+    "create": "user",
+    "read": "admin",
+    "update": "admin",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",

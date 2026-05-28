@@ -1,6 +1,12 @@
 {
   "name": "WeeklyBatch",
   "type": "object",
+  "x-acl": {
+    "create": "user",
+    "read": "user",
+    "update": "user",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",

@@ -1,6 +1,12 @@
 {
   "name": "OrganizationKeywordProfile",
   "type": "object",
+  "x-acl": {
+    "create": "user",
+    "read": "user",
+    "update": "user",
+    "delete": "admin"
+  },
   "properties": {
     "organization_id": {
       "type": "string",
@@ -13,6 +19,18 @@
     "keyword": {
       "type": "string",
       "title": "Suchbegriff"
+    },
+    "keyword_type": {
+      "type": "string",
+      "title": "Keyword-Typ",
+      "enum": [
+        "target_customer",
+        "service",
+        "search_variant",
+        "learned_query",
+        "manual"
+      ],
+      "default": "manual"
     },
     "source": {
       "type": "string",
@@ -92,6 +110,17 @@
       "type": "boolean",
       "title": "Manuell hinzugef\u00fcgt",
       "default": false
+    },
+    "linked_setting": {
+      "type": "string",
+      "title": "Verkn\u00fcpfte Einstellung",
+      "enum": [
+        "target_customer_types",
+        "own_services",
+        "taxonomy_variant",
+        "learned_signal",
+        "manual"
+      ]
     }
   },
   "required": [
