@@ -1613,8 +1613,15 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true, done: isDone, status: newStatus,
       leads_saved: totalLeadsSaved, leads_saved_this_batch: newLeadsSavedThisBatch,
+      duplicates_skipped: (run.duplicates_skipped || 0) + dupSkippedThisBatch,
+      raw_hits: (run.raw_hits || 0) + rawHitsThisBatch,
       progress_percent: isDone ? 100 : progressPercent,
       current_step: newStep, batch_index: nextBatchIndex, total_batches: totalBatches, message: newStep,
+      // Coverage (für Banner-Live-Update ohne extra DB-Read)
+      locations_searched_count: cumulativeLocationsSearched,
+      selected_locations_count: selectedLocationsCount,
+      covered_locations_count: coveredLocationsTotal,
+      coverage_complete: coverageComplete,
     });
 
   } catch (error) {

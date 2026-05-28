@@ -164,14 +164,14 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
           progress_percent: data?.progress_percent ?? freshRun.progress_percent ?? 0,
           message: data?.current_step || freshRun.current_step || 'Recherche läuft…',
           research_run_id: freshRun.id,
-          // Coverage-Daten
-          covered_locations_count: freshRun.covered_locations_count ?? 0,
-          selected_locations_count: freshRun.selected_locations_count ?? 0,
-          locations_searched_count: freshRun.locations_searched_count ?? 0,
+          // Coverage: API-Response hat Vorrang (aktueller), dann freshRun als Fallback
+          covered_locations_count: data?.covered_locations_count ?? freshRun.covered_locations_count ?? 0,
+          selected_locations_count: data?.selected_locations_count ?? freshRun.selected_locations_count ?? 0,
+          locations_searched_count: data?.locations_searched_count ?? freshRun.locations_searched_count ?? 0,
           search_center_city: freshRun.search_center_city || '',
           search_radius_km: freshRun.search_radius_km ?? null,
-          raw_hits: freshRun.raw_hits ?? 0,
-          duplicates_skipped: freshRun.duplicates_skipped ?? 0,
+          raw_hits: data?.raw_hits ?? freshRun.raw_hits ?? 0,
+          duplicates_skipped: data?.duplicates_skipped ?? freshRun.duplicates_skipped ?? 0,
         });
 
       } else if (recentDone && recentDone.id !== dismissed) {
