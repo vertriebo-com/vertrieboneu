@@ -52,14 +52,14 @@ export default function SEOFooter() {
             <h3 style={{ fontSize: 11, fontWeight: 800, color: "rgba(148,163,184,1)", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 14 }}>Regionen</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {[
-                ["Frankfurt am Main", "/branchen/gebaeudereinigung/frankfurt-am-main"],
-                ["München", "/branchen/gebaeudereinigung/muenchen"],
-                ["Berlin", "/branchen/gebaeudereinigung/berlin"],
-                ["Hamburg", "/branchen/gebaeudereinigung/hamburg"],
-                ["Köln", "/branchen/gebaeudereinigung/koeln"],
-                ["Düsseldorf", "/branchen/gebaeudereinigung/duesseldorf"],
-                ["Stuttgart", "/branchen/gebaeudereinigung/stuttgart"],
-                ["Alle Regionen →", "/branchen"],
+                ["IT-Service Frankfurt", "/branchen/it_service/frankfurt-am-main"],
+                ["Facility Service München", "/branchen/facility_service/muenchen"],
+                ["Handwerk Berlin", "/branchen/handwerk/berlin"],
+                ["Sicherheitsdienst Hamburg", "/branchen/sicherheitsdienst/hamburg"],
+                ["Gartenbau Köln", "/branchen/gartenbau/koeln"],
+                ["Catering Düsseldorf", "/branchen/catering/duesseldorf"],
+                ["SHK Stuttgart", "/branchen/shk/stuttgart"],
+                ["Alle Branchen & Regionen →", "/branchen"],
               ].map(([l, h]) => <a key={l} href={h} style={{ fontSize: 13, color: "rgba(100,116,139,1)", textDecoration: "none" }}>{l}</a>)}
             </div>
           </div>
@@ -69,11 +69,11 @@ export default function SEOFooter() {
             <h3 style={{ fontSize: 11, fontWeight: 800, color: "rgba(148,163,184,1)", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 14 }}>Wissen & Ratgeber</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
               {[
-                ["Was ist CRM?", "/was-ist-leadgenerierung"],
-                ["Was ist Lead-Scoring?", "/ki-lead-scoring"],
-                ["B2B Kaltakquise", "/was-ist-leadgenerierung"],
+                ["Was ist B2B Leadgenerierung?", "/was-ist-leadgenerierung"],
+                ["Wie funktioniert KI-Lead-Scoring?", "/ki-lead-scoring"],
                 ["Firmenrecherche automatisieren", "/automatisierte-recherche"],
-                ["Vertriebssoftware für KMU", "/preise"],
+                ["Preise & Pläne im Überblick", "/preise"],
+                ["Über Vertriebo", "/ueber-uns"],
               ].map(([l, h]) => <a key={l} href={h} style={{ fontSize: 13, color: "rgba(100,116,139,1)", textDecoration: "none" }}>{l}</a>)}
             </div>
           </div>
