@@ -209,11 +209,17 @@ export default function Onboarding() {
 
     setSaving(true);
     try {
-      // Mark onboarding as done
-      await base44.entities.Organization.update(org.id, {
+      // Mark onboarding as done — platform_status auf active setzen (sofern nicht suspended)
+      const orgCheck = await base44.entities.Organization.filter({ id: org.id });
+      const currentOrg = orgCheck?.[0];
+      const updatePayload = {
         onboarding_done: true,
         onboarding_completed_at: new Date().toISOString(),
-      });
+      };
+      if (currentOrg?.platform_status !== 'suspended') {
+        updatePayload.platform_status = 'active';
+      }
+      await base44.entities.Organization.update(org.id, updatePayload);
 
       const leadsFound = researchResult?.leads_saved || 0;
       const status = researchResult?.status;

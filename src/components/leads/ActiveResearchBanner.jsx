@@ -225,26 +225,32 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
   if (activeRun.duplicates_skipped > 0) coverageParts.push(`${activeRun.duplicates_skipped} Duplikate`);
   if (activeRun.raw_hits > 0) coverageParts.push(`${activeRun.raw_hits.toLocaleString('de-DE')} Profile geprüft`);
 
-  // Abschluss-Text
+  // Abschluss-Text — bei partial/max_runtime_exceeded spezifischere Meldung
   const doneLeads = activeRun.leads_saved || 0;
+  const isPartial = activeRun.status === 'partial';
   const doneText = doneLeads > 0
-    ? `${doneLeads} neue Leads gespeichert`
+    ? isPartial
+      ? `${doneLeads} Leads gefunden · Recherche teilweise abgeschlossen`
+      : `${doneLeads} neue Leads gespeichert`
     : 'Keine neuen Leads gefunden';
 
+  // Status-Label für abgeschlossene Runs
+  const doneLabel = isPartial ? 'Teilweise abgeschlossen' : 'Recherche abgeschlossen';
+
   return (
-    <div className={`rounded-xl border p-3 ${isDone ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+    <div className={`rounded-xl border p-3 ${isDone ? (isPartial ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200') : 'bg-blue-50 border-blue-200'}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           {isRunning ? (
             <Loader2 className="w-4 h-4 animate-spin text-blue-500 shrink-0" />
           ) : (
-            <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+            <CheckCircle2 className={`w-4 h-4 shrink-0 ${isPartial ? 'text-amber-600' : 'text-green-600'}`} />
           )}
           <div className="min-w-0 flex-1">
-            <div className={`text-sm font-semibold ${isDone ? 'text-green-900' : 'text-blue-900'}`}>
-              {isRunning ? 'Automatische Gebietsrecherche läuft' : 'Recherche abgeschlossen'}
+            <div className={`text-sm font-semibold ${isDone ? (isPartial ? 'text-amber-900' : 'text-green-900') : 'text-blue-900'}`}>
+              {isRunning ? 'Automatische Gebietsrecherche läuft' : doneLabel}
             </div>
-            <div className={`text-xs mt-0.5 ${isDone ? 'text-green-700' : 'text-blue-600'}`}>
+            <div className={`text-xs mt-0.5 ${isDone ? (isPartial ? 'text-amber-700' : 'text-green-700') : 'text-blue-600'}`}>
               {isRunning ? subline : doneText}
             </div>
 
@@ -257,7 +263,7 @@ export default function ActiveResearchBanner({ orgId, onNewLeads }) {
 
             {/* Abschluss-Details */}
             {isDone && (
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs text-green-700">
+              <div className={`flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-xs ${isPartial ? 'text-amber-700' : 'text-green-700'}`}>
                 {activeRun.raw_hits > 0 && (
                   <span>{activeRun.raw_hits.toLocaleString('de-DE')} Firmenprofile geprüft</span>
                 )}
