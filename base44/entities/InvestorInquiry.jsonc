@@ -46,10 +46,10 @@
       "title": "Status",
       "enum": [
         "new",
+        "geprueft",
         "contacted",
-        "in_talks",
-        "closed",
-        "archived"
+        "gespraech",
+        "abgelehnt"
       ],
       "default": "new"
     },
@@ -60,6 +60,20 @@
     "internal_note": {
       "type": "string",
       "title": "Interne Notiz"
+    },
+    "contacted_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Kontaktiert am"
+    },
+    "meeting_date": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Meeting-Termin"
+    },
+    "handled_by": {
+      "type": "string",
+      "title": "Bearbeitet von (E-Mail)"
     }
   },
   "required": [

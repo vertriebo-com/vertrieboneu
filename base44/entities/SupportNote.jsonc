@@ -39,6 +39,35 @@
         "resolved"
       ],
       "default": "open"
+    },
+    "priority": {
+      "type": "string",
+      "title": "Priorit\u00e4t",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium"
+    },
+    "internal_reply_note": {
+      "type": "string",
+      "title": "Interne Antwortnotiz"
+    },
+    "reviewed_by": {
+      "type": "string",
+      "title": "Gepr\u00fcft von (E-Mail)"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Gepr\u00fcft am"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Erledigt am"
     }
   },
   "required": [

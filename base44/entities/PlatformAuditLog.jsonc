@@ -27,7 +27,9 @@
         "organization",
         "agency",
         "agency_client",
-        "support_note"
+        "support_note",
+        "waitlist_lead",
+        "investor_inquiry"
       ]
     },
     "target_id": {

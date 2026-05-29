@@ -59,15 +59,33 @@
       "enum": [
         "new",
         "contacted",
-        "invited",
-        "converted",
-        "archived"
+        "demo_geplant",
+        "onboarded",
+        "abgelehnt"
       ],
       "default": "new"
     },
     "internal_note": {
       "type": "string",
       "title": "Interne Notiz"
+    },
+    "contacted_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Kontaktiert am"
+    },
+    "demo_date": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Demo-Termin"
+    },
+    "handled_by": {
+      "type": "string",
+      "title": "Bearbeitet von (E-Mail)"
+    },
+    "converted_organization_id": {
+      "type": "string",
+      "title": "Umgewandelt zu Org-ID"
     }
   },
   "required": [
