@@ -7,8 +7,9 @@ import {
   Building2, X, Users, CreditCard, Search, Brain, FileText,
   Settings, Shield, MessageSquare, AlertTriangle, Loader2,
   CheckCircle2, AlertCircle, Lock, Unlock, RefreshCw, Wrench,
-  Copy, Check, ChevronDown
+  Copy, Check, ChevronDown, DatabaseZap
 } from 'lucide-react';
+import DataQualityTab from '@/components/platform-admin/DataQualityTab';
 import { toast } from 'sonner';
 import moment from 'moment';
 
@@ -746,6 +747,7 @@ export default function OrgDetailDrawer({ org, plans, onClose, onRefetch }) {
                 <TabsTrigger value="research" className="gap-1.5 text-[11px] py-1.5 px-2"><Search className="w-3 h-3" /> Research</TabsTrigger>
                 <TabsTrigger value="learning" className="gap-1.5 text-[11px] py-1.5 px-2"><Brain className="w-3 h-3" /> Learning</TabsTrigger>
                 <TabsTrigger value="notes" className="gap-1.5 text-[11px] py-1.5 px-2"><MessageSquare className="w-3 h-3" /> Support Notes</TabsTrigger>
+                <TabsTrigger value="dataquality" className="gap-1.5 text-[11px] py-1.5 px-2"><DatabaseZap className="w-3 h-3" /> Datenqualität</TabsTrigger>
                 <TabsTrigger value="danger" className="gap-1.5 text-[11px] py-1.5 px-2 data-[state=active]:bg-red-600 data-[state=active]:text-white"><AlertTriangle className="w-3 h-3" /> Gefahrenzone</TabsTrigger>
               </TabsList>
 
@@ -755,6 +757,7 @@ export default function OrgDetailDrawer({ org, plans, onClose, onRefetch }) {
               <TabsContent value="research"><ResearchTab org={org} researchRuns={researchRuns} /></TabsContent>
               <TabsContent value="learning"><LearningTab org={org} /></TabsContent>
               <TabsContent value="notes"><SupportNotesTab org={org} /></TabsContent>
+              <TabsContent value="dataquality"><DataQualityTab org={org} /></TabsContent>
               <TabsContent value="danger"><DangerZoneTab org={org} onClose={onClose} onRefetch={onRefetch} /></TabsContent>
             </Tabs>
           )}
