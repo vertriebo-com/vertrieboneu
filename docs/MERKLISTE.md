@@ -50,6 +50,25 @@ Mandantenisolation muss im Code passieren:
 
 Langfristig soll echte Mandantenisolation über Supabase/Postgres RLS erfolgen.
 
+### Security-Scan-Klärung 2026-05-28
+
+Der Base44-Security-Scanner kann keine echte `owner_only`- oder `same_organization_id_only`-RLS erkennen, weil Base44 diese deklarative Row-Level-Security auf Plattformebene nicht anbietet.
+
+Daher können RLS-Warnungen für kundenspezifische Entities trotz gesetzter `x-acl` und Backend-Guards als Plattform-Limit / False Positive bestehen bleiben.
+
+Aktuelle Bewertung aus Base44-Bericht:
+
+```txt
+- x-acl-Fixes sind gespeichert.
+- GitHub-Sync hat keine Entity-Dateien überschrieben.
+- Interner Audit auditEntityPermissionConsistency: 0 rote Entities, 3 gelbe, 13 grüne.
+- Externer Base44-Security-Scanner erkennt Backend-Guards nicht.
+- 23 RLS-Warnungen wurden als Platform-Limit / False Positive klassifiziert.
+- Echte offene Sicherheitslücken laut Bericht: 0.
+```
+
+Wichtig: Diese Klassifizierung gilt nur, solange alle kritischen Datenzugriffe weiterhin über Backend-Guards, `organization_id`-Filter, `sharedAuthz` oder gleichwertige Checks laufen.
+
 ---
 
 ## 3. Sicherheitsregel für alle Kundendaten
@@ -137,6 +156,7 @@ upsertContact
 blacklistCompany
 deleteCompany
 enrichCompany
+processLeadOutcomeFeedback
 ```
 
 Richtige Muster:
@@ -292,6 +312,27 @@ simulateProcessResearchRun: nur PlatformAdmin oder löschen
 testPlatformAuth: nur PlatformAdmin oder löschen
 testQuotaEnforcement: nur PlatformAdmin oder löschen
 sendBrevoEmail: nicht frei für jeden eingeloggten Nutzer; mindestens Rollen- und Org-Check
+```
+
+Aktueller Sicherheitsstand laut Base44-Bericht vom 2026-05-28:
+
+```txt
+- generateLeads: DEPRECATED-Guard, 410 für Nicht-Admins.
+- runUnifiedResearch: DEPRECATED-Guard, 410 für Nicht-Admins.
+- parallelQuotaTest: 403 für Nicht-PlatformAdmins.
+- simulateProcessResearchRun: 403 für Nicht-PlatformAdmins.
+- testPlatformAuth: 403 für Nicht-PlatformAdmins.
+- testQuotaEnforcement: 403 für Nicht-PlatformAdmins.
+- sendBrevoEmail: muss Tenant-/Rollencheck behalten; nicht frei für alle User.
+- processLeadOutcomeFeedback: Sicherheitslücke gefunden und gefixt.
+```
+
+`processLeadOutcomeFeedback`-Regel:
+
+```txt
+- Daily-Run-Modus ohne organization_id darf nur PlatformAdmin oder Scheduler/System-Kontext ausführen.
+- Einzel-Org-Modus darf nur Owner, aktives OrganizationMember oder PlatformAdmin ausführen.
+- Falls kein echter Scheduler registriert ist, direkte Aufrufe streng schützen.
 ```
 
 Vor Live-Go muss der Security Scan hierzu sauber sein oder die verbleibenden Warnungen müssen als bewusst akzeptierte Plattformlimits dokumentiert sein.
@@ -625,12 +666,35 @@ Alte Research-Flows nicht wiederbeleben.
 
 ---
 
-## 18. Live-Go-Regel
+## 18. Security-Header
+
+Base44 erlaubt laut aktueller Projektklärung keine direkte Plattform-Konfiguration für:
+
+```txt
+X-Frame-Options
+Permissions-Policy
+Content-Security-Policy
+```
+
+Diese Punkte sind als Base44-Plattformlimit dokumentiert.
+
+Für späteres eigenes Hosting/Vercel/Cloudflare vormerken:
+
+```txt
+- X-Frame-Options oder frame-ancestors in CSP setzen.
+- Permissions-Policy restriktiv setzen.
+- Content-Security-Policy sauber definieren.
+- HSTS aktivieren.
+```
+
+---
+
+## 19. Live-Go-Regel
 
 Vor Live-Go prüfen:
 
 ```txt
-1. Security Scan: keine echten kritischen ACL/RLS-Probleme.
+1. Security Scan: keine echten kritischen ACL/RLS-Probleme; verbleibende RLS-Warnungen müssen als Base44-Plattformlimit / False Positive dokumentiert sein.
 2. Deprecated/Test Functions entfernt oder PlatformAdmin-only.
 3. Public Forms: create public, read admin-only.
 4. Kundendaten: organization_id-Isolation in Backend und Frontend geprüft.
@@ -640,13 +704,12 @@ Vor Live-Go prüfen:
 8. ResearchRun mit echtem Ort testen, z. B. 35708 Haiger / 25 km.
 9. Dashboard, Leads, LeadDetail, Tasks, Settings, PlatformAdmin prüfen.
 10. Feedback/Waitlist/Investor-Daten im PlatformAdmin sichtbar.
+11. Security-Header-Limits dokumentiert oder bei eigenem Hosting gesetzt.
 ```
-
-Wenn Security-Header wie `X-Frame-Options` oder `Permissions-Policy` in Base44 nicht steuerbar sind, als Base44-Plattformlimit dokumentieren und später bei eigenem Hosting/Vercel/Cloudflare setzen.
 
 ---
 
-## 19. Was Base44 NICHT tun soll
+## 20. Was Base44 NICHT tun soll
 
 ```txt
 - Keine neuen großen Features vor Security-/Migration-Basis.
@@ -658,11 +721,12 @@ Wenn Security-Header wie `X-Frame-Options` oder `Permissions-Policy` in Base44 n
 - Keine technischen IDs im UI anzeigen, wenn menschenlesbare Labels möglich sind.
 - Keine Supabase-Migration als Big-Bang durchführen.
 - Keine Änderungen ohne Merkliste prüfen/aktualisieren.
+- Keine Security-Scan-Warnungen pauschal ignorieren; immer als echtes Risiko oder dokumentiertes Plattformlimit klassifizieren.
 ```
 
 ---
 
-## 20. Merksatz
+## 21. Merksatz
 
 ```txt
 Base44 ist die schnelle Bauplattform.
