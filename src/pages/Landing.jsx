@@ -452,7 +452,7 @@ export default function Landing() {
       {/* STATS BAR */}
       <section style={{ background: "#060d1f", borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "28px 20px" }}>
         <div className="stats-grid" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0 }}>
-        {[{ v: "40+", l: "Branchen", s: "Von Reinigung bis IT-Service" }, { v: "< 5 Min", l: "bis zum ersten Lead", s: "Kein langer Setup" }, { v: "KI-Score", l: "für jeden Lead", s: "Priorität auf Knopfdruck" }, { v: "100%", l: "DSGVO", s: "Made for Germany" }].map((s, i) => (
+        {[{ v: "40+", l: "Branchen", s: "Von Reinigung bis IT-Service" }, { v: "< 5 Min", l: "bis zum ersten Lead", s: "Kein langer Setup" }, { v: "KI-Score", l: "für jeden Lead", s: "Priorität auf Knopfdruck" }, { v: "Made", l: "in Germany", s: "Für den deutschen Markt entwickelt" }].map((s, i) => (
           <div key={i} style={{ textAlign: "center", padding: "12px 8px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
             <p style={{ fontSize: "clamp(18px,2.5vw,32px)", fontWeight: 900, background: "linear-gradient(135deg,#60a5fa,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", marginBottom: 3 }}>{s.v}</p>
             <p style={{ fontSize: 11, fontWeight: 700, color: "white", marginBottom: 2 }}>{s.l}</p>
@@ -737,9 +737,7 @@ export default function Landing() {
             <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo – B2B Leadgenerierung für lokale Dienstleister" style={{ height: 110, width: "auto", objectFit: "contain", marginBottom: 10, opacity: 0.7 }} />
             <p style={{ fontSize: 12, color: "rgba(71,85,105,1)", textAlign: "center" }}>Automatisierte B2B-Leadgenerierung · KI-Lead-Scoring · CRM für lokale Dienstleister</p>
             <p style={{ fontSize: 12, color: "rgba(71,85,105,1)" }}>
-              <a href="tel:026019131820" style={{ color: "rgba(100,116,139,1)", textDecoration: "none" }}>📞 02601/9131820</a>
-              {" · "}
-              <a href="mailto:info@huwa-gebaeudedienste.de" style={{ color: "rgba(100,116,139,1)", textDecoration: "none" }}>✉️ info@huwa-gebaeudedienste.de</a>
+              <a href="mailto:noreply@vertriebo.de" style={{ color: "rgba(100,116,139,1)", textDecoration: "none" }}>✉️ noreply@vertriebo.de</a>
             </p>
           </div>
 
@@ -751,12 +749,12 @@ export default function Landing() {
               <h3 style={{ fontSize: 11, fontWeight: 800, color: "rgba(148,163,184,1)", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 14 }}>Produkt</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                 {[
-                  ["Was ist B2B Leadgenerierung?", "/was-ist-leadgenerierung"],
-                  ["Automatisierte Recherche", "/automatisierte-recherche"],
-                  ["KI-Lead-Scoring", "/ki-lead-scoring"],
-                  ["Preise & Pläne", "/preise"],
-                  ["Funktionen", "/#wie-es-funktioniert"],
-                ].map(([l, h]) => <a key={l} href={h} style={{ fontSize: 13, color: "rgba(100,116,139,1)", textDecoration: "none" }}>{l}</a>)}
+                       ["Funktionen", "/#wie-es-funktioniert"],
+                       ["Automatische Firmenrecherche", "/automatisierte-recherche"],
+                       ["Lead-Bewertung", "/ki-lead-scoring"],
+                       ["Tagesliste", "/#wie-es-funktioniert"],
+                       ["Preise & Pläne", "/preise"],
+                     ].map(([l, h]) => <a key={l} href={h} style={{ fontSize: 13, color: "rgba(100,116,139,1)", textDecoration: "none" }}>{l}</a>)}
               </div>
             </div>
 
@@ -813,13 +811,11 @@ export default function Landing() {
               <h3 style={{ fontSize: 11, fontWeight: 800, color: "rgba(148,163,184,1)", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 14 }}>Unternehmen</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                 {[
-                  ["Über Vertriebo", "/ueber-uns"],
-                  ["Kontakt", "/kontakt"],
-                  ["Investor Relations", "/investors"],
-                  ["Preise", "/preise"],
-                  ["Anmelden", "/anmelden"],
-                  ["Registrieren", "/registrieren"],
-                ].map(([l, h]) => <a key={l} href={h} style={{ fontSize: 13, color: "rgba(100,116,139,1)", textDecoration: "none" }}>{l}</a>)}
+                   ["Über Vertriebo", "/ueber-uns"],
+                   ["Kontakt", "/kontakt"],
+                   ["Investor Relations", "/investors"],
+                   ["Preise", "/preise"],
+                 ].map(([l, h]) => <a key={l} href={h} style={{ fontSize: 13, color: "rgba(100,116,139,1)", textDecoration: "none" }}>{l}</a>)}
               </div>
             </div>
 
@@ -854,7 +850,7 @@ export default function Landing() {
 
           {/* RECHTLICHES */}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 20, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <p style={{ color: "rgba(51,65,85,1)", fontSize: 11 }}>© 2026 Vertriebo · Ein Produkt der Huwa Gebäudereinigung & Hausmeisterdienste, Mittelweg 24, 56566 Neuwied</p>
+            <p style={{ color: "rgba(51,65,85,1)", fontSize: 11 }}>© 2026 Vertriebo. Alle Rechte vorbehalten.</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
               {[["Impressum", "/impressum"], ["Datenschutz", "/datenschutz"], ["AGB", "/agb"]].map(([l, h]) => (
                 <a key={l} href={h} style={{ color: "rgba(71,85,105,1)", fontSize: 11, textDecoration: "none" }}>{l}</a>
