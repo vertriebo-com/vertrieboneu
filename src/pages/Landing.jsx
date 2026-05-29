@@ -311,14 +311,14 @@ const TESTIMONIALS = [
 
 const COMPARE_ROWS = [
   { f: "Automatische Firmenrecherche", v: true, c: false, e: false },
-  { f: "KI-Lead-Scoring (0–100)", v: true, c: false, e: false },
-  { f: "Priorisierte Tagesliste", v: true, c: false, e: false },
-  { f: "In 5 Min. startklar", v: true, c: false, e: true },
-  { f: "Lückenlose Gebietsabdeckung", v: true, c: false, e: false },
+  { f: "Gebietsabdeckung mit Nachbarorten", v: true, c: false, e: false },
+  { f: "Lead-Bewertung aus Recherche-Daten", v: true, c: "partial", e: false },
+  { f: "Priorisierte Tagesliste", v: true, c: "partial", e: false },
+  { f: "Schnell startklar", v: true, c: "partial", e: true },
   { f: "Kontakthistorie & CRM", v: true, c: true, e: false },
-  { f: "System lernt mit", v: true, c: false, e: false },
-  { f: "DSGVO Made in Germany", v: true, c: false, e: false },
-  { f: "Monatlich kündbar", v: true, c: false, e: true },
+  { f: "System lernt mit", v: true, c: "partial", e: false },
+  { f: "Datenschutz-bewusste Entwicklung", v: true, c: "partial", e: false },
+  { f: "Für Dienstleister vorkonfiguriert", v: true, c: "partial", e: false },
 ];
 
 const INDUSTRIES = ["🏢 Gebäudereinigung", "🛡️ Sicherheitsdienst", "🏠 Facility Service", "📦 Entrümpelung", "🔨 Handwerk", "💻 IT-Service", "🌿 Gartenbau", "🚚 Spedition", "🔧 SHK / Heizung", "⚡ Elektro", "🍽️ Catering", "👥 Zeitarbeit", "⚙️ Industrieservice", "🧹 Maler", "💰 Buchhaltung", "🏥 Pflege", "🚗 Kfz-Service", "🏗️ Bau"];
@@ -585,8 +585,8 @@ export default function Landing() {
               <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", padding: "10px 12px", borderBottom: i < COMPARE_ROWS.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none", alignItems: "center" }}>
                 <span style={{ fontSize: 12, color: "rgba(203,213,225,1)", fontWeight: 500 }}>{row.f}</span>
                 <div style={{ textAlign: "center" }}>{row.v ? <span style={{ fontSize: 15, color: "#4ade80" }}>✓</span> : <span style={{ color: "rgba(100,116,139,0.3)" }}>–</span>}</div>
-                <div style={{ textAlign: "center" }}>{row.c ? <span style={{ fontSize: 13, color: "rgba(148,163,184,0.5)" }}>✓</span> : <span style={{ color: "rgba(100,116,139,0.3)" }}>–</span>}</div>
-                <div style={{ textAlign: "center" }}>{row.e ? <span style={{ fontSize: 13, color: "rgba(148,163,184,0.5)" }}>✓</span> : <span style={{ color: "rgba(100,116,139,0.3)" }}>–</span>}</div>
+                <div style={{ textAlign: "center" }}>{row.c === true ? <span style={{ fontSize: 15, color: "#4ade80" }}>✓</span> : row.c === "partial" ? <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 5, background: "rgba(100,116,139,0.1)", color: "rgba(148,163,184,1)", border: "1px solid rgba(100,116,139,0.2)" }}>teilweise</span> : <span style={{ color: "rgba(100,116,139,0.3)" }}>–</span>}</div>
+                <div style={{ textAlign: "center" }}>{row.e ? <span style={{ fontSize: 15, color: "#4ade80" }}>✓</span> : <span style={{ color: "rgba(100,116,139,0.3)" }}>–</span>}</div>
               </div>
             ))}
           </div>
