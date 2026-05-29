@@ -129,12 +129,40 @@ export default function SecurityAuditPanel() {
                           ✓ {result.data.counts.green} · ⚠ {result.data.counts.yellow} · ✗ {result.data.counts.red}
                         </div>
                       )}
-                      {/* Fallback: show key metrics for audits with non-standard response shape */}
-                      {!result.data.red_blockers && !result.data.yellow_warnings && !result.data.green_checks && !result.data.counts && (
-                        <pre className="text-[9px] text-slate-500 bg-slate-50 rounded px-2 py-1 overflow-auto max-h-32 whitespace-pre-wrap">
-                          {JSON.stringify(result.data, null, 2)}
-                        </pre>
-                      )}
+                      {/* Fallback: compact summary for non-standard response shapes */}
+                      {!result.data.red_blockers && !result.data.yellow_warnings && !result.data.green_checks && !result.data.counts && (() => {
+                        const d = result.data;
+                        const s = typeof d.summary === 'object' ? d.summary : null;
+                        // Try to extract key numbers
+                        const passed = d.passed ?? s?.passed;
+                        const failed = d.failed ?? s?.failed;
+                        const warnings = d.warnings ?? s?.warnings;
+                        const green = d.green_entities ?? s?.green_entities;
+                        const yellow = d.yellow_entities ?? s?.yellow_entities;
+                        const red = d.red_entities ?? s?.red_entities;
+                        const riskLevel = d.risk_level ?? s?.risk_level;
+                        const keyFinding = s?.key_finding ?? d.key_finding;
+                        const hasNumbers = passed != null || green != null;
+                        return (
+                          <div className="space-y-1">
+                            {hasNumbers && (
+                              <div className="text-[10px] text-slate-600">
+                                {passed != null && <span>✓ {passed} bestanden</span>}
+                                {failed != null && failed > 0 && <span className="text-red-600 ml-2">✗ {failed} Fehler</span>}
+                                {warnings != null && warnings > 0 && <span className="text-amber-600 ml-2">⚠ {warnings} Warnungen</span>}
+                                {green != null && <span className="ml-2">✓ {green} grün · ⚠ {yellow ?? 0} gelb · ✗ {red ?? 0} rot</span>}
+                                {riskLevel && <span className="ml-2 font-semibold">Risk: {riskLevel}</span>}
+                              </div>
+                            )}
+                            {keyFinding && <div className="text-[10px] text-slate-500 italic">{keyFinding}</div>}
+                            {!hasNumbers && !keyFinding && (
+                              <pre className="text-[9px] text-slate-500 bg-slate-50 rounded px-2 py-1 overflow-auto max-h-24 whitespace-pre-wrap">
+                                {JSON.stringify(d, null, 2).slice(0, 400)}…
+                              </pre>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
