@@ -121,7 +121,9 @@ export default function SecurityAuditPanel() {
                         </div>
                       )}
                       {result.data.summary && (
-                        <div className="text-[10px] text-slate-600">{result.data.summary}</div>
+                        <div className="text-[10px] text-slate-600">
+                          {typeof result.data.summary === 'object' ? JSON.stringify(result.data.summary) : result.data.summary}
+                        </div>
                       )}
                       {result.data.counts && (
                         <div className="text-[10px] text-slate-600">
