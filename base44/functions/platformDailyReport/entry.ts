@@ -122,6 +122,140 @@ Deno.serve(async (req) => {
 
     report.status = hasCritical ? 'critical' : hasWarnings ? 'warning' : 'ok';
 
+    // ── E-Mail-Bericht per Brevo senden ───────────────────────────────────────
+    const REPORT_EMAIL = 'noreply@vertriebo.com';
+    const statusEmoji = report.status === 'critical' ? '🔴' : report.status === 'warning' ? '🟡' : '🟢';
+    const dateStr = now.toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Europe/Berlin' });
+
+    const htmlBody = `
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; background: #f6f8fb; margin: 0; padding: 20px; }
+  .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .header { background: #0f172a; color: white; padding: 24px 28px; }
+  .header h1 { margin: 0; font-size: 20px; }
+  .header p { margin: 4px 0 0; font-size: 13px; color: #94a3b8; }
+  .status-bar { padding: 12px 28px; font-size: 13px; font-weight: bold; }
+  .status-ok { background: #f0fdf4; color: #166534; }
+  .status-warning { background: #fffbeb; color: #92400e; }
+  .status-critical { background: #fef2f2; color: #991b1b; }
+  .section { padding: 20px 28px; border-bottom: 1px solid #f1f5f9; }
+  .section h2 { font-size: 13px; font-weight: bold; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric { background: #f8fafc; border-radius: 8px; padding: 12px 14px; }
+  .metric .val { font-size: 22px; font-weight: bold; color: #0f172a; }
+  .metric .lbl { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .metric.warn .val { color: #d97706; }
+  .metric.crit .val { color: #dc2626; }
+  .list-item { font-size: 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; color: #334155; }
+  .list-item:last-child { border: none; }
+  .badge { display: inline-block; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .footer { padding: 16px 28px; font-size: 11px; color: #94a3b8; text-align: center; }
+</style></head><body>
+<div class="container">
+  <div class="header">
+    <h1>🏢 Vertriebo Platform Report</h1>
+    <p>${dateStr}</p>
+  </div>
+  <div class="status-bar status-${report.status}">
+    ${statusEmoji} Status: ${report.status.toUpperCase()} &nbsp;·&nbsp; Generiert: ${now.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin' })} Uhr
+  </div>
+
+  <div class="section">
+    <h2>📊 Übersicht (letzte 24h)</h2>
+    <div class="grid">
+      <div class="metric"><div class="val">${report.summary.new_waitlist_leads}</div><div class="lbl">Neue Interessenten</div></div>
+      <div class="metric"><div class="val">${report.summary.new_investor_inquiries}</div><div class="lbl">Investor-Anfragen</div></div>
+      <div class="metric"><div class="val">${report.summary.new_orgs}</div><div class="lbl">Neue Organisationen</div></div>
+      <div class="metric"><div class="val">${report.summary.new_leads_24h}</div><div class="lbl">Neue Leads</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>⚙️ System-Status</h2>
+    <div class="grid">
+      <div class="metric ${report.summary.failed_research_runs > 0 ? 'crit' : ''}"><div class="val">${report.summary.failed_research_runs}</div><div class="lbl">Fehlgeschlagene Runs</div></div>
+      <div class="metric ${report.summary.stuck_runs > 0 ? 'crit' : ''}"><div class="val">${report.summary.stuck_runs}</div><div class="lbl">Hängende Runs</div></div>
+      <div class="metric ${report.summary.partial_zero_runs > 0 ? 'warn' : ''}"><div class="val">${report.summary.partial_zero_runs}</div><div class="lbl">Partial-Zero Runs</div></div>
+      <div class="metric ${report.summary.paid_orgs_no_plan > 0 ? 'warn' : ''}"><div class="val">${report.summary.paid_orgs_no_plan}</div><div class="lbl">Paid Orgs ohne Plan</div></div>
+    </div>
+  </div>
+
+  ${report.details.new_waitlist_leads.length > 0 ? `
+  <div class="section">
+    <h2>🧲 Neue Interessenten</h2>
+    ${report.details.new_waitlist_leads.map(l => `
+      <div class="list-item">
+        <strong>${l.name || 'Unbekannt'}</strong> – ${l.email}
+        ${l.company ? `· ${l.company}` : ''}
+        ${l.industry ? `<span class="badge badge-amber">${l.industry}</span>` : ''}
+      </div>`).join('')}
+  </div>` : ''}
+
+  ${report.details.new_investor_inquiries.length > 0 ? `
+  <div class="section">
+    <h2>💼 Investor-Anfragen</h2>
+    ${report.details.new_investor_inquiries.map(i => `
+      <div class="list-item">
+        <strong>${i.name || 'Unbekannt'}</strong> – ${i.email}
+        ${i.company ? `· ${i.company}` : ''}
+        <span class="badge badge-amber">${i.role || ''}</span>
+      </div>`).join('')}
+  </div>` : ''}
+
+  ${report.details.failed_runs.length > 0 ? `
+  <div class="section">
+    <h2>🔴 Fehlgeschlagene Research Runs</h2>
+    ${report.details.failed_runs.slice(0, 5).map(r => `
+      <div class="list-item">
+        Org: <code>${r.org}</code>
+        <span class="badge badge-red">FAILED</span>
+        ${r.error ? `<br><span style="color:#94a3b8;font-size:11px">${r.error.slice(0,100)}</span>` : ''}
+      </div>`).join('')}
+  </div>` : ''}
+
+  ${report.details.paid_orgs_no_plan.length > 0 ? `
+  <div class="section">
+    <h2>⚠️ Paid Orgs ohne Plan-ID</h2>
+    ${report.details.paid_orgs_no_plan.map(o => `
+      <div class="list-item">
+        <strong>${o.name}</strong> · Status: ${o.billing_status}
+        <span class="badge badge-amber">KEIN PLAN</span>
+      </div>`).join('')}
+  </div>` : ''}
+
+  <div class="footer">
+    Vertriebo Platform · Automatischer Tagesbericht · ${now.toISOString()}
+  </div>
+</div>
+</body></html>`;
+
+    try {
+      const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': Deno.env.get('BREVO_API_KEY'),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: 'Vertriebo System', email: 'noreply@vertriebo.com' },
+          to: [{ email: REPORT_EMAIL, name: 'Vertriebo Admin' }],
+          subject: `${statusEmoji} Vertriebo Daily Report – ${now.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' })}`,
+          htmlContent: htmlBody,
+        }),
+      });
+      if (!brevoRes.ok) {
+        const errText = await brevoRes.text();
+        console.error('[platformDailyReport] Brevo error:', errText);
+      } else {
+        console.info('[platformDailyReport] E-Mail erfolgreich gesendet an ' + REPORT_EMAIL);
+      }
+    } catch (emailErr) {
+      console.error('[platformDailyReport] E-Mail-Versand fehlgeschlagen:', emailErr?.message);
+    }
+
     // ── PlatformAuditLog schreiben ─────────────────────────────────────────────
     await db.PlatformAuditLog.create({
       actor_email: 'system@vertriebo.scheduler',
