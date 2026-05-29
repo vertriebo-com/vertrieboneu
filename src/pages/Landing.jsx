@@ -452,7 +452,7 @@ export default function Landing() {
       {/* STATS BAR */}
       <section style={{ background: "#060d1f", borderTop: "1px solid rgba(255,255,255,0.05)", borderBottom: "1px solid rgba(255,255,255,0.05)", padding: "28px 20px" }}>
         <div className="stats-grid" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0 }}>
-        {[{ v: "40+", l: "Branchen", s: "Von Reinigung bis IT-Service" }, { v: "< 5 Min", l: "bis zum ersten Lead", s: "Kein langer Setup" }, { v: "KI-Score", l: "für jeden Lead", s: "Priorität auf Knopfdruck" }, { v: "Made", l: "in Germany", s: "Für den deutschen Markt entwickelt" }].map((s, i) => (
+        {[{ v: "40+", l: "Branchen", s: "Von Reinigung bis IT-Service" }, { v: "< 5 Min", l: "bis zum ersten Lead", s: "Kein langer Setup" }, { v: "KI-Score", l: "für jeden Lead", s: "Priorität auf Knopfdruck" }, { v: "🔒", l: "Datenschutz", s: "im Fokus" }].map((s, i) => (
           <div key={i} style={{ textAlign: "center", padding: "12px 8px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
             <p style={{ fontSize: "clamp(18px,2.5vw,32px)", fontWeight: 900, background: "linear-gradient(135deg,#60a5fa,#a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", marginBottom: 3 }}>{s.v}</p>
             <p style={{ fontSize: 11, fontWeight: 700, color: "white", marginBottom: 2 }}>{s.l}</p>
