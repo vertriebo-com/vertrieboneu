@@ -246,10 +246,11 @@ Deno.serve(async (req) => {
           htmlContent: htmlBody,
         }),
       });
+      const brevoBody = await brevoRes.text();
       if (!brevoRes.ok) {
-        const errText = await brevoRes.text();
-        console.error('[platformDailyReport] Brevo error:', errText);
+        console.error('[platformDailyReport] Brevo error HTTP ' + brevoRes.status + ':', brevoBody);
       } else {
+        console.info('[platformDailyReport] Brevo response:', brevoBody);
         console.info('[platformDailyReport] E-Mail erfolgreich gesendet an ' + REPORT_EMAIL);
       }
     } catch (emailErr) {
