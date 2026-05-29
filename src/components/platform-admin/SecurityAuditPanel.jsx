@@ -92,7 +92,8 @@ export default function SecurityAuditPanel() {
           {AUDIT_FUNCTIONS.map(audit => {
             const result = results[audit.key];
             const isRunning = running[audit.key];
-            const status = result?.data?.overall_status || result?.data?.claim_status || result?.data?.status;
+            const rawStatus = result?.data?.overall_status || result?.data?.claim_status || result?.data?.status;
+            const status = typeof rawStatus === 'string' ? rawStatus : undefined;
 
             return (
               <div key={audit.key} className="flex items-start gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
@@ -120,15 +121,19 @@ export default function SecurityAuditPanel() {
                           ✓ {result.data.green_checks.length} Checks bestanden
                         </div>
                       )}
-                      {result.data.summary && (
-                        <div className="text-[10px] text-slate-600">
-                          {typeof result.data.summary === 'object' ? JSON.stringify(result.data.summary) : result.data.summary}
-                        </div>
+                      {result.data.summary && typeof result.data.summary === 'string' && (
+                        <div className="text-[10px] text-slate-600">{result.data.summary}</div>
                       )}
                       {result.data.counts && (
                         <div className="text-[10px] text-slate-600">
                           ✓ {result.data.counts.green} · ⚠ {result.data.counts.yellow} · ✗ {result.data.counts.red}
                         </div>
+                      )}
+                      {/* Fallback: show key metrics for audits with non-standard response shape */}
+                      {!result.data.red_blockers && !result.data.yellow_warnings && !result.data.green_checks && !result.data.counts && (
+                        <pre className="text-[9px] text-slate-500 bg-slate-50 rounded px-2 py-1 overflow-auto max-h-32 whitespace-pre-wrap">
+                          {JSON.stringify(result.data, null, 2)}
+                        </pre>
                       )}
                     </div>
                   )}
