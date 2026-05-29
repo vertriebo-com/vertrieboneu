@@ -77,10 +77,31 @@ function CheckRow({ label, data, expandable = true }) {
   );
 }
 
+function BackfillResult({ result, label }) {
+  if (!result) return null;
+  const hasRetry = result.retry_hint && result.failed > 0;
+  return (
+    <div className={`mt-2 rounded-lg border p-3 text-xs space-y-1.5 ${hasRetry ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+      <div className="flex flex-wrap gap-3">
+        <span className="font-bold text-slate-800">{label}</span>
+        <span className="text-emerald-700 font-semibold">✓ {result.updated ?? 0} aktualisiert</span>
+        {result.skipped > 0 && <span className="text-slate-500">⏭ {result.skipped} übersprungen (bereits gesetzt)</span>}
+        {result.failed > 0 && <span className="text-red-600 font-semibold">✗ {result.failed} Fehler</span>}
+        {result.remaining_candidates > 0 && <span className="text-amber-700">⟳ {result.remaining_candidates} verbleibend</span>}
+      </div>
+      {result.retry_hint && (
+        <p className="text-amber-800 font-medium">{result.retry_hint}</p>
+      )}
+    </div>
+  );
+}
+
 export default function DataQualityTab({ org }) {
   const [auditResult, setAuditResult]     = useState(null);
   const [missingResult, setMissingResult] = useState(null);
   const [dupResult, setDupResult]         = useState(null);
+  const [bfQualResult, setBfQualResult]   = useState(null);
+  const [bfLifeResult, setBfLifeResult]   = useState(null);
   const [loading, setLoading]             = useState({});
   const [forceBackfill, setForceBackfill] = useState(false);
   const [showDupGroups, setShowDupGroups] = useState(false);
@@ -115,7 +136,12 @@ export default function DataQualityTab({ org }) {
     const res = await base44.functions.invoke('adminDataQualityActions', {
       action: 'backfillQualityTier', organization_id: org.id, force: forceBackfill,
     });
-    toast.success(`quality_tier: ${res.data?.updated ?? 0} Companies aktualisiert`);
+    setBfQualResult(res.data);
+    if (res.data?.retry_hint) {
+      toast.warning(res.data.retry_hint);
+    } else {
+      toast.success(`quality_tier: ${res.data?.updated ?? 0} Companies aktualisiert`);
+    }
     handleAudit();
   });
 
@@ -124,7 +150,12 @@ export default function DataQualityTab({ org }) {
     const res = await base44.functions.invoke('adminDataQualityActions', {
       action: 'backfillLifecycleStage', organization_id: org.id, force: forceBackfill,
     });
-    toast.success(`lifecycle_stage: ${res.data?.updated ?? 0} Companies aktualisiert`);
+    setBfLifeResult(res.data);
+    if (res.data?.retry_hint) {
+      toast.warning(res.data.retry_hint);
+    } else {
+      toast.success(`lifecycle_stage: ${res.data?.updated ?? 0} Companies aktualisiert`);
+    }
     handleAudit();
   });
 
@@ -173,6 +204,10 @@ export default function DataQualityTab({ org }) {
             className="rounded border-slate-300" />
           <span>Force-Backfill (bestehende Werte überschreiben) — Bestätigung erforderlich</span>
         </label>
+
+        {/* Backfill Ergebnisse */}
+        <BackfillResult result={bfQualResult} label="quality_tier" />
+        <BackfillResult result={bfLifeResult} label="lifecycle_stage" />
       </div>
 
       {/* Audit Ergebnis */}

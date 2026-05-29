@@ -180,6 +180,10 @@ Deno.serve(async (req) => {
         }
       }
 
+      const failed = errors.length;
+      const skipped = companies.length - candidates.length;
+      const remaining_candidates = failed; // rate-limit failures can be retried
+
       await db.PlatformAuditLog.create({
         actor_email: user.email,
         actor_role: user.role,
@@ -187,12 +191,22 @@ Deno.serve(async (req) => {
         target_type: 'organization',
         target_id: organization_id,
         organization_id,
-        metadata: JSON.stringify({ total: companies.length, candidates: candidates.length, updated, force, errors: errors.length }),
-        reason: `Backfill quality_tier: ${updated}/${candidates.length} Companies aktualisiert (force=${force})`,
+        metadata: JSON.stringify({ attempted: candidates.length, updated, failed, skipped, force, action, organization_id }),
+        reason: `Backfill quality_tier: ${updated}/${candidates.length} aktualisiert, ${failed} Fehler, ${skipped} übersprungen (force=${force})`,
       });
 
-      console.info(`[adminDataQualityActions] backfillQualityTier: org=${organization_id} updated=${updated} force=${force}`);
-      return Response.json({ success: true, action, total: companies.length, candidates: candidates.length, updated, errors });
+      console.info(`[adminDataQualityActions] backfillQualityTier: org=${organization_id} updated=${updated} failed=${failed} skipped=${skipped} force=${force}`);
+      return Response.json({
+        success: true, action,
+        total: companies.length,
+        candidates: candidates.length,
+        updated,
+        failed,
+        skipped,
+        remaining_candidates,
+        retry_hint: failed > 0 ? `${updated} Datensätze aktualisiert, ${failed} wegen Plattform-Limit übersprungen. Bitte erneut ausführen.` : null,
+        errors,
+      });
     }
 
     // ── backfillLifecycleStage ────────────────────────────────────────────────
@@ -251,6 +265,10 @@ Deno.serve(async (req) => {
         }
       }
 
+      const failed = errors.length;
+      const skipped = companies.length - candidates.length;
+      const remaining_candidates = failed;
+
       await db.PlatformAuditLog.create({
         actor_email: user.email,
         actor_role: user.role,
@@ -258,12 +276,22 @@ Deno.serve(async (req) => {
         target_type: 'organization',
         target_id: organization_id,
         organization_id,
-        metadata: JSON.stringify({ total: companies.length, candidates: candidates.length, updated, force, errors: errors.length }),
-        reason: `Backfill lifecycle_stage: ${updated}/${candidates.length} Companies aktualisiert (force=${force})`,
+        metadata: JSON.stringify({ attempted: candidates.length, updated, failed, skipped, force, action, organization_id }),
+        reason: `Backfill lifecycle_stage: ${updated}/${candidates.length} aktualisiert, ${failed} Fehler, ${skipped} übersprungen (force=${force})`,
       });
 
-      console.info(`[adminDataQualityActions] backfillLifecycleStage: org=${organization_id} updated=${updated} force=${force}`);
-      return Response.json({ success: true, action, total: companies.length, candidates: candidates.length, updated, errors });
+      console.info(`[adminDataQualityActions] backfillLifecycleStage: org=${organization_id} updated=${updated} failed=${failed} skipped=${skipped} force=${force}`);
+      return Response.json({
+        success: true, action,
+        total: companies.length,
+        candidates: candidates.length,
+        updated,
+        failed,
+        skipped,
+        remaining_candidates,
+        retry_hint: failed > 0 ? `${updated} Datensätze aktualisiert, ${failed} wegen Plattform-Limit übersprungen. Bitte erneut ausführen.` : null,
+        errors,
+      });
     }
 
     // ── detectDuplicateCompanies ──────────────────────────────────────────────
