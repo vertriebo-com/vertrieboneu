@@ -22,6 +22,7 @@
       "enum": [
         "won",
         "lost",
+        "relevant",
         "not_relevant",
         "contacted",
         "no_response",
@@ -31,7 +32,57 @@
     },
     "outcome_reason": {
       "type": "string",
-      "title": "Grund / Notiz"
+      "title": "Freitext-Begr\u00fcndung (optional)"
+    },
+    "outcome_reason_code": {
+      "type": "string",
+      "title": "Strukturierter Grund-Code",
+      "enum": [
+        "falsche_branche",
+        "zu_klein",
+        "zu_weit_entfernt",
+        "privatkunde_kein_b2b",
+        "kein_ansprechpartner",
+        "schlechte_kontaktdaten",
+        "bereits_bekannt",
+        "kein_bedarf",
+        "passt_zur_zielgruppe",
+        "gute_unternehmensgroesse",
+        "guter_standort",
+        "klare_b2b_firma",
+        "passende_branche",
+        "gute_kontaktdaten",
+        "richtige_branche",
+        "hoher_bedarf",
+        "guter_ansprechpartner",
+        "wiederkehrender_auftrag",
+        "hoher_auftragswert",
+        "sonstiges"
+      ]
+    },
+    "outcome_reason_label": {
+      "type": "string",
+      "title": "Anzeigename des Grunds"
+    },
+    "outcome_reason_text": {
+      "type": "string",
+      "title": "Freitext-Erg\u00e4nzung zum Grund-Code"
+    },
+    "estimated_value_tier": {
+      "type": "string",
+      "title": "Gesch\u00e4tzter Auftragswert-Tier",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "unknown"
+      ],
+      "default": "unknown"
+    },
+    "recurring_potential": {
+      "type": "boolean",
+      "title": "Wiederkehrendes Potenzial",
+      "default": false
     },
     "recorded_at": {
       "type": "string",
