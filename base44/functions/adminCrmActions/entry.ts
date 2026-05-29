@@ -5,28 +5,60 @@
  * Schreibt PlatformAuditLog bei allen Statusänderungen.
  *
  * Auth: admin / platform_owner / platform_admin only
+ *
+ * Fehlercodes:
+ *   400 – fehlende/ungültige Parameter oder unbekannte action
+ *   403 – kein Admin
+ *   404 – Datensatz nicht gefunden
+ *   500 – echter unerwarteter Fehler
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.30';
 
 const ADMIN_ROLES = new Set(['admin', 'platform_owner', 'platform_admin']);
 
+/** Lädt einen einzelnen Datensatz sicher und wirft 404 wenn nicht vorhanden. */
+async function findOrThrow(entity, id, label) {
+  if (!id || typeof id !== 'string') {
+    throw { status: 400, message: `target_id fehlt oder ungültig` };
+  }
+  let records;
+  try {
+    records = await entity.filter({ id });
+  } catch (_) {
+    // SDK wirft bei ungültiger ID eine Exception → 404
+    throw { status: 404, message: `${label} nicht gefunden (ungültige ID)` };
+  }
+  if (!records || records.length === 0) {
+    throw { status: 404, message: `${label} nicht gefunden` };
+  }
+  return records[0];
+}
+
 Deno.serve(async (req) => {
+  let action = null;
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
 
+    // 403 – kein Admin
     if (!user || !ADMIN_ROLES.has(user.role)) {
       return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
     }
 
     const payload = await req.json();
-    const { action, target_id } = payload;
+    action = payload.action;
+    const { target_id } = payload;
 
-    if (!action || !target_id) {
-      return Response.json({ error: 'action and target_id required' }, { status: 400 });
+    // 400 – fehlende Pflichtfelder
+    if (!action) {
+      return Response.json({ error: 'action ist erforderlich' }, { status: 400 });
+    }
+    if (!target_id) {
+      return Response.json({ error: 'target_id ist erforderlich' }, { status: 400 });
     }
 
     const now = new Date().toISOString();
+    const db = base44.asServiceRole.entities;
 
     // ── WAITLIST LEAD ─────────────────────────────────────────────────────────
 
@@ -34,18 +66,16 @@ Deno.serve(async (req) => {
       const { status } = payload;
       const allowed = ['new', 'contacted', 'demo_geplant', 'onboarded', 'abgelehnt'];
       if (!allowed.includes(status)) {
-        return Response.json({ error: 'Invalid status for WaitlistLead' }, { status: 400 });
+        return Response.json({ error: `Ungültiger Status. Erlaubt: ${allowed.join(', ')}` }, { status: 400 });
       }
 
-      const records = await base44.asServiceRole.entities.WaitlistLead.filter({ id: target_id });
-      if (!records[0]) return Response.json({ error: 'WaitlistLead not found' }, { status: 404 });
-      const old = records[0];
+      const old = await findOrThrow(db.WaitlistLead, target_id, 'WaitlistLead');
 
       const patch = { status, handled_by: user.email };
       if (status === 'contacted' && !old.contacted_at) patch.contacted_at = now;
-      await base44.asServiceRole.entities.WaitlistLead.update(target_id, patch);
+      await db.WaitlistLead.update(target_id, patch);
 
-      await base44.asServiceRole.entities.PlatformAuditLog.create({
+      await db.PlatformAuditLog.create({
         actor_email: user.email,
         actor_role: user.role,
         action: 'update_waitlist_status',
@@ -53,7 +83,7 @@ Deno.serve(async (req) => {
         target_id,
         organization_id: target_id,
         metadata: JSON.stringify({ old_status: old.status, new_status: status }),
-        reason: `Status von ${old.status} → ${status}`,
+        reason: `Status ${old.status} → ${status}`,
       });
 
       console.info(`[adminCrmActions] waitlist status: ${target_id} ${old.status} → ${status}`);
@@ -62,14 +92,8 @@ Deno.serve(async (req) => {
 
     if (action === 'updateWaitlistLeadNote') {
       const { internal_note } = payload;
-      const records = await base44.asServiceRole.entities.WaitlistLead.filter({ id: target_id });
-      if (!records[0]) return Response.json({ error: 'WaitlistLead not found' }, { status: 404 });
-
-      await base44.asServiceRole.entities.WaitlistLead.update(target_id, {
-        internal_note: internal_note || '',
-        handled_by: user.email,
-      });
-
+      await findOrThrow(db.WaitlistLead, target_id, 'WaitlistLead');
+      await db.WaitlistLead.update(target_id, { internal_note: internal_note || '', handled_by: user.email });
       return Response.json({ success: true, action });
     }
 
@@ -79,18 +103,16 @@ Deno.serve(async (req) => {
       const { status } = payload;
       const allowed = ['new', 'geprueft', 'contacted', 'gespraech', 'abgelehnt'];
       if (!allowed.includes(status)) {
-        return Response.json({ error: 'Invalid status for InvestorInquiry' }, { status: 400 });
+        return Response.json({ error: `Ungültiger Status. Erlaubt: ${allowed.join(', ')}` }, { status: 400 });
       }
 
-      const records = await base44.asServiceRole.entities.InvestorInquiry.filter({ id: target_id });
-      if (!records[0]) return Response.json({ error: 'InvestorInquiry not found' }, { status: 404 });
-      const old = records[0];
+      const old = await findOrThrow(db.InvestorInquiry, target_id, 'InvestorInquiry');
 
       const patch = { status, handled_by: user.email };
       if (status === 'contacted' && !old.contacted_at) patch.contacted_at = now;
-      await base44.asServiceRole.entities.InvestorInquiry.update(target_id, patch);
+      await db.InvestorInquiry.update(target_id, patch);
 
-      await base44.asServiceRole.entities.PlatformAuditLog.create({
+      await db.PlatformAuditLog.create({
         actor_email: user.email,
         actor_role: user.role,
         action: 'update_investor_status',
@@ -98,7 +120,7 @@ Deno.serve(async (req) => {
         target_id,
         organization_id: target_id,
         metadata: JSON.stringify({ old_status: old.status, new_status: status }),
-        reason: `Status von ${old.status} → ${status}`,
+        reason: `Status ${old.status} → ${status}`,
       });
 
       console.info(`[adminCrmActions] investor status: ${target_id} ${old.status} → ${status}`);
@@ -107,14 +129,8 @@ Deno.serve(async (req) => {
 
     if (action === 'updateInvestorInquiryNote') {
       const { internal_note } = payload;
-      const records = await base44.asServiceRole.entities.InvestorInquiry.filter({ id: target_id });
-      if (!records[0]) return Response.json({ error: 'InvestorInquiry not found' }, { status: 404 });
-
-      await base44.asServiceRole.entities.InvestorInquiry.update(target_id, {
-        internal_note: internal_note || '',
-        handled_by: user.email,
-      });
-
+      await findOrThrow(db.InvestorInquiry, target_id, 'InvestorInquiry');
+      await db.InvestorInquiry.update(target_id, { internal_note: internal_note || '', handled_by: user.email });
       return Response.json({ success: true, action });
     }
 
@@ -124,19 +140,17 @@ Deno.serve(async (req) => {
       const { status } = payload;
       const allowed = ['open', 'reviewed', 'resolved'];
       if (!allowed.includes(status)) {
-        return Response.json({ error: 'Invalid status for SupportNote' }, { status: 400 });
+        return Response.json({ error: `Ungültiger Status. Erlaubt: ${allowed.join(', ')}` }, { status: 400 });
       }
 
-      const records = await base44.asServiceRole.entities.SupportNote.filter({ id: target_id });
-      if (!records[0]) return Response.json({ error: 'SupportNote not found' }, { status: 404 });
-      const old = records[0];
+      const old = await findOrThrow(db.SupportNote, target_id, 'SupportNote');
 
       const patch = { status, reviewed_by: user.email };
       if (status === 'reviewed' && !old.reviewed_at) patch.reviewed_at = now;
       if (status === 'resolved' && !old.resolved_at) patch.resolved_at = now;
-      await base44.asServiceRole.entities.SupportNote.update(target_id, patch);
+      await db.SupportNote.update(target_id, patch);
 
-      await base44.asServiceRole.entities.PlatformAuditLog.create({
+      await db.PlatformAuditLog.create({
         actor_email: user.email,
         actor_role: user.role,
         action: 'update_support_note_status',
@@ -144,7 +158,7 @@ Deno.serve(async (req) => {
         target_id,
         organization_id: old.organization_id || target_id,
         metadata: JSON.stringify({ old_status: old.status, new_status: status }),
-        reason: `Support Note Status von ${old.status} → ${status}`,
+        reason: `SupportNote Status ${old.status} → ${status}`,
       });
 
       return Response.json({ success: true, action, new_status: status });
@@ -154,21 +168,19 @@ Deno.serve(async (req) => {
       const { priority } = payload;
       const allowed = ['low', 'medium', 'high', 'critical'];
       if (!allowed.includes(priority)) {
-        return Response.json({ error: 'Invalid priority for SupportNote' }, { status: 400 });
+        return Response.json({ error: `Ungültige Priorität. Erlaubt: ${allowed.join(', ')}` }, { status: 400 });
       }
 
-      const records = await base44.asServiceRole.entities.SupportNote.filter({ id: target_id });
-      if (!records[0]) return Response.json({ error: 'SupportNote not found' }, { status: 404 });
+      const record = await findOrThrow(db.SupportNote, target_id, 'SupportNote');
+      await db.SupportNote.update(target_id, { priority });
 
-      await base44.asServiceRole.entities.SupportNote.update(target_id, { priority });
-
-      await base44.asServiceRole.entities.PlatformAuditLog.create({
+      await db.PlatformAuditLog.create({
         actor_email: user.email,
         actor_role: user.role,
         action: 'update_support_note_priority',
         target_type: 'support_note',
         target_id,
-        organization_id: records[0].organization_id || target_id,
+        organization_id: record.organization_id || target_id,
         metadata: JSON.stringify({ new_priority: priority }),
         reason: `Priorität gesetzt auf ${priority}`,
       });
@@ -178,22 +190,26 @@ Deno.serve(async (req) => {
 
     if (action === 'updateSupportNoteInternalReply') {
       const { internal_reply_note } = payload;
-      const records = await base44.asServiceRole.entities.SupportNote.filter({ id: target_id });
-      if (!records[0]) return Response.json({ error: 'SupportNote not found' }, { status: 404 });
-
-      await base44.asServiceRole.entities.SupportNote.update(target_id, {
+      const record = await findOrThrow(db.SupportNote, target_id, 'SupportNote');
+      await db.SupportNote.update(target_id, {
         internal_reply_note: internal_reply_note || '',
         reviewed_by: user.email,
         reviewed_at: now,
       });
-
       return Response.json({ success: true, action });
     }
 
-    return Response.json({ error: 'Unknown action' }, { status: 400 });
+    // 400 – unbekannte action
+    return Response.json({ error: `Unbekannte action: ${action}` }, { status: 400 });
 
-  } catch (error) {
-    console.error('[adminCrmActions]', error?.message);
-    return Response.json({ error: error?.message || 'Unbekannter Fehler' }, { status: 500 });
+  } catch (err) {
+    // Strukturierte Fehler aus findOrThrow (400/404)
+    if (err && typeof err.status === 'number' && err.message) {
+      console.warn(`[adminCrmActions] ${err.status} – ${err.message}`);
+      return Response.json({ error: err.message }, { status: err.status });
+    }
+    // Echter unerwarteter Fehler → 500
+    console.error(`[adminCrmActions] Unerwarteter Fehler (action=${action}):`, err?.message);
+    return Response.json({ error: err?.message || 'Interner Fehler' }, { status: 500 });
   }
 });
