@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
     report.status = hasCritical ? 'critical' : hasWarnings ? 'warning' : 'ok';
 
     // ── E-Mail-Bericht per Brevo senden ───────────────────────────────────────
-    const REPORT_EMAIL = 'noreply@vertriebo.com';
+    const REPORT_EMAIL = 'backend@slidebnb.de';
     const statusEmoji = report.status === 'critical' ? '🔴' : report.status === 'warning' ? '🟡' : '🟢';
     const dateStr = now.toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Europe/Berlin' });
 
