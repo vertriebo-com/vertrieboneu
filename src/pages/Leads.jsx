@@ -384,7 +384,14 @@ export default function Leads() {
 
       {/* PIPELINE TAB */}
       {activeTab === "pipeline" && (
-        <LeadsPipelineView companies={companies} />
+        <LeadsPipelineView
+          companies={companies}
+          loadedCount={companies.length}
+          totalCount={totalCompanies}
+          hasMore={hasMorePages}
+          onLoadMore={fetchNextPage}
+          isLoadingMore={isFetchingNextPage}
+        />
       )}
 
       {/* LIST TABS: today / all / archive */}
