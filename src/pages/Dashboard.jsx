@@ -6,7 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import {
   Building2, ArrowRight, Flame,
-  TrendingUp, Calendar, RefreshCw, Search, AlertCircle, Zap
+  TrendingUp, Calendar, RefreshCw, Search, AlertCircle, Zap,
+  ChevronDown, ChevronUp, Phone
 } from "lucide-react";
 import StatusBadge from "../components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -19,15 +20,15 @@ import DashboardPrimaryAction from "@/components/dashboard/DashboardPrimaryActio
 import ActiveResearchBanner from "@/components/leads/ActiveResearchBanner";
 import TrialStatusBanner from "@/components/TrialStatusBanner";
 import ResearchObservabilityPanel from "@/components/research/ResearchObservabilityPanel";
+import DashboardCard from "@/components/dashboard/DashboardCard";
+import DashboardMetricCard from "@/components/dashboard/DashboardMetricCard";
+import DashboardSectionHeader from "@/components/dashboard/DashboardSectionHeader";
 
 export default function Dashboard() {
   const { user: authUser, org: authOrg, loading: orgLoading } = useLeadsFilter();
   const navigate = useNavigate();
 
-  // orgData direkt aus useLeadsFilter – kein separates useState das den Initialwert einfriert
   const orgData = authOrg;
-
-  // Für Checkout-Polling: lokaler Override-State nur wenn Billing-Refresh nötig
   const [orgOverride, setOrgOverride] = useState(null);
   const activeOrg = orgOverride || orgData;
 
@@ -43,7 +44,6 @@ export default function Dashboard() {
     };
     window.addEventListener('checkout-success', handleCheckoutSuccess);
 
-    // Checkout-URL-Polling
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success' && activeOrg?.id) {
       let pollCount = 0;
@@ -68,11 +68,10 @@ export default function Dashboard() {
     return () => window.removeEventListener('checkout-success', handleCheckoutSuccess);
   }, [activeOrg?.id]);
 
-  const { data: dashboardData, isLoading, error, refetch } = useQuery({
+  const { data: dashboardData, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ["dashboard-data", activeOrg?.id],
     queryFn: async () => {
       if (!activeOrg?.id) throw new Error('No organization');
-      // org_id explizit übergeben → Backend validiert Zugehörigkeit
       const response = await base44.functions.invoke('getDashboardData', { org_id: activeOrg.id });
       return response.data;
     },
@@ -81,8 +80,6 @@ export default function Dashboard() {
     refetchOnWindowFocus: false,
     placeholderData: null,
   });
-
-
 
   // Personalisierter Vorname
   const [displayName, setDisplayName] = useState("");
@@ -116,7 +113,9 @@ export default function Dashboard() {
     staleTime: 60000,
   });
 
-  // Skeleton solange: org lädt, query lädt, oder query enabled aber dashboardData noch null (erster Load)
+  // ResearchObservability nur für Owner/Admin – State für aufklappbaren Bereich
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+
   const isFirstLoad = orgLoading || isLoading || (!activeOrg?.id) || (!!activeOrg?.id && !dashboardData && !error);
   if (isFirstLoad) return <DashboardSkeleton />;
 
@@ -150,37 +149,46 @@ export default function Dashboard() {
 
   const greeting = moment().hour() < 12 ? "Guten Morgen" : moment().hour() < 18 ? "Guten Tag" : "Guten Abend";
 
+  const isOwnerOrAdmin =
+    authUser?.role === 'admin' ||
+    authUser?.role === 'organization_admin' ||
+    dashboardData?.user?.role === 'organization_admin';
+
   const handleUpgrade = () => navigate('/settings?tab=billing');
   const handleManagePlan = () => navigate('/settings?tab=billing');
 
-  return (
-    <div className="space-y-5 pb-6">
+  const usage = meta?.usage_summary;
+  const isUnlimited = usage?.is_unlimited || usage?.monthly_limit === -1;
+  const isOverLimit = usage?.is_over_limit;
+  const isFallback = usage?.reconciliation?.source_used === 'companies_count';
+  const barWidth = !usage || isUnlimited ? 0 : Math.min(100, Math.round((usage.monthly_used || 0) / (usage.monthly_limit || 1) * 100));
+  const barColor = isOverLimit ? 'bg-red-500' : barWidth >= 90 ? 'bg-amber-500' : 'bg-blue-500';
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
+  return (
+    <div className="space-y-6 pb-8 max-w-5xl mx-auto">
+
+      {/* ── 1. HEADER ─────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 pt-1">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">
             {greeting}{displayName ? `, ${displayName}` : ""} 👋
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {(() => {
-              const raw = moment().locale("de").format("dddd, D. MMMM YYYY");
-              // "donnerstag, 28. mai 2026" → "Donnerstag, 28. Mai 2026"
-              return raw.replace(/(^|\s|,\s*)([a-zäöüß])/g, (m, pre, ch) => pre + ch.toUpperCase());
-            })()}
+            Das ist heute im Vertrieb wichtig.
           </p>
         </div>
         <button
           onClick={() => refetch()}
           aria-label="Dashboard aktualisieren"
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-blue-50"
+          disabled={isFetching}
+          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-600 transition-colors px-2.5 py-1.5 rounded-xl hover:bg-blue-50 mt-1 disabled:opacity-50"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Aktualisieren</span>
+          <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">{isFetching ? 'Lädt…' : 'Aktualisieren'}</span>
         </button>
       </div>
 
-      {/* Trial / Billing Banner */}
+      {/* ── 2. SYSTEM BANNERS ─────────────────────────────────────────── */}
       {org && (org.trial_stage !== 'paid' || org.billing_status !== 'active') && (
         <TrialStatusBanner
           trial_stage={org.trial_stage}
@@ -191,7 +199,6 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Active Research Banner */}
       {activeOrg?.id && (
         <ActiveResearchBanner
           orgId={activeOrg.id}
@@ -201,21 +208,21 @@ export default function Dashboard() {
 
       {/* Neue Leads aus Recherche */}
       {newLeadsFromResearch.length > 0 && (
-        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4 shadow-sm">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                <Building2 className="w-5 h-5 text-emerald-600" />
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4 text-emerald-600" />
               </div>
               <div>
-                <p className="text-sm font-bold text-emerald-900">
-                  {stats.newLeadsFromResearchCount || newLeadsFromResearch.length} neue Leads gefunden
+                <p className="text-sm font-semibold text-emerald-900">
+                  {stats.newLeadsFromResearchCount || newLeadsFromResearch.length} neue Leads bereit
                 </p>
                 <p className="text-xs text-emerald-700">Aus Ihrer letzten Recherche – bereit zur Bearbeitung</p>
               </div>
             </div>
             <Link to="/leads?new_run=latest">
-              <Button variant="outline" size="sm" className="gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs">
+              <Button variant="outline" size="sm" className="gap-1.5 border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs shrink-0">
                 Ansehen <ArrowRight className="w-3 h-3" />
               </Button>
             </Link>
@@ -223,282 +230,253 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Research Observability – letzte Recherchen (nur Owner/Admin, kompakt) */}
-      {activeOrg?.id && (authUser?.role === 'organization_admin' || authUser?.role === 'admin' || dashboardData?.user?.role === 'organization_admin') && (
-        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm p-4">
-          <ResearchObservabilityPanel orgId={activeOrg.id} />
-        </div>
-      )}
-
-      {/* Primary Action – Heute zuerst */}
+      {/* ── 3. PRIMARY ACTION – Hero ───────────────────────────────────── */}
       <DashboardPrimaryAction
         actionableLeads={actionableLeads}
         totalLeads={totalLeads}
       />
 
-      {/* KPI-Karten */}
+      {/* ── 4. KPI-LEISTE ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Link to="/leads" className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-sm hover:shadow-md hover:border-blue-200 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Lead-Bestand</p>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-              <Building2 className="w-4 h-4 text-blue-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">{totalLeads}</p>
-        </Link>
+        <DashboardMetricCard
+          label="Firmen im CRM"
+          value={totalLeads}
+          to="/leads"
+          icon={Building2}
+          iconBg="bg-blue-50"
+          iconColor="text-blue-600"
+          hoverBorder="hover:border-blue-200"
+        />
 
-        <Link to="/leads?temperature=hot" className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-sm hover:shadow-md hover:border-orange-200 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Heiße Leads</p>
-            <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
-              <Flame className="w-4 h-4 text-orange-500" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">{hotLeads.length}</p>
-        </Link>
+        <DashboardMetricCard
+          label="Heiße Leads"
+          value={hotLeads.length}
+          to="/leads?temperature=hot"
+          icon={Flame}
+          iconBg="bg-orange-50"
+          iconColor="text-orange-500"
+          hoverBorder="hover:border-orange-200"
+        />
 
-        <Link to="/tasks" className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-sm hover:shadow-md hover:border-amber-200 transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Aufgaben heute</p>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-amber-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">{todayTasks.length}</p>
+        <DashboardMetricCard
+          label="Heute fällig"
+          value={todayTasks.length}
+          to="/tasks"
+          icon={Calendar}
+          iconBg="bg-amber-50"
+          iconColor="text-amber-600"
+          hoverBorder="hover:border-amber-200"
+          sub={overdueTasks.length > 0 ? `${overdueTasks.length} überfällig` : undefined}
+        >
           {overdueTasks.length > 0 && (
-            <p className="text-[11px] font-semibold text-red-500 mt-0.5">{overdueTasks.length} überfällig</p>
+            <p className="text-[11px] font-semibold text-red-500 mt-1">{overdueTasks.length} überfällig</p>
           )}
-        </Link>
+        </DashboardMetricCard>
 
-        <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Wochenziel</p>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-slate-900">{weeklyProgress}%</p>
+        <DashboardMetricCard
+          label="Diese Woche kontaktiert"
+          value={`${weeklyProgress}%`}
+          icon={TrendingUp}
+          iconBg="bg-emerald-50"
+          iconColor="text-emerald-600"
+        >
           <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-500"
+              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
               style={{ width: `${weeklyProgress}%` }}
             />
           </div>
-          <p className="text-[10px] text-slate-400 mt-1">{contactsThisWeek} / {weeklyGoal} Leads kontaktiert</p>
-        </div>
+          <p className="text-[10px] text-slate-400 mt-1">{contactsThisWeek} / {weeklyGoal}</p>
+        </DashboardMetricCard>
       </div>
 
-      {/* Hauptbereich: Tagesplan + Heiße Leads */}
+      {/* ── 5. ARBEITSBEREICH 2-Spalten ────────────────────────────────── */}
       <div className="grid lg:grid-cols-2 gap-5">
 
-        {/* Tagesplan / Actionable Leads */}
-        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm">
-          <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center gap-2">
-            <Zap className="w-4 h-4 text-amber-500" />
-            <h2 className="text-sm font-semibold text-slate-900">Heute wichtig</h2>
-          </div>
+        {/* Tagesplan */}
+        <DashboardCard>
+          <DashboardSectionHeader icon={Zap} iconColor="text-amber-500" title="Heute wichtig" />
           <div className="p-4">
             <DailyActionList orgId={activeOrg?.id} />
           </div>
-        </div>
+        </DashboardCard>
 
         {/* Heiße Leads */}
-        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm">
-          <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center gap-2">
-            <Flame className="w-4 h-4 text-orange-500" />
-            <h2 className="text-sm font-semibold text-slate-900">Heiße Leads</h2>
-            <Link to="/leads" className="ml-auto">
-              <Button variant="ghost" size="sm" className="text-xs gap-1 h-7 text-slate-500 hover:text-slate-800">
+        <DashboardCard>
+          <DashboardSectionHeader icon={Flame} iconColor="text-orange-500" title="Heiße Leads">
+            <Link to="/leads">
+              <Button variant="ghost" size="sm" className="text-xs gap-1 h-7 text-slate-400 hover:text-slate-700">
                 Alle <ArrowRight className="w-3 h-3" />
               </Button>
             </Link>
-          </div>
-          <div className="divide-y divide-[#E2E8F0]">
+          </DashboardSectionHeader>
+          <div className="divide-y divide-slate-100">
             {hotLeads.length > 0 ? (
-              hotLeads.map(company => (
+              hotLeads.slice(0, 6).map(company => (
                 <Link
                   key={company.id}
                   to={`/leads/${company.id}`}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-orange-50/50 transition-colors"
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-100 to-red-100 border border-orange-200 flex items-center justify-center shrink-0">
-                    <Flame className="w-4 h-4 text-orange-500" />
+                  <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0">
+                    <Flame className="w-3.5 h-3.5 text-orange-500" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-900 truncate">{company.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{company.branche || company.ort || "Lead"}</p>
+                    <p className="text-xs text-slate-400 truncate">{company.branche || company.ort || "Lead"}</p>
                   </div>
                   <StatusBadge status={company.status} />
                 </Link>
               ))
             ) : (
-              <div className="px-5 py-8 text-center">
-                <Flame className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-slate-700">
-                  {totalLeads > 0 ? "Noch keine heißen Leads erkannt" : "Noch keine Leads vorhanden"}
+              <div className="px-5 py-10 text-center">
+                <Flame className="w-7 h-7 text-slate-200 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-700 mb-1">
+                  {totalLeads > 0 ? "Noch keine heißen Leads" : "Noch keine Leads vorhanden"}
                 </p>
-                <p className="text-xs text-slate-400 mt-1 mb-4">
+                <p className="text-xs text-slate-400 mb-4">
                   {totalLeads > 0
-                    ? "Vertriebo-KI muss Ihre Leads einmalig analysieren, um heiße Kontakte zu erkennen."
+                    ? "Analysieren Sie Ihre Leads, damit Vertriebo heiße Kontakte erkennt."
                     : "Starten Sie eine Recherche, um erste Firmenkontakte zu finden."}
                 </p>
                 {totalLeads > 0 ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Link to="/leads?analyze=true">
-                      <Button size="sm" className="gap-2 text-xs bg-orange-500 hover:bg-orange-600 text-white">
-                        <Zap className="w-3.5 h-3.5" />
-                        Jetzt analysieren
-                      </Button>
-                    </Link>
-                    <p className="text-[10px] text-slate-400">Startet die KI-Analyse für Ihre neuesten Leads</p>
-                  </div>
+                  <Link to="/leads?analyze=true">
+                    <Button size="sm" className="gap-2 text-xs bg-orange-500 hover:bg-orange-600 text-white">
+                      <Zap className="w-3.5 h-3.5" /> Jetzt analysieren
+                    </Button>
+                  </Link>
                 ) : (
                   <Link to="/leads">
                     <Button size="sm" variant="outline" className="gap-2 text-xs">
-                      <Search className="w-3.5 h-3.5" />
-                      Zur Lead-Übersicht
+                      <Search className="w-3.5 h-3.5" /> Zur Lead-Übersicht
                     </Button>
                   </Link>
                 )}
               </div>
             )}
           </div>
-        </div>
+        </DashboardCard>
       </div>
 
-      {/* Pipeline-Übersicht */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm">
-        <div className="px-5 py-4 border-b border-[#E2E8F0]">
-          <h2 className="text-sm font-semibold text-slate-900">Pipeline</h2>
+      {/* ── 6. PIPELINE ───────────────────────────────────────────────── */}
+      <DashboardCard>
+        <DashboardSectionHeader icon={TrendingUp} iconColor="text-blue-500" title="Pipeline" />
+        <div className="p-4 grid grid-cols-3 md:grid-cols-6 gap-2">
+          {[
+            { label: "Neu",      count: pipelineStats.neu,      dot: "bg-blue-400",    hover: "hover:bg-blue-50 hover:border-blue-200" },
+            { label: "Kontakt",  count: pipelineStats.kontakt,  dot: "bg-cyan-400",    hover: "hover:bg-cyan-50 hover:border-cyan-200" },
+            { label: "Rückruf",  count: pipelineStats.rueckruf, dot: "bg-amber-400",   hover: "hover:bg-amber-50 hover:border-amber-200" },
+            { label: "Termin",   count: pipelineStats.termin,   dot: "bg-violet-400",  hover: "hover:bg-violet-50 hover:border-violet-200" },
+            { label: "Angebot",  count: pipelineStats.angebot,  dot: "bg-orange-400",  hover: "hover:bg-orange-50 hover:border-orange-200" },
+            { label: "Gewonnen", count: pipelineStats.gewonnen, dot: "bg-emerald-400", hover: "hover:bg-emerald-50 hover:border-emerald-200" },
+          ].map(stage => (
+            <Link
+              key={stage.label}
+              to={`/leads?status=${stage.label}`}
+              className={`flex flex-col items-center p-3 rounded-xl border border-slate-200 transition-all ${stage.hover}`}
+            >
+              <div className={`w-2 h-2 rounded-full ${stage.dot} mb-2`} />
+              <p className="text-xl font-bold text-slate-900">{stage.count ?? 0}</p>
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-0.5 text-center">{stage.label}</p>
+            </Link>
+          ))}
         </div>
-        <div className="p-4">
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-2.5">
-            {[
-              { label: "Neu", count: pipelineStats.neu, color: "bg-blue-500", hover: "hover:border-blue-200 hover:bg-blue-50" },
-              { label: "Kontakt", count: pipelineStats.kontakt, color: "bg-cyan-500", hover: "hover:border-cyan-200 hover:bg-cyan-50" },
-              { label: "Rückruf", count: pipelineStats.rueckruf, color: "bg-amber-500", hover: "hover:border-amber-200 hover:bg-amber-50" },
-              { label: "Termin", count: pipelineStats.termin, color: "bg-violet-500", hover: "hover:border-violet-200 hover:bg-violet-50" },
-              { label: "Angebot", count: pipelineStats.angebot, color: "bg-orange-500", hover: "hover:border-orange-200 hover:bg-orange-50" },
-              { label: "Gewonnen", count: pipelineStats.gewonnen, color: "bg-emerald-500", hover: "hover:border-emerald-200 hover:bg-emerald-50" },
-            ].map(stage => (
-              <Link
-                key={stage.label}
-                to={`/leads?status=${stage.label}`}
-                className={`flex flex-col items-center p-3 rounded-lg border border-[#E2E8F0] transition-all ${stage.hover}`}
-              >
-                <div className={`w-2.5 h-2.5 rounded-full ${stage.color} mb-2`} />
-                <p className="text-xl font-bold text-slate-900">{stage.count ?? 0}</p>
-                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mt-0.5 text-center">{stage.label}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
+      </DashboardCard>
 
-      {/* Opportunity Pipeline – nur wenn Daten vorhanden */}
+      {/* Opportunity-Pipeline – nur wenn Daten vorhanden */}
       {crmPipeline && crmPipeline.open_opportunities_count > 0 && (
-        <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm">
-          <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-violet-500" />
-            <h2 className="text-sm font-semibold text-slate-900">Opportunity-Pipeline</h2>
+        <DashboardCard>
+          <DashboardSectionHeader icon={TrendingUp} iconColor="text-violet-500" title="Opportunity-Pipeline">
             {crmPipeline.overdue_opportunities_count > 0 && (
-              <span className="ml-auto text-xs bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded-full">
                 {crmPipeline.overdue_opportunities_count} überfällig
               </span>
             )}
-          </div>
+          </DashboardSectionHeader>
           <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
-              <p className="text-xl font-bold text-blue-700">{crmPipeline.open_opportunities_count}</p>
-              <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wide mt-0.5">Offen</p>
-            </div>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-              <p className="text-xl font-bold text-emerald-700">
-                {(crmPipeline.pipeline_value || 0) >= 1000
-                  ? `${((crmPipeline.pipeline_value) / 1000).toFixed(1)}k`
-                  : `${(crmPipeline.pipeline_value || 0).toFixed(0)}`}€
-              </p>
-              <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wide mt-0.5">Pipeline</p>
-            </div>
-            <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-center">
-              <p className="text-xl font-bold text-violet-700">
-                {(crmPipeline.weighted_forecast || 0) >= 1000
-                  ? `${((crmPipeline.weighted_forecast) / 1000).toFixed(1)}k`
-                  : `${(crmPipeline.weighted_forecast || 0).toFixed(0)}`}€
-              </p>
-              <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wide mt-0.5">Forecast</p>
-            </div>
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
-              <p className="text-xl font-bold text-slate-700">{crmPipeline.won_this_period}</p>
-              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide mt-0.5">Gewonnen</p>
-            </div>
+            {[
+              { value: crmPipeline.open_opportunities_count, label: "Offen", bg: "bg-blue-50", border: "border-blue-100", text: "text-blue-700", sub: "text-blue-500" },
+              { value: `${(crmPipeline.pipeline_value || 0) >= 1000 ? `${((crmPipeline.pipeline_value) / 1000).toFixed(1)}k` : (crmPipeline.pipeline_value || 0).toFixed(0)}€`, label: "Pipeline", bg: "bg-emerald-50", border: "border-emerald-100", text: "text-emerald-700", sub: "text-emerald-500" },
+              { value: `${(crmPipeline.weighted_forecast || 0) >= 1000 ? `${((crmPipeline.weighted_forecast) / 1000).toFixed(1)}k` : (crmPipeline.weighted_forecast || 0).toFixed(0)}€`, label: "Forecast", bg: "bg-violet-50", border: "border-violet-100", text: "text-violet-700", sub: "text-violet-500" },
+              { value: crmPipeline.won_this_period, label: "Gewonnen", bg: "bg-slate-50", border: "border-slate-100", text: "text-slate-700", sub: "text-slate-500" },
+            ].map(({ value, label, bg, border, text, sub }) => (
+              <div key={label} className={`${bg} border ${border} rounded-xl p-3 text-center`}>
+                <p className={`text-xl font-bold ${text}`}>{value}</p>
+                <p className={`text-[10px] font-semibold ${sub} uppercase tracking-wide mt-0.5`}>{label}</p>
+              </div>
+            ))}
           </div>
+        </DashboardCard>
+      )}
+
+      {/* ── 7. LEARNING INSIGHT ───────────────────────────────────────── */}
+      <LearningLoopBox learnedSignals={learnedSignals} />
+
+      {/* ── 8. USAGE / BILLING – kompakt ──────────────────────────────── */}
+      {usage && (
+        <div className={`border rounded-2xl px-5 py-4 ${isOverLimit ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-slate-600">
+                {usage.plan_name || "Plan"} · <span className="font-normal text-slate-400">Monatskontingent</span>
+                {isFallback && <span className="ml-1 text-[10px] text-amber-600 font-normal">(geschätzt)</span>}
+              </p>
+              {isUnlimited ? (
+                <p className="text-sm font-bold text-slate-900 mt-0.5">
+                  Unbegrenzt · <span className="font-normal text-slate-500">{usage.monthly_used || 0} neue Leads diesen Monat</span>
+                </p>
+              ) : (
+                <p className="text-sm font-bold text-slate-900 mt-0.5">
+                  {usage.monthly_used || 0}
+                  <span className="font-normal text-slate-500"> von {usage.monthly_limit} neuen Leads genutzt</span>
+                </p>
+              )}
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {!isUnlimited && `${usage.monthly_remaining ?? 0} verbleibend`}
+                {!isUnlimited && usage.reset_date && ` · Reset am ${usage.reset_date}`}
+                {isUnlimited && `${usage.monthly_used || 0} neue Leads diesen Monat`}
+                {' · '}Gesamtbestand: {usage.crm_total ?? totalLeads} Leads
+              </p>
+            </div>
+            {!isUnlimited && (
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div className={`h-1.5 ${barColor} rounded-full transition-all`} style={{ width: `${barWidth}%` }} />
+                </div>
+                <span className="text-xs text-slate-400 whitespace-nowrap">{barWidth}%</span>
+              </div>
+            )}
+          </div>
+          {isOverLimit && (
+            <p className="text-xs font-semibold text-red-700 mt-2 flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              Kontingent überschritten – weitere Recherche blockiert bis Reset oder Upgrade.
+            </p>
+          )}
         </div>
       )}
 
-      {/* Learning Loop Box */}
-      <LearningLoopBox learnedSignals={learnedSignals} />
-
-      {/* Usage-Info aus usage_summary */}
-      {(() => {
-        const usage = meta?.usage_summary;
-        // Kein usage_summary → kein falscher 0-Wert anzeigen (§I Merkliste)
-        if (!usage) return null;
-        const isUnlimited = usage.is_unlimited || usage.monthly_limit === -1;
-        const isOverLimit = usage.is_over_limit;
-        // "(geschätzt)" nur wenn source_used=companies_count — unabhängig von committed_slots-Wert.
-        // Nicht über !committed_slots entscheiden: usageLog kann korrekt sein auch wenn slots=0.
-        const isFallback = usage.reconciliation?.source_used === 'companies_count';
-        const barWidth = isUnlimited ? 0 : Math.min(100, Math.round((usage.monthly_used || 0) / (usage.monthly_limit || 1) * 100));
-        const barColor = isOverLimit ? 'bg-red-500' : barWidth >= 90 ? 'bg-amber-500' : 'bg-blue-500';
-        const crmTotal = usage.crm_total ?? totalLeads;
-        return (
-          <div className={`border rounded-xl px-5 py-4 ${isOverLimit ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-slate-700">
-                  {usage.plan_name || "Plan"} · <span className="font-normal text-slate-500">Monatskontingent</span>
-                  {isFallback && <span className="ml-1 text-[10px] text-amber-600 font-normal">(geschätzt)</span>}
-                </p>
-                {isUnlimited ? (
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">
-                    Unbegrenzt · <span className="font-normal text-slate-500">{usage.monthly_used || 0} neue Leads diesen Monat</span>
-                  </p>
-                ) : (
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">
-                    {usage.monthly_used || 0}
-                    <span className="font-normal text-slate-500"> von {usage.monthly_limit} neuen Leads genutzt</span>
-                  </p>
-                )}
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  {!isUnlimited && `${usage.monthly_remaining ?? 0} verbleibend`}
-                  {!isUnlimited && usage.reset_date && ` · Reset am ${usage.reset_date}`}
-                  {isUnlimited && `${usage.monthly_used || 0} neue Leads diesen Monat`}
-                </p>
-                {/* Gesamtbestand immer sichtbar (§F Merkliste) */}
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Gesamtbestand: {crmTotal} Leads im CRM
-                </p>
-              </div>
-              {!isUnlimited && (
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
-                    <div className={`h-2 ${barColor} rounded-full transition-all`} style={{ width: `${barWidth}%` }} />
-                  </div>
-                  <span className="text-xs text-slate-500 whitespace-nowrap">{barWidth}%</span>
-                </div>
-              )}
+      {/* ── 9. RECHERCHE-DIAGNOSE – nur Owner/Admin, ausklappbar ──────── */}
+      {isOwnerOrAdmin && activeOrg?.id && (
+        <div className="border border-slate-200 rounded-2xl overflow-hidden">
+          <button
+            onClick={() => setShowDiagnostics(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-3.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+          >
+            <span className="text-xs font-semibold text-slate-500">Recherche-Diagnose anzeigen</span>
+            {showDiagnostics
+              ? <ChevronUp className="w-4 h-4 text-slate-400" />
+              : <ChevronDown className="w-4 h-4 text-slate-400" />
+            }
+          </button>
+          {showDiagnostics && (
+            <div className="bg-white p-4">
+              <ResearchObservabilityPanel orgId={activeOrg.id} />
             </div>
-            {isOverLimit && (
-              <p className="text-xs font-semibold text-red-700 mt-2 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                Kontingent überschritten – weitere Recherche blockiert bis Reset oder Upgrade.
-              </p>
-            )}
-          </div>
-        );
-      })()}
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
