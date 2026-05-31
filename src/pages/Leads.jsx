@@ -15,7 +15,6 @@ import LeadKpiBar from "../components/leads/LeadKpiBar";
 import LeadsFilterBar from "../components/leads/LeadsFilterBar";
 import LeadsPipelineView from "../components/leads/LeadsPipelineView";
 import TageslisteView from "../components/leads/TageslisteView";
-import moment from "moment";
 import { isHotLead } from "@/utils/leadTemperature";
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
@@ -222,18 +221,8 @@ export default function Leads() {
 
   // Frontend-Filter: nur noch leichte Zusatzfilterung (Archiv/Tagesliste already handled server-side)
   const filtered = useMemo(() => {
-    const weekAgo = moment().subtract(7, "days").toISOString();
-    return applySort(
-      filterCompanies(companies).filter(c => {
-        // Tagesliste: nur Hot, Rückruf, Termin oder neu diese Woche
-        if (activeTab === "today") {
-          return isHotLead(c) || c.status === "Rückruf" || c.status === "Termin"
-            || (c.created_date && c.created_date >= weekAgo);
-        }
-        return true;
-      })
-    );
-  }, [companies, filterCompanies, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+    return applySort(filterCompanies(companies));
+  }, [companies, filterCompanies]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleResetFilters = () => {
     setStatusFilter(null);
@@ -401,7 +390,7 @@ export default function Leads() {
           {/* TAGESLISTE – gruppierte Ansicht */}
           {activeTab === "today" && (
             <TageslisteView
-              companies={companies}
+              companies={filtered}
               totalCompanies={totalCompanies}
               isAdmin={isAdmin}
               onLogged={loadData}
