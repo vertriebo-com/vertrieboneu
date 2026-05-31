@@ -43,20 +43,25 @@ export default function LeadKpiBar({ companies = [], totalCompanies = 0, isFetch
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-      {items.map(({ label, value, icon: Icon, iconBg, iconColor }) => (
-        <div key={label} className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 flex items-center gap-2.5">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
-            <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
+    <div className="space-y-1.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {items.map(({ label, value, icon: Icon, iconBg, iconColor }) => (
+          <div key={label} className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 flex items-center gap-2.5">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${iconBg}`}>
+              <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none">{label}</p>
+              <p className="text-base font-bold text-slate-900 leading-tight mt-0.5">
+                {isFetching && value === 0 ? "…" : value}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none">{label}</p>
-            <p className="text-base font-bold text-slate-900 leading-tight mt-0.5">
-              {isFetching && value === 0 ? "…" : value}
-            </p>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
+      <p className="text-[10px] text-slate-400 text-right">
+        Kennzahlen beziehen sich auf aktuell geladene Kontakte.
+      </p>
     </div>
   );
 }

@@ -15,7 +15,6 @@ export default function LeadsFilterBar({
   newRunFilter, setNewRunFilter,
   isFetching,
   onReset,
-  setPage,
 }) {
   const hasActiveFilters = statusFilter || priorityFilter !== "Alle" || newRunFilter || search;
 
@@ -36,7 +35,7 @@ export default function LeadsFilterBar({
             aria-label="Leads durchsuchen"
           />
         </div>
-        <Select value={sortBy} onValueChange={v => { setSortBy(v); setPage(1); }}>
+        <Select value={sortBy} onValueChange={v => { setSortBy(v); }}>
           <SelectTrigger className="w-full sm:w-44 h-9 text-sm bg-white border-slate-200">
             <SelectValue placeholder="Sortierung" />
           </SelectTrigger>
@@ -52,7 +51,7 @@ export default function LeadsFilterBar({
 
       {/* Row 2: Status + Temperatur + Reset */}
       <div className="flex flex-wrap items-center gap-2 mt-2">
-        <Select value={statusFilter || "alle_status"} onValueChange={v => { setStatusFilter(v === "alle_status" ? null : v); setPage(1); }}>
+        <Select value={statusFilter || "alle_status"} onValueChange={v => { setStatusFilter(v === "alle_status" ? null : v); }}>
           <SelectTrigger className="w-32 h-8 text-xs bg-white border-slate-200">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -62,7 +61,7 @@ export default function LeadsFilterBar({
           </SelectContent>
         </Select>
 
-        <Select value={priorityFilter} onValueChange={v => { setPriorityFilter(v); setPage(1); }}>
+        <Select value={priorityFilter} onValueChange={v => { setPriorityFilter(v); }}>
           <SelectTrigger className="w-36 h-8 text-xs bg-white border-slate-200">
             <SelectValue placeholder="Temperatur" />
           </SelectTrigger>
@@ -88,16 +87,16 @@ export default function LeadsFilterBar({
       {hasActiveFilters && (
         <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-slate-100">
           {statusFilter && (
-            <Chip label={statusFilter} color="purple" onRemove={() => { setStatusFilter(null); setPage(1); }} />
+            <Chip label={statusFilter} color="purple" onRemove={() => setStatusFilter(null)} />
           )}
           {priorityFilter !== "Alle" && (
-            <Chip label={`Temp: ${priorityFilter}`} color="orange" onRemove={() => { setPriorityFilter("Alle"); setPage(1); }} />
+            <Chip label={`Temp: ${priorityFilter}`} color="orange" onRemove={() => setPriorityFilter("Alle")} />
           )}
           {newRunFilter && (
             <Chip label="Neue Leads" color="emerald" onRemove={() => setNewRunFilter(null)} />
           )}
           {search && (
-            <Chip label={`Suche: ${search}`} color="slate" onRemove={() => { setSearch(""); setPage(1); }} />
+            <Chip label={`Suche: ${search}`} color="slate" onRemove={() => setSearch("")} />
           )}
         </div>
       )}

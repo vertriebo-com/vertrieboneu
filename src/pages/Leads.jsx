@@ -14,15 +14,16 @@ import ActiveResearchBanner from "../components/leads/ActiveResearchBanner";
 import LeadKpiBar from "../components/leads/LeadKpiBar";
 import LeadsFilterBar from "../components/leads/LeadsFilterBar";
 import LeadsPipelineView from "../components/leads/LeadsPipelineView";
+import TageslisteView from "../components/leads/TageslisteView";
 import moment from "moment";
 import { isHotLead } from "@/utils/leadTemperature";
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 const TABS = [
-  { key: "today",    label: "Tagesliste" },
-  { key: "all",      label: "Alle Leads" },
-  { key: "pipeline", label: "Pipeline"   },
-  { key: "archive",  label: "Archiv"     },
+  { key: "today",    label: "Tagesliste"   },
+  { key: "all",      label: "Aktive Leads" },
+  { key: "pipeline", label: "Pipeline"     },
+  { key: "archive",  label: "Archiv"       },
 ];
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -344,7 +345,6 @@ export default function Leads() {
           setNewRunFilter={setNewRunFilter}
           isFetching={isFetching}
           onReset={handleResetFilters}
-          setPage={() => {}} // no-op: reset passiert über queryKey
         />
       )}
 
@@ -398,25 +398,20 @@ export default function Leads() {
       {/* LIST TABS: today / all / archive */}
       {activeTab !== "pipeline" && (
         <>
-          {/* Tagesliste – leer */}
-          {activeTab === "today" && filtered.length === 0 && !isFetching && (
-            <div className="bg-white border border-slate-200 rounded-xl p-10 text-center">
-              <Building2 className="w-10 h-10 mx-auto mb-3 text-slate-200" />
-              <h3 className="text-base font-bold text-slate-700 mb-1">Heute alles erledigt 🎉</h3>
-              <p className="text-sm text-slate-400">
-                {companies.length === 0
-                  ? "Noch keine Firmenkontakte. Starten Sie Ihre erste Recherche."
-                  : "Keine heißen Leads, Rückrufe oder neuen Kontakte heute."}
-              </p>
-              {companies.length === 0 && (
-                <Button size="sm" onClick={() => setShowResearch(true)} className="gap-2 mt-4 bg-blue-600 hover:bg-blue-700 text-white">
-                  <Sparkles className="w-3.5 h-3.5" /> Firmen recherchieren
-                </Button>
-              )}
-            </div>
+          {/* TAGESLISTE – gruppierte Ansicht */}
+          {activeTab === "today" && (
+            <TageslisteView
+              companies={companies}
+              totalCompanies={totalCompanies}
+              isAdmin={isAdmin}
+              onLogged={loadData}
+              onLoadMore={fetchNextPage}
+              isLoadingMore={isFetchingNextPage}
+              pageSize={PAGE_SIZE}
+            />
           )}
 
-          {/* Alle Leads / Archiv – leer */}
+          {/* Aktive Leads / Archiv – leer */}
           {activeTab !== "today" && filtered.length === 0 && !isFetching && (
             <div className="bg-white border border-slate-200 rounded-xl p-10 text-center">
               <Building2 className="w-10 h-10 mx-auto mb-3 text-slate-200" />
@@ -452,14 +447,23 @@ export default function Leads() {
           {/* Loading skeleton while fetching without existing data */}
           {isFetching && !data && <LeadListSkeleton />}
 
-          {/* Lead list */}
-          {filtered.length > 0 && (
+          {/* Lead list (Aktive Leads + Archiv, nicht Tagesliste) */}
+          {activeTab !== "today" && filtered.length > 0 && (
             <div className="space-y-2">
+              {/* Subline Aktive Leads */}
+              {activeTab === "all" && (
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-xs text-slate-400">Aktive Kontakte ohne Gewonnen / Verloren.</p>
+                  {totalCompanies > companies.length && (
+                    <p className="text-xs text-slate-400">{companies.length} von {totalCompanies} geladen</p>
+                  )}
+                </div>
+              )}
               {filtered.map(company => (
                 <LeadRow key={company.id} company={company} isAdmin={isAdmin} onLogged={loadData} />
               ))}
 
-              {(() => {
+              {activeTab !== "today" && (() => {
                 const remainingContacts = Math.max(0, totalCompanies - companies.length);
                 const nextLoadCount = Math.min(PAGE_SIZE, remainingContacts);
                 
