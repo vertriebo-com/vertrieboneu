@@ -6,6 +6,7 @@
  * 4. Bei done=true → Erfolg anzeigen, onSuccess triggern
  */
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,8 @@ function getFriendlyResearchError(err, responseData) {
 const POLL_INTERVAL_MS = 3000;
 
 export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
-  const [phase, setPhase] = useState("idle"); // idle | starting | running | done | error | quota | ratelimit
+  const navigate = useNavigate();
+  const [phase, setPhase] = useState("idle"); // idle | starting | running | done | background | error | quota | ratelimit
   const [researchRunId, setResearchRunId] = useState(null);
   const [progressPercent, setProgressPercent] = useState(0);
   const [leadsSaved, setLeadsSaved] = useState(0);
@@ -201,15 +203,19 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
       setLeadsSaved(data.leads_saved || 0);
       setCurrentStep(data.current_step || data.message || "");
 
-      if (data.done || ['completed', 'partial', 'failed'].includes(data?.status)) {
+      if (data.done || ['completed', 'partial'].includes(data?.status)) {
         stopPolling();
         setPhase("done");
-        // Nur navigieren wenn runId gültig (nie undefined/null in URL)
+        onSuccess?.();
+        // navigate ohne hard reload
         if (runId && runId !== 'undefined' && runId !== 'null') {
-          window.location.href = `/leads?new_run=${runId}`;
+          navigate(`/leads?new_run=${runId}`, { replace: false });
         } else {
-          window.location.href = `/leads`;
+          navigate('/leads', { replace: false });
         }
+      } else if (data?.status === 'failed') {
+        stopPolling();
+        setPhase("done"); // zeige was gefunden wurde, auch wenn 0
         onSuccess?.();
       }
 
@@ -221,13 +227,12 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
     }
   };
 
-  // Sicherheitsnetz: Nach 3 Minuten ohne done-Signal → erzwinge Abschluss-UI
+  // Sicherheitsnetz: Nach 3 Minuten ohne done-Signal → "background" phase (kein falsches "done")
   useEffect(() => {
     if (phase !== "running") return;
     const timeout = setTimeout(() => {
       stopPolling();
-      setPhase("done"); // Zeigt "X Kontakte gefunden" – Run wird im Backend durch Watchdog beendet
-      onSuccess?.();
+      setPhase("background"); // Recherche läuft weiter im Hintergrund
     }, 3 * 60 * 1000);
     return () => clearTimeout(timeout);
   }, [phase]);
@@ -312,7 +317,7 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
                     onClick={() => {
                       stopPolling();
                       onClose?.();
-                      window.location.href = '/dashboard';
+                      navigate('/dashboard');
                     }}
                     className="mt-2 text-xs"
                   >
@@ -379,6 +384,28 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
             </div>
           )}
 
+          {/* BACKGROUND: Läuft weiter im Hintergrund (3-Minuten-Timeout) */}
+          {phase === "background" && (
+            <div className="space-y-4">
+              <div className="flex flex-col items-center gap-3 py-3 text-center">
+                <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center">
+                  <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                </div>
+                <div>
+                  <div className="text-base font-semibold text-slate-800">
+                    {leadsSaved > 0 ? `${leadsSaved} Kontakte bereits gefunden` : "Recherche läuft im Hintergrund"}
+                  </div>
+                  <div className="text-sm text-slate-500 mt-1">
+                    Die Suche läuft weiter. Neue Kontakte erscheinen automatisch in Ihrer Leadliste.
+                  </div>
+                </div>
+              </div>
+              <Button onClick={handleClose} variant="outline" className="w-full border-slate-200 text-slate-700">
+                Dialog schließen
+              </Button>
+            </div>
+          )}
+
           {/* DONE: Abgeschlossen */}
           {isDone && (
             <div className="space-y-4">
@@ -433,7 +460,7 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
                     <Button variant="outline" onClick={handleClose} className="flex-1 border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium">
                       Bestehende Leads
                     </Button>
-                    <Button onClick={() => { handleClose(); window.location.href = '/settings?tab=billing'; }} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">
+                    <Button onClick={() => { handleClose(); navigate('/settings?tab=billing'); }} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm">
                       Plan ansehen
                     </Button>
                   </div>

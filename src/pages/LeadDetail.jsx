@@ -314,6 +314,7 @@ export default function LeadDetail() {
             <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
               {company.telefon ? (
                 <a href={`tel:${company.telefon}`}
+                  aria-label={`${company.name} anrufen: ${company.telefon}`}
                   className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-sm transition-all">
                   <Phone className="w-4 h-4" /> Anrufen
                 </a>
@@ -452,7 +453,7 @@ export default function LeadDetail() {
                 </div>
               )}
               {company.telefon && (
-                <a href={`tel:${company.telefon}`} className="flex items-center gap-2.5 group">
+                <a href={`tel:${company.telefon}`} aria-label={`Telefon: ${company.telefon}`} className="flex items-center gap-2.5 group">
                   <div className="w-7 h-7 rounded-md bg-emerald-50 flex items-center justify-center flex-shrink-0">
                     <Phone className="w-3.5 h-3.5 text-emerald-600" />
                   </div>
@@ -466,7 +467,7 @@ export default function LeadDetail() {
                 </a>
               )}
               {company.email && (
-                <a href={`mailto:${company.email}`} className="flex items-center gap-2.5 group">
+                <a href={`mailto:${company.email}`} aria-label={`E-Mail an: ${company.email}`} className="flex items-center gap-2.5 group">
                   <div className="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center flex-shrink-0">
                     <Mail className="w-3.5 h-3.5 text-blue-600" />
                   </div>
@@ -480,7 +481,7 @@ export default function LeadDetail() {
                 </a>
               )}
               {company.website && (
-                <a href={company.website.startsWith("http") ? company.website : `https://${company.website}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 group">
+                <a href={company.website.startsWith("http") ? company.website : `https://${company.website}`} target="_blank" rel="noopener noreferrer" aria-label={`Website öffnen: ${company.website}`} className="flex items-center gap-2.5 group">
                   <div className="w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center flex-shrink-0">
                     <Globe className="w-3.5 h-3.5 text-slate-600" />
                   </div>

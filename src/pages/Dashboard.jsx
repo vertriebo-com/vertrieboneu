@@ -172,6 +172,7 @@ export default function Dashboard() {
         </div>
         <button
           onClick={() => refetch()}
+          aria-label="Dashboard aktualisieren"
           className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 transition-colors px-2 py-1.5 rounded-lg hover:bg-blue-50"
         >
           <RefreshCw className="w-3.5 h-3.5" />
