@@ -3,27 +3,33 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useLeadsFilter } from "../hooks/useLeadsFilter";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, X, TrendingUp, Building2, Upload, Sparkles, Activity, Target } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Building2, Sparkles, TrendingUp, Upload, X, Target, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import AddCompanyDialog from "../components/AddCompanyDialog";
-import PipelineBar from "../components/leads/PipelineBar";
 import LeadRow from "../components/leads/LeadRow";
 import ResearchDialog from "../components/leads/ResearchDialog";
 import ActiveResearchBanner from "../components/leads/ActiveResearchBanner";
-import CompactStats from "../components/leads/CompactStats";
+import LeadKpiBar from "../components/leads/LeadKpiBar";
+import LeadsFilterBar from "../components/leads/LeadsFilterBar";
+import LeadsPipelineView from "../components/leads/LeadsPipelineView";
 import moment from "moment";
 import { isHotLead } from "@/utils/leadTemperature";
 
-// ── Skeleton für Lead-Liste ────────────────────────────────────────────────
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+const TABS = [
+  { key: "today",    label: "Tagesliste" },
+  { key: "all",      label: "Alle Leads" },
+  { key: "pipeline", label: "Pipeline"   },
+  { key: "archive",  label: "Archiv"     },
+];
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
 function LeadListSkeleton() {
   return (
     <div className="space-y-2">
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-3">
           <Skeleton className="w-10 h-10 rounded-lg flex-shrink-0" />
           <div className="flex-1 space-y-1.5">
@@ -42,15 +48,14 @@ export default function Leads() {
   const location = useLocation();
   const { user, org, filterCompanies, loading: filterLoading } = useLeadsFilter();
 
-  // ═ States
+  // ── States ────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
-  const [focusFilter, setFocusFilter] = useState(null);
+  const [priorityFilter, setPriorityFilter] = useState("Alle");
   const [sortBy, setSortBy] = useState("created");
   const [showAdd, setShowAdd] = useState(false);
-  const [priorityFilter, setPriorityFilter] = useState("Alle");
-  const [showArchived, setShowArchived] = useState(false);
   const [showResearch, setShowResearch] = useState(false);
   const [researching, setResearching] = useState(false);
   const [newRunFilter, setNewRunFilter] = useState(null);
@@ -58,18 +63,18 @@ export default function Leads() {
   const [showOnboardingFailed, setShowOnboardingFailed] = useState(false);
   const [page, setPage] = useState(1);
 
-  // ═ Debounce Search
+  // ── Debounce Search ───────────────────────────────────────────────────────
   const debounceRef = useRef(null);
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setDebouncedSearch(search);
-      setPage(1); // Reset page on new search
+      setPage(1);
     }, 350);
     return () => clearTimeout(debounceRef.current);
   }, [search]);
 
-  // ═ Effects: Parse query parameters
+  // ── URL Params ────────────────────────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(location.search);
 
@@ -102,8 +107,17 @@ export default function Leads() {
   const orgId = org?.id || null;
   const PAGE_SIZE = 50;
 
+  // Backend-Filter je Tab
+  const tabBackendFilters = useMemo(() => {
+    if (activeTab === "archive") {
+      return { status: null, archive: true }; // handled below
+    }
+    return {};
+  }, [activeTab]);
+
+  // ── Data Fetching ─────────────────────────────────────────────────────────
   const { data: listCompaniesResult, isLoading: loading, isFetching, refetch } = useQuery({
-    queryKey: ["companies-list", orgId, page, PAGE_SIZE, statusFilter, priorityFilter, debouncedSearch, sortBy, newRunFilter],
+    queryKey: ["companies-list", orgId, page, PAGE_SIZE, statusFilter, priorityFilter, debouncedSearch, sortBy, newRunFilter, activeTab],
     queryFn: async () => {
       const backendFilters = {};
       if (statusFilter) backendFilters.status = statusFilter;
@@ -112,13 +126,17 @@ export default function Leads() {
       }
       if (debouncedSearch) backendFilters.search = debouncedSearch;
       if (newRunFilter) backendFilters.research_run_id = newRunFilter;
+      // Archive tab: fetch won+lost
+      if (activeTab === "archive" && !statusFilter) {
+        backendFilters.status_in = ["Gewonnen", "Verloren"];
+      }
 
       const sortMap = {
-        "priority": { field: "priority_score", direction: "desc" },
-        "score": { field: "relevance_score", direction: "desc" },
-        "name": { field: "name", direction: "asc" },
-        "created": { field: "created_date", direction: "desc" },
-        "last_contact": { field: "last_contact_date", direction: "desc" },
+        "priority":     { field: "priority_score",   direction: "desc" },
+        "score":        { field: "relevance_score",  direction: "desc" },
+        "name":         { field: "name",             direction: "asc"  },
+        "created":      { field: "created_date",     direction: "desc" },
+        "last_contact": { field: "last_contact_date",direction: "desc" },
       };
       const sort = sortMap[sortBy] || { field: "created_date", direction: "desc" };
 
@@ -133,18 +151,14 @@ export default function Leads() {
     },
     enabled: !!orgId,
     staleTime: 60_000,
-    placeholderData: (prev) => prev, // keepPreviousData – verhindert hartes Verschwinden beim Filtern
+    placeholderData: (prev) => prev,
   });
 
   const companies = listCompaniesResult?.companies || [];
   const totalCompanies = listCompaniesResult?.total || 0;
   const hasMorePages = listCompaniesResult?.has_more || false;
 
-  const outcomeByCompany = {};
-  for (const c of companies) {
-    if (c._latest_outcome) outcomeByCompany[c.id] = c._latest_outcome.outcome_type;
-  }
-
+  // ── handleAnalyzeLatest ───────────────────────────────────────────────────
   const handleAnalyzeLatest = useCallback(async () => {
     if (!orgId || researching) return;
     try {
@@ -156,20 +170,19 @@ export default function Leads() {
         limit: 10,
       });
       if (result?.data?.success) {
-        const analyzed = result.data.analyzed_count || result.data.analyzed || 0;
-        toast.success(`${analyzed} Leads analysiert. Hot/Warm/Cold wurde aktualisiert.`);
+        toast.success(`${result.data.analyzed_count || 0} Leads analysiert.`);
         await refetch();
       } else {
-        toast.error(result?.data?.error || "Die Vertriebo Engine konnte nicht gestartet werden.");
+        toast.error(result?.data?.error || "Analyse konnte nicht gestartet werden.");
       }
     } catch (error) {
-      toast.error(error?.message || "Analyse fehlgeschlagen. Bitte erneut versuchen.");
+      toast.error(error?.message || "Analyse fehlgeschlagen.");
     } finally {
       setResearching(false);
     }
   }, [orgId, researching, refetch]);
 
-  // Auto-analyze when coming from Dashboard CTA
+  // Auto-analyze from Dashboard CTA
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("analyze") === "true" && companies.length > 0 && !researching) {
@@ -179,42 +192,60 @@ export default function Leads() {
     }
   }, [companies.length, location.search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadData = () => refetch();
   const isAdmin = user?.role === "admin" || (org && org.owner_email === user?.email);
+  const loadData = () => refetch();
 
   const applySort = (arr) => {
     const sorted = [...arr];
     switch (sortBy) {
-      case "name": return sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-      case "score": return sorted.sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
-      case "created": return sorted.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      case "name":         return sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      case "score":        return sorted.sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0));
+      case "created":      return sorted.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
       case "last_contact": return sorted.sort((a, b) => new Date(b.last_contact_date || 0) - new Date(a.last_contact_date || 0));
       default: return sorted.sort((a, b) => {
         if (isHotLead(a) && !isHotLead(b)) return -1;
         if (!isHotLead(a) && isHotLead(b)) return 1;
-        const statusPrio = { "Rückruf": 0, "Termin": 1, "Angebot": 2, "Kontakt": 3, "Neu": 4, "Gewonnen": 5, "Verloren": 6 };
-        return (statusPrio[a.status] ?? 9) - (statusPrio[b.status] ?? 9);
+        const prio = { "Rückruf": 0, "Termin": 1, "Angebot": 2, "Kontakt": 3, "Neu": 4, "Gewonnen": 5, "Verloren": 6 };
+        return (prio[a.status] ?? 9) - (prio[b.status] ?? 9);
       });
     }
   };
 
-  // Frontend-only Filter: showArchived + focusFilter (Backend kann das nicht)
+  // Frontend-only filtering for specific tab logic
   const filtered = useMemo(() => {
+    const weekAgo = moment().subtract(7, "days").toISOString();
     return applySort(
       filterCompanies(companies).filter(c => {
-        if (!showArchived && ["Gewonnen", "Verloren"].includes(c.status)) return false;
-
-        const today = moment().format("YYYY-MM-DD");
-        const weekAgo = moment().subtract(7, "days").toISOString();
-        if (focusFilter === "call_today" && !(c.last_contact_date && c.last_contact_date.startsWith(today))) return false;
-        if (focusFilter === "callback_open" && c.status !== "Rückruf") return false;
-        if (focusFilter === "hot_leads" && !isHotLead(c)) return false;
-        if (focusFilter === "new_this_week" && !(c.created_date && c.created_date >= weekAgo)) return false;
-
+        // Tagesliste: hot + Rückruf + Termin + neue diese Woche, kein Archiv
+        if (activeTab === "today") {
+          if (["Gewonnen", "Verloren"].includes(c.status)) return false;
+          return isHotLead(c) || c.status === "Rückruf" || c.status === "Termin"
+            || (c.created_date && c.created_date >= weekAgo);
+        }
+        // Archiv: nur Gewonnen/Verloren
+        if (activeTab === "archive") {
+          return ["Gewonnen", "Verloren"].includes(c.status);
+        }
+        // Pipeline: keine Archiv-Leads (unless statusFilter explicitly includes them)
+        if (activeTab === "pipeline") {
+          if (!statusFilter && ["Gewonnen", "Verloren"].includes(c.status)) return false;
+          return true;
+        }
+        // Alle: kein Archiv
+        if (!statusFilter && ["Gewonnen", "Verloren"].includes(c.status)) return false;
         return true;
       })
     );
-  }, [companies, filterCompanies, showArchived, focusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [companies, filterCompanies, activeTab, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleResetFilters = () => {
+    setStatusFilter(null);
+    setPriorityFilter("Alle");
+    setSearch("");
+    setDebouncedSearch("");
+    setNewRunFilter(null);
+    setPage(1);
+  };
 
   const handleCsvExport = () => {
     const headers = ["Name", "Branche", "Telefon", "E-Mail", "Status", "Priorität"];
@@ -225,196 +256,123 @@ export default function Leads() {
     URL.revokeObjectURL(url);
   };
 
-  // Erstes Laden: Skeleton zeigen
+  // ── Erstes Laden ──────────────────────────────────────────────────────────
   if ((loading && !listCompaniesResult) || filterLoading) {
     return (
-      <div className="space-y-2.5">
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <Skeleton className="h-7 w-24 mb-1" />
-          <Skeleton className="h-4 w-40" />
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-7 w-20 mb-1 rounded-xl" />
+            <Skeleton className="h-4 w-56 rounded-lg" />
+          </div>
+          <Skeleton className="h-9 w-36 rounded-xl" />
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3">
-          <Skeleton className="h-9 w-full" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}
         </div>
+        <Skeleton className="h-24 rounded-xl" />
         <LeadListSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="space-y-2.5">
-      {/* Hero Zone */}
-      <div className="bg-gradient-to-r from-white to-blue-50/30 border border-slate-200 rounded-xl shadow-sm p-3.5 sm:p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-0.5">Leads</h1>
-            <p className="text-sm font-medium text-slate-700">
-              {filtered.length === totalCompanies
-                ? `${totalCompanies} ${totalCompanies === 1 ? "Firmenkontakt" : "Firmenkontakte"}`
-                : `${filtered.length} von ${totalCompanies} Firmenkontakten`}
-              {isFetching && !loading && <span className="ml-2 text-xs text-slate-400">· wird aktualisiert…</span>}
-              {filtered.filter(c => c.status === "Rückruf").length > 0 && (
-                <span className="ml-2 text-amber-700">· {filtered.filter(c => c.status === "Rückruf").length} Rückrufe offen</span>
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {isAdmin && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={() => setShowResearch(true)}
-                      size="sm"
-                      aria-label="Firmen automatisch recherchieren"
-                      className="gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-sm"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" /> Firmen recherchieren
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs text-xs">
-                    Vertriebo sucht automatisch passende Firmenkontakte in Ihrem Suchgebiet.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
+    <div className="space-y-3 pb-8">
+
+      {/* ── 1. HEADER ────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 leading-tight">Leads</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Ihre Firmenkontakte, priorisiert für den nächsten Vertriebsschritt.
+          </p>
         </div>
-      </div>
-
-      {/* Aktiver ResearchRun Banner */}
-      <ActiveResearchBanner orgId={orgId} onNewLeads={() => refetch()} />
-
-      {/* Success Box for new_run filter */}
-      {newRunFilter && filtered.length > 0 && (
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-6 mb-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">✨ Recherche abgeschlossen</p>
-              <p className="text-lg font-bold text-emerald-900 mt-1">
-                {filtered.length} {filtered.length === 1 ? "Firmenkontakt" : "Firmenkontakte"} gefunden
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => setNewRunFilter(null)}
-              className="gap-2 bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-            >
-              Filter aufheben <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Compact Stats */}
-      <CompactStats companies={filtered} />
-
-      {/* Pipeline */}
-      <PipelineBar companies={companies} activeStatus={statusFilter} onStatusClick={setStatusFilter} />
-
-      {/* Filterbar */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-3 sm:p-3.5">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                placeholder="Suche: Name, Branche, Ort, PLZ, Telefon, E-Mail..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-white border border-[#E2E8F0] text-slate-900 placeholder:text-slate-500 focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-                aria-label="Leads durchsuchen"
-              />
-            </div>
-            <Select value={sortBy} onValueChange={(v) => { setSortBy(v); setPage(1); }}>
-              <SelectTrigger className="w-full sm:w-48 bg-white border border-[#E2E8F0] text-slate-900">
-                <SelectValue placeholder="Sortieren nach…" />
-              </SelectTrigger>
-              <SelectContent>
-                {[
-                  { value: "priority", label: "Höchste Priorität zuerst" },
-                  { value: "score", label: "Bester Score zuerst" },
-                  { value: "name", label: "Name A–Z" },
-                  { value: "created", label: "Neueste zuerst" },
-                  { value: "last_contact", label: "Zuletzt kontaktiert" },
-                ].map(o => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setPage(1); }}>
-                      <SelectTrigger className="w-36 bg-white border border-[#E2E8F0]"><SelectValue placeholder="Temperatur" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Alle">Alle Temperaturen</SelectItem>
-                        <SelectItem value="Hoch">🔥 Heiß (Score ≥60)</SelectItem>
-                        <SelectItem value="Mittel">Warm (30–59)</SelectItem>
-                        <SelectItem value="Niedrig">Kalt (&lt;30)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs text-xs">
-                  <strong>🔥 Heiß (≥60):</strong> Hoher KI-Score – sofort handeln.<br />
-                  <strong>Warm (30–59):</strong> Mittleres Potenzial.<br />
-                  <strong>Kalt (&lt;30):</strong> Geringes Signal.
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <Select value={statusFilter || "alle_status"} onValueChange={v => { setStatusFilter(v === "alle_status" ? null : v); setPage(1); }}>
-              <SelectTrigger className="w-32 bg-white border border-[#E2E8F0]"><SelectValue placeholder="Status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="alle_status">Alle Status</SelectItem>
-                {["Neu", "Kontakt", "Rückruf", "Termin", "Angebot", "Gewonnen", "Verloren"].map(s => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex-1" />
-          </div>
-        </div>
-
-        {(statusFilter || priorityFilter !== "Alle" || debouncedSearch || newRunFilter) && (
-          <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-slate-200">
-            {statusFilter && <button onClick={() => { setStatusFilter(null); setPage(1); }} className="inline-flex items-center gap-1 text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-full hover:bg-purple-200"><span>{statusFilter}</span><X className="w-3 h-3" /></button>}
-            {priorityFilter !== "Alle" && <button onClick={() => { setPriorityFilter("Alle"); setPage(1); }} className="inline-flex items-center gap-1 text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-full hover:bg-orange-200"><span>Temperatur: {priorityFilter}</span><X className="w-3 h-3" /></button>}
-            {newRunFilter && <button onClick={() => setNewRunFilter(null)} className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full hover:bg-emerald-200"><span>Neue Leads</span><X className="w-3 h-3" /></button>}
-            {debouncedSearch && <button onClick={() => { setSearch(""); setDebouncedSearch(""); setPage(1); }} className="inline-flex items-center gap-1 text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-full hover:bg-slate-200"><span>Suche</span><X className="w-3 h-3" /></button>}
-          </div>
+        {isAdmin && (
+          <Button
+            onClick={() => setShowResearch(true)}
+            size="sm"
+            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm shrink-0"
+            aria-label="Firmen automatisch recherchieren"
+          >
+            <Sparkles className="w-3.5 h-3.5" /> Firmen recherchieren
+          </Button>
         )}
       </div>
 
-      {/* Onboarding States */}
+      {/* ── 2. ACTIVE RESEARCH BANNER ────────────────────────────────── */}
+      <ActiveResearchBanner orgId={orgId} onNewLeads={() => refetch()} />
+
+      {/* New run success notice */}
+      {newRunFilter && filtered.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-emerald-800">
+            ✨ {filtered.length} {filtered.length === 1 ? "Firmenkontakt" : "Firmenkontakte"} aus letzter Recherche
+          </p>
+          <button onClick={() => setNewRunFilter(null)} className="text-emerald-600 hover:text-emerald-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* ── 3. KPI BAR ───────────────────────────────────────────────── */}
+      <LeadKpiBar companies={companies} totalCompanies={totalCompanies} isFetching={isFetching} />
+
+      {/* ── 4. TABS ──────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+        {TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => { setActiveTab(tab.key); setPage(1); }}
+            className={`flex-1 text-xs font-semibold px-3 py-2 rounded-lg transition-all ${
+              activeTab === tab.key
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── 5. FILTER BAR (nicht auf Pipeline-Tab) ───────────────────── */}
+      {activeTab !== "pipeline" && (
+        <LeadsFilterBar
+          search={search}
+          setSearch={setSearch}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          priorityFilter={priorityFilter}
+          setPriorityFilter={setPriorityFilter}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          newRunFilter={newRunFilter}
+          setNewRunFilter={setNewRunFilter}
+          isFetching={isFetching}
+          onReset={handleResetFilters}
+          setPage={setPage}
+        />
+      )}
+
+      {/* ── 6. ONBOARDING STATES ─────────────────────────────────────── */}
       {showOnboardingZeroLeads && companies.length === 0 && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-8 mb-6 text-center">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center">
           <Target className="w-12 h-12 text-amber-600 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-amber-900 mb-2">Keine passenden Firmenkontakte gefunden</h3>
           <p className="text-sm text-amber-800 mb-6 max-w-lg mx-auto">Das kann an zu engen Einstellungen liegen.</p>
-          <div className="grid sm:grid-cols-2 gap-3 max-w-2xl mx-auto mb-6">
+          <div className="grid sm:grid-cols-2 gap-3 max-w-2xl mx-auto mb-4">
             <Button onClick={() => navigate("/settings?tab=company")} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">
               <Target className="w-4 h-4" /> Suchradius erhöhen
-            </Button>
-            <Button onClick={() => navigate("/settings?tab=targeting")} className="gap-2 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50">
-              <Filter className="w-4 h-4" /> Zielkunden anpassen
             </Button>
             <Button onClick={() => { setShowResearch(true); setShowOnboardingZeroLeads(false); }} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white sm:col-span-2">
               <Sparkles className="w-4 h-4" /> Erneut recherchieren
             </Button>
           </div>
-          <Button variant="outline" onClick={() => { setShowOnboardingZeroLeads(false); navigate("/dashboard"); }} className="text-slate-600">
-            Zum Dashboard
-          </Button>
+          <Button variant="outline" onClick={() => { setShowOnboardingZeroLeads(false); navigate("/dashboard"); }}>Zum Dashboard</Button>
         </div>
       )}
 
       {showOnboardingFailed && (
-        <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-2xl p-8 mb-6 text-center">
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
           <Activity className="w-12 h-12 text-red-600 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-red-900 mb-2">Recherche konnte nicht abgeschlossen werden</h3>
           <p className="text-sm text-red-800 mb-6">Bitte prüfen Sie Ihre Einstellungen oder starten Sie die Recherche erneut.</p>
@@ -422,70 +380,113 @@ export default function Leads() {
             <Button onClick={() => { setShowResearch(true); setShowOnboardingFailed(false); }} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
               <Sparkles className="w-4 h-4" /> Erneut versuchen
             </Button>
-            <Button variant="outline" onClick={() => { setShowOnboardingFailed(false); navigate("/dashboard"); }} className="text-slate-600">
-              Zum Dashboard
-            </Button>
+            <Button variant="outline" onClick={() => { setShowOnboardingFailed(false); navigate("/dashboard"); }}>Zum Dashboard</Button>
           </div>
         </div>
       )}
 
-      {/* Leads List */}
-      {isFetching && !listCompaniesResult ? (
-        <LeadListSkeleton />
-      ) : filtered.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
-          <Building2 className="w-14 h-14 mx-auto mb-3 text-slate-300" />
-          <h3 className="text-lg font-bold text-slate-900 mb-1.5">Keine Leads gefunden</h3>
-          <p className="text-sm text-slate-600 mb-5">
-            {companies.length === 0 ? "Noch keine Firmenkontakte vorhanden." : "Filter anpassen oder neuen Lead hinzufügen."}
-          </p>
-          {companies.length === 0 ? (
-            <div className="flex flex-col gap-2.5 max-w-sm mx-auto">
-              <Button size="lg" onClick={() => setShowResearch(true)} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm w-full">
-                <TrendingUp className="w-4 h-4" /> Firmen automatisch recherchieren
-              </Button>
-              {isAdmin && (
-                <a href="/import" className="w-full">
-                  <Button variant="outline" size="lg" className="gap-2 border border-slate-200 w-full">
-                    <Upload className="w-4 h-4" /> CSV/Excel importieren
-                  </Button>
-                </a>
-              )}
-            </div>
-          ) : (
-            <Button variant="outline" onClick={() => { setStatusFilter(null); setFocusFilter(null); setSearch(""); setDebouncedSearch(""); setPriorityFilter("Alle"); setPage(1); }} className="gap-2 border border-slate-200">
-              Filter zurücksetzen
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map(company => (
-            <LeadRow key={company.id} company={company} isAdmin={isAdmin} onLogged={loadData} />
-          ))}
+      {/* ── 7. TAB CONTENT ───────────────────────────────────────────── */}
 
-          {hasMorePages && (
-            <div className="flex flex-col items-center pt-6 gap-2">
-              <button
-                onClick={() => setPage(p => p + 1)}
-                className="px-5 py-2.5 text-sm font-semibold text-blue-600 hover:text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50"
-              >
-                Weitere 50 Kontakte laden
-              </button>
-              <p className="text-xs text-slate-500">
-                Seite {page} von {Math.ceil(totalCompanies / PAGE_SIZE)} · {totalCompanies} Kontakte gesamt
-              </p>
-            </div>
-          )}
-        </div>
+      {/* PIPELINE TAB */}
+      {activeTab === "pipeline" && (
+        <LeadsPipelineView companies={companies} />
       )}
 
+      {/* LIST TABS: today / all / archive */}
+      {activeTab !== "pipeline" && (
+        <>
+          {/* Tagesliste – leer */}
+          {activeTab === "today" && filtered.length === 0 && !isFetching && (
+            <div className="bg-white border border-slate-200 rounded-xl p-10 text-center">
+              <Building2 className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+              <h3 className="text-base font-bold text-slate-700 mb-1">Heute alles erledigt 🎉</h3>
+              <p className="text-sm text-slate-400">
+                {companies.length === 0
+                  ? "Noch keine Firmenkontakte. Starten Sie Ihre erste Recherche."
+                  : "Keine heißen Leads, Rückrufe oder neuen Kontakte heute."}
+              </p>
+              {companies.length === 0 && (
+                <Button size="sm" onClick={() => setShowResearch(true)} className="gap-2 mt-4 bg-blue-600 hover:bg-blue-700 text-white">
+                  <Sparkles className="w-3.5 h-3.5" /> Firmen recherchieren
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Alle Leads / Archiv – leer */}
+          {activeTab !== "today" && filtered.length === 0 && !isFetching && (
+            <div className="bg-white border border-slate-200 rounded-xl p-10 text-center">
+              <Building2 className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+              <h3 className="text-base font-bold text-slate-700 mb-1">
+                {companies.length === 0
+                  ? "Noch keine Firmenkontakte vorhanden."
+                  : "Keine Leads zu diesen Filtern."}
+              </h3>
+              <p className="text-sm text-slate-400 mb-4">
+                {companies.length === 0
+                  ? "Starten Sie eine Recherche und Vertriebo baut Ihre erste Leadliste auf."
+                  : "Passen Sie die Filter an oder setzen Sie sie zurück."}
+              </p>
+              {companies.length === 0 ? (
+                <div className="flex flex-col gap-2 max-w-xs mx-auto">
+                  <Button size="sm" onClick={() => setShowResearch(true)} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white">
+                    <Sparkles className="w-3.5 h-3.5" /> Firmen automatisch recherchieren
+                  </Button>
+                  {isAdmin && (
+                    <Button variant="outline" size="sm" onClick={() => navigate("/import")} className="gap-2">
+                      <Upload className="w-3.5 h-3.5" /> CSV importieren
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" onClick={handleResetFilters} className="gap-2">
+                  <X className="w-3.5 h-3.5" /> Filter zurücksetzen
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Loading skeleton while fetching without existing data */}
+          {isFetching && !listCompaniesResult && <LeadListSkeleton />}
+
+          {/* Lead list */}
+          {filtered.length > 0 && (
+            <div className="space-y-2">
+              {filtered.map(company => (
+                <LeadRow key={company.id} company={company} isAdmin={isAdmin} onLogged={loadData} />
+              ))}
+
+              {hasMorePages && (
+                <div className="flex flex-col items-center pt-4 gap-2">
+                  <button
+                    onClick={() => setPage(p => p + 1)}
+                    className="px-5 py-2.5 text-sm font-semibold text-blue-600 hover:text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition-colors"
+                  >
+                    Weitere 50 Kontakte laden
+                  </button>
+                  <p className="text-xs text-slate-400">
+                    Seite {page} von {Math.ceil(totalCompanies / PAGE_SIZE)} · {totalCompanies} Kontakte gesamt
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Dialogs ──────────────────────────────────────────────────── */}
       <AddCompanyDialog open={showAdd} onClose={() => setShowAdd(false)} onCreated={loadData} organizationId={orgId} />
       <ResearchDialog
         open={showResearch}
         orgId={orgId}
         onClose={() => setShowResearch(false)}
-        onSuccess={() => { setSortBy("created"); setNewRunFilter(null); setStatusFilter(null); setFocusFilter(null); setPage(1); refetch(); }}
+        onSuccess={() => {
+          setSortBy("created");
+          setNewRunFilter(null);
+          setStatusFilter(null);
+          setPage(1);
+          refetch();
+        }}
       />
     </div>
   );
