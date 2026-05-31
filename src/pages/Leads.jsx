@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useLeadsFilter } from "../hooks/useLeadsFilter";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Building2, Sparkles, TrendingUp, Upload, X, Target, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,23 +61,16 @@ export default function Leads() {
   const [newRunFilter, setNewRunFilter] = useState(null);
   const [showOnboardingZeroLeads, setShowOnboardingZeroLeads] = useState(false);
   const [showOnboardingFailed, setShowOnboardingFailed] = useState(false);
-  const [page, setPage] = useState(1);
 
   // ── Debounce Search ───────────────────────────────────────────────────────
   const debounceRef = useRef(null);
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 350);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(search), 350);
     return () => clearTimeout(debounceRef.current);
   }, [search]);
 
-  // ── Page reset on filter/tab change ──────────────────────────────────────
-  useEffect(() => {
-    setPage(1);
-  }, [activeTab, statusFilter, priorityFilter, debouncedSearch, newRunFilter, sortBy]);
+  // Page-Reset passiert automatisch durch queryKey-Wechsel bei useInfiniteQuery
 
   // ── URL Params ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -85,7 +78,11 @@ export default function Leads() {
 
     const validStatuses = ["Neu", "Kontakt", "Rückruf", "Termin", "Angebot", "Gewonnen", "Verloren"];
     const statusParam = params.get("status");
-    if (statusParam && validStatuses.includes(statusParam)) setStatusFilter(statusParam);
+    if (statusParam && validStatuses.includes(statusParam)) {
+      setStatusFilter(statusParam);
+      // Archiv-Status → direkt zum Archiv-Tab wechseln
+      if (["Gewonnen", "Verloren"].includes(statusParam)) setActiveTab("archive");
+    }
 
     const tempParam = params.get("temperature");
     if (tempParam === "hot") setPriorityFilter("Hoch");
@@ -112,29 +109,35 @@ export default function Leads() {
   const orgId = org?.id || null;
   const PAGE_SIZE = 50;
 
-  // Backend-Filter je Tab
-  const tabBackendFilters = useMemo(() => {
-    if (activeTab === "archive") {
-      return { status: null, archive: true }; // handled below
-    }
-    return {};
-  }, [activeTab]);
-
-  // ── Data Fetching ─────────────────────────────────────────────────────────
-  const { data: listCompaniesResult, isLoading: loading, isFetching, refetch } = useQuery({
-    queryKey: ["companies-list", orgId, page, PAGE_SIZE, statusFilter, priorityFilter, debouncedSearch, sortBy, newRunFilter, activeTab],
-    queryFn: async () => {
+  // ── Data Fetching (useInfiniteQuery → Seiten anhängen) ────────────────────
+  const {
+    data,
+    isLoading: loading,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: ["companies-list", orgId, PAGE_SIZE, statusFilter, priorityFilter, debouncedSearch, sortBy, newRunFilter, activeTab],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam = 1 }) => {
       const backendFilters = {};
-      if (statusFilter) backendFilters.status = statusFilter;
+
+      if (statusFilter) {
+        backendFilters.status = statusFilter;
+      } else if (activeTab === "archive") {
+        backendFilters.status = ["Gewonnen", "Verloren"];
+      } else if (activeTab === "all" || activeTab === "today" || activeTab === "pipeline") {
+        // Aktive Leads: schließe Archiv serverseitig aus, wenn kein Statusfilter gesetzt
+        backendFilters.status = ["Neu", "Kontakt", "Rückruf", "Termin", "Angebot"];
+      }
+
       if (priorityFilter !== "Alle") {
         backendFilters.temperature = priorityFilter === "Hoch" ? "hot" : priorityFilter === "Mittel" ? "warm" : "cold";
       }
       if (debouncedSearch) backendFilters.search = debouncedSearch;
       if (newRunFilter) backendFilters.research_run_id = newRunFilter;
-      // Archive tab: fetch won+lost
-      if (activeTab === "archive" && !statusFilter) {
-        backendFilters.status = ["Gewonnen", "Verloren"];
-      }
 
       const sortMap = {
         "priority":     { field: "priority_score",   direction: "desc" },
@@ -147,21 +150,21 @@ export default function Leads() {
 
       const result = await base44.functions.invoke("listCompanies", {
         org_id: orgId,
-        page,
+        page: pageParam,
         page_size: PAGE_SIZE,
         filters: backendFilters,
         sort,
       });
-      return result?.data || { companies: [], total: 0, page: 1, has_more: false };
+      return result?.data || { companies: [], total: 0, page: pageParam, has_more: false };
     },
+    getNextPageParam: (lastPage) => lastPage.has_more ? (lastPage.page + 1) : undefined,
     enabled: !!orgId,
     staleTime: 60_000,
-    placeholderData: (prev) => prev,
   });
 
-  const companies = listCompaniesResult?.companies || [];
-  const totalCompanies = listCompaniesResult?.total || 0;
-  const hasMorePages = listCompaniesResult?.has_more || false;
+  const companies = data?.pages.flatMap(page => page.companies || []) || [];
+  const totalCompanies = data?.pages[0]?.total || 0;
+  const hasMorePages = hasNextPage ?? false;
 
   // ── handleAnalyzeLatest ───────────────────────────────────────────────────
   const handleAnalyzeLatest = useCallback(async () => {
@@ -216,32 +219,20 @@ export default function Leads() {
     }
   };
 
-  // Frontend-only filtering for specific tab logic
+  // Frontend-Filter: nur noch leichte Zusatzfilterung (Archiv/Tagesliste already handled server-side)
   const filtered = useMemo(() => {
     const weekAgo = moment().subtract(7, "days").toISOString();
     return applySort(
       filterCompanies(companies).filter(c => {
-        // Tagesliste: hot + Rückruf + Termin + neue diese Woche, kein Archiv
+        // Tagesliste: nur Hot, Rückruf, Termin oder neu diese Woche
         if (activeTab === "today") {
-          if (["Gewonnen", "Verloren"].includes(c.status)) return false;
           return isHotLead(c) || c.status === "Rückruf" || c.status === "Termin"
             || (c.created_date && c.created_date >= weekAgo);
         }
-        // Archiv: nur Gewonnen/Verloren
-        if (activeTab === "archive") {
-          return ["Gewonnen", "Verloren"].includes(c.status);
-        }
-        // Pipeline: keine Archiv-Leads (unless statusFilter explicitly includes them)
-        if (activeTab === "pipeline") {
-          if (!statusFilter && ["Gewonnen", "Verloren"].includes(c.status)) return false;
-          return true;
-        }
-        // Alle: kein Archiv
-        if (!statusFilter && ["Gewonnen", "Verloren"].includes(c.status)) return false;
         return true;
       })
     );
-  }, [companies, filterCompanies, activeTab, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [companies, filterCompanies, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleResetFilters = () => {
     setStatusFilter(null);
@@ -249,7 +240,6 @@ export default function Leads() {
     setSearch("");
     setDebouncedSearch("");
     setNewRunFilter(null);
-    setPage(1);
   };
 
   const handleCsvExport = () => {
@@ -262,7 +252,7 @@ export default function Leads() {
   };
 
   // ── Erstes Laden ──────────────────────────────────────────────────────────
-  if ((loading && !listCompaniesResult) || filterLoading) {
+  if ((loading && !data) || filterLoading) {
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -327,7 +317,7 @@ export default function Leads() {
         {TABS.map(tab => (
           <button
             key={tab.key}
-            onClick={() => { setActiveTab(tab.key); setPage(1); }}
+            onClick={() => setActiveTab(tab.key)}
             className={`flex-1 text-xs font-semibold px-3 py-2 rounded-lg transition-all ${
               activeTab === tab.key
                 ? "bg-white text-slate-900 shadow-sm"
@@ -354,7 +344,7 @@ export default function Leads() {
           setNewRunFilter={setNewRunFilter}
           isFetching={isFetching}
           onReset={handleResetFilters}
-          setPage={setPage}
+          setPage={() => {}} // no-op: reset passiert über queryKey
         />
       )}
 
@@ -452,7 +442,7 @@ export default function Leads() {
           )}
 
           {/* Loading skeleton while fetching without existing data */}
-          {isFetching && !listCompaniesResult && <LeadListSkeleton />}
+          {isFetching && !data && <LeadListSkeleton />}
 
           {/* Lead list */}
           {filtered.length > 0 && (
@@ -464,15 +454,24 @@ export default function Leads() {
               {hasMorePages && (
                 <div className="flex flex-col items-center pt-4 gap-2">
                   <button
-                    onClick={() => setPage(p => p + 1)}
-                    className="px-5 py-2.5 text-sm font-semibold text-blue-600 hover:text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition-colors"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                    className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-blue-600 hover:text-blue-700 border border-blue-300 rounded-xl hover:bg-blue-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Weitere 50 Kontakte laden
+                    {isFetchingNextPage && (
+                      <span className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                    )}
+                    {isFetchingNextPage ? "Lädt weitere Kontakte…" : "Weitere 50 Kontakte laden"}
                   </button>
                   <p className="text-xs text-slate-400">
-                    Seite {page} von {Math.ceil(totalCompanies / PAGE_SIZE)} · {totalCompanies} Kontakte gesamt
+                    {companies.length} von {totalCompanies} Kontakten geladen
                   </p>
                 </div>
+              )}
+              {!hasMorePages && companies.length > PAGE_SIZE && (
+                <p className="text-xs text-slate-400 text-center pt-4">
+                  Alle {companies.length} sichtbaren Kontakte geladen
+                </p>
               )}
             </div>
           )}
@@ -489,7 +488,6 @@ export default function Leads() {
           setSortBy("created");
           setNewRunFilter(null);
           setStatusFilter(null);
-          setPage(1);
           refetch();
         }}
       />
