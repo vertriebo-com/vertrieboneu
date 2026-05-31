@@ -196,10 +196,9 @@ export default function LeadDetail() {
   const handleSonstigesSubmit = async () => {
     if (!assertOrgMatch()) return;
     setSonstigesSaving(true);
-    // TODO: ContactLogSafe Backend-Function später ergänzen (direkte Entity-Write hier noch vertretbar)
-    await base44.entities.ContactLog.create({
+    await base44.functions.invoke("createContactLogSafe", {
       organization_id: orgId, company_id: id, typ: "Sonstiges", ergebnis: "Abgeschlossen",
-      notiz: sonstigesNotiz, naechster_schritt: "Kunde meldet sich selbst", user_email: currentUser?.email,
+      notiz: sonstigesNotiz, naechster_schritt: "Kunde meldet sich selbst",
     });
     await base44.functions.invoke("updateCompanySafe", { company_id: id, patch: { last_contact_date: new Date().toISOString() } });
     toast.success("Notiz gespeichert");

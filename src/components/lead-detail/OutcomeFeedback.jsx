@@ -128,12 +128,12 @@ export default function OutcomeFeedback({ companyId, organizationId, onStatusSyn
         setOutcomeId(created.id);
       }
 
-      // Status-Sync
+      // Status-Sync über updateCompanySafe (kein direktes Entity-Write)
       if (pendingType === "not_relevant") {
-        await base44.entities.Company.update(companyId, { status: "Verloren" });
+        await base44.functions.invoke("updateCompanySafe", { company_id: companyId, patch: { status: "Verloren" } });
         onStatusSync?.("Verloren");
       } else if (pendingType === "won") {
-        await base44.entities.Company.update(companyId, { status: "Gewonnen" });
+        await base44.functions.invoke("updateCompanySafe", { company_id: companyId, patch: { status: "Gewonnen" } });
         onStatusSync?.("Gewonnen");
       }
 
