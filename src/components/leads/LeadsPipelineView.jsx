@@ -95,9 +95,8 @@ function DesktopStageColumn({ stage, leads }) {
       {/* Cards */}
       <div className="divide-y divide-slate-50 flex-1">
         {shown.length === 0 ? (
-          <div className="px-3 py-4 text-center">
-            <p className="text-[11px] text-slate-300 font-medium">Keine Leads</p>
-            <p className="text-[10px] text-slate-200 mt-0.5">Kontakte landen hier nach dem ersten Schritt.</p>
+          <div className="px-3 py-3 text-center">
+            <p className="text-[10px] text-slate-300">Keine Leads · landen hier nach Statuswechsel</p>
           </div>
         ) : (
           shown.map(c => <PipelineCard key={c.id} company={c} />)
@@ -253,24 +252,8 @@ export default function LeadsPipelineView({
     </div>
   );
 
-  const LoadMoreFooter = companies.length > 0 && (
-    <div className="flex flex-col items-center gap-1 pt-1">
-      {remainingContacts > 0 ? (
-        <>
-          <button
-            onClick={onLoadMore}
-            disabled={isLoadingMore}
-            className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-blue-600 border border-blue-300 rounded-xl hover:bg-blue-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {isLoadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {isLoadingMore ? "Lädt weitere Kontakte…" : nextLoadCount === 1 ? "Weiteren Kontakt laden" : `Weitere ${nextLoadCount} Kontakte laden`}
-          </button>
-          <p className="text-xs text-slate-400">{loadedCount} von {totalCount} Kontakten geladen</p>
-        </>
-      ) : (
-        <p className="text-xs text-slate-400">Alle {totalCount} Kontakte geladen</p>
-      )}
-    </div>
+  const LoadMoreFooter = companies.length > 0 && remainingContacts === 0 && (
+    <p className="text-xs text-slate-400 text-center pt-1">Alle {totalCount} Kontakte geladen</p>
   );
 
   return (
