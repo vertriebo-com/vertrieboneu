@@ -85,7 +85,7 @@ function DesktopStageColumn({ stage, leads }) {
           <span className={`text-xs font-bold ${stage.text}`}>{stage.label}</span>
           {leads.length > 0 && (
             <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${stage.badge}`}>
-              {leads.length}
+              {leads.length} geladen
             </span>
           )}
         </div>
@@ -112,7 +112,7 @@ function DesktopStageColumn({ stage, leads }) {
         >
           {expanded
             ? <><ChevronUp className="w-3 h-3" /> Weniger anzeigen</>
-            : <><ChevronDown className="w-3 h-3" /> Alle {leads.length} anzeigen</>
+            : <><ChevronDown className="w-3 h-3" /> Alle {leads.length} in {stage.label} anzeigen</>
           }
         </button>
       )}
@@ -149,7 +149,7 @@ function MobileStageRow({ stage, leads }) {
             <span className={`text-sm font-bold ${stage.text}`}>{stage.label}</span>
             {leads.length > 0 && (
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${stage.badge}`}>
-                {leads.length}
+                {leads.length} geladen
               </span>
             )}
           </div>
@@ -247,7 +247,7 @@ export default function LeadsPipelineView({
         >
           {isLoadingMore
             ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Lädt…</>
-            : `Weitere ${nextLoadCount} laden`}
+            : nextLoadCount === 1 ? "Weiteren Kontakt laden" : `Weitere ${nextLoadCount} Kontakte laden`}
         </button>
       )}
     </div>
