@@ -391,6 +391,7 @@ export default function Leads() {
           hasMore={hasMorePages}
           onLoadMore={fetchNextPage}
           isLoadingMore={isFetchingNextPage}
+          pageSize={PAGE_SIZE}
         />
       )}
 
