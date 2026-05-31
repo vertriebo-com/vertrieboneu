@@ -74,6 +74,11 @@ export default function Leads() {
     return () => clearTimeout(debounceRef.current);
   }, [search]);
 
+  // ── Page reset on filter/tab change ──────────────────────────────────────
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, statusFilter, priorityFilter, debouncedSearch, newRunFilter, sortBy]);
+
   // ── URL Params ────────────────────────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -128,7 +133,7 @@ export default function Leads() {
       if (newRunFilter) backendFilters.research_run_id = newRunFilter;
       // Archive tab: fetch won+lost
       if (activeTab === "archive" && !statusFilter) {
-        backendFilters.status_in = ["Gewonnen", "Verloren"];
+        backendFilters.status = ["Gewonnen", "Verloren"];
       }
 
       const sortMap = {
