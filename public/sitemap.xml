@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 
-  <!-- Hauptseiten -->
   <url>
     <loc>https://vertriebo.de/</loc>
     <changefreq>weekly</changefreq>
@@ -22,8 +21,6 @@
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
-
-  <!-- Über uns & Kontakt -->
   <url>
     <loc>https://vertriebo.de/ueber-uns</loc>
     <changefreq>monthly</changefreq>
@@ -39,8 +36,6 @@
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
-
-  <!-- SEO-Contentseiten -->
   <url>
     <loc>https://vertriebo.de/was-ist-leadgenerierung</loc>
     <changefreq>monthly</changefreq>
@@ -56,15 +51,11 @@
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
-
-  <!-- Branchen-Übersicht -->
   <url>
     <loc>https://vertriebo.de/branchen</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
-
-  <!-- Rechtliches -->
   <url>
     <loc>https://vertriebo.de/impressum</loc>
     <changefreq>yearly</changefreq>
