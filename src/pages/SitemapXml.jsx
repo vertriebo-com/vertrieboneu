@@ -1,0 +1,30 @@
+import { useEffect } from "react";
+
+const SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://vertriebo.de/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://vertriebo.de/preise</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vertriebo.de/registrieren</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vertriebo.de/anmelden</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vertriebo.de/ueber-uns</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://vertriebo.de/kontakt</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://vertriebo.de/investors</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://vertriebo.de/was-ist-leadgenerierung</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vertriebo.de/automatisierte-recherche</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vertriebo.de/ki-lead-scoring</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vertriebo.de/branchen</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vertriebo.de/impressum</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://vertriebo.de/datenschutz</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://vertriebo.de/agb</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+</urlset>`;
+
+export default function SitemapXml() {
+  useEffect(() => {
+    // Replace the entire document with raw XML
+    document.open("application/xml");
+    document.write(SITEMAP);
+    document.close();
+  }, []);
+
+  return null;
+}

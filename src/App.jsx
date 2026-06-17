@@ -39,6 +39,7 @@ import BranchenStadtPage from './pages/BranchenStadtPage';
 import UeberVertriebo from './pages/UeberVertriebo';
 import Kontakt from './pages/Kontakt';
 import Preise from './pages/Preise';
+import SitemapXml from './pages/SitemapXml';
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
@@ -71,6 +72,7 @@ const Spinner = () => (
 const PublicApp = () => {
   return (
     <Routes>
+      <Route path="/sitemap.xml" element={<SitemapXml />} />
       <Route path="/" element={<Landing />} />
       <Route path="/landing" element={<Landing />} />
       <Route path="/start" element={<Start />} />
