@@ -41,6 +41,11 @@
       "type": "number",
       "title": "Schemaversion",
       "default": 1
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [

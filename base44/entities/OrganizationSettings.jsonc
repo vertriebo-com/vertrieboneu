@@ -19,6 +19,11 @@
     "value": {
       "type": "string",
       "title": "Einstellungswert"
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [

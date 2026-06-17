@@ -37,6 +37,11 @@
         "Abgeschlossen"
       ],
       "default": "Offen"
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [

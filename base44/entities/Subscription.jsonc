@@ -93,6 +93,11 @@
       "type": "string",
       "format": "date-time",
       "title": "Trial Ende"
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [

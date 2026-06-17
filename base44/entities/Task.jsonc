@@ -63,6 +63,11 @@
     "assigned_to": {
       "type": "string",
       "title": "Zugewiesen an"
+    },
+    "description": {
+      "type": "string",
+      "title": "Zusatzinformation",
+      "maxLength": 1000
     }
   },
   "required": [

@@ -27,6 +27,11 @@
     "email": {
       "type": "string",
       "title": "E-Mail"
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [

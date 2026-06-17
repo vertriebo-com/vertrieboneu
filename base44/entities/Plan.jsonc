@@ -137,6 +137,11 @@
       "type": "number",
       "title": "Gesch\u00e4tzte externe Kosten/Monat (Cent, intern)",
       "default": 0
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [

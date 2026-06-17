@@ -30,6 +30,11 @@
       "type": "string",
       "title": "Admin-E-Mail f\u00fcr Error-Alerts",
       "default": "admin@vertriebo.com"
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": []

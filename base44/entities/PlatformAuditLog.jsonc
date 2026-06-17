@@ -51,6 +51,11 @@
     "reason": {
       "type": "string",
       "title": "Grund"
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [

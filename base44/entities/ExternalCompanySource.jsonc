@@ -183,6 +183,11 @@
     "promoted_by": {
       "type": "string",
       "title": "Promoted von (E-Mail)"
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [

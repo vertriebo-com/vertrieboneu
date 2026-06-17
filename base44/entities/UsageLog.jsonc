@@ -113,6 +113,11 @@
     "last_lead_generation_report": {
       "type": "string",
       "title": "Letzter Recherche-Bericht (JSON)"
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [

@@ -102,6 +102,11 @@
     "filter_reasons": {
       "type": "string",
       "title": "Filter-Gr\u00fcnde (JSON-Array)"
+    },
+    "description": {
+      "type": "string",
+      "title": "Beschreibung",
+      "maxLength": 1000
     }
   },
   "required": [
