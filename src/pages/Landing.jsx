@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { ArrowRight, CheckCircle2, Star } from "lucide-react";
-import LaunchCountdown from "@/components/landing/LaunchCountdown";
 
 // ─── PARTICLE BACKGROUND ────────────────────────────────────────────────────
 const Particles = () => {
@@ -396,9 +395,10 @@ export default function Landing() {
           <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo" style={{ height: 160, width: "auto", objectFit: "contain" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => document.getElementById("wie-es-funktioniert")?.scrollIntoView({ behavior: "smooth" })} className="nav-btn-text" style={{ color: "rgba(148,163,184,1)", fontSize: 13, background: "none", border: "none", cursor: "pointer", fontWeight: 500, fontFamily: "inherit" }}>Funktionen</button>
-            <button onClick={scrollToForm} style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", boxShadow: "0 0 20px rgba(37,99,235,0.35)" }}>
-              Jetzt sichern →
-            </button>
+            <a href="/anmelden" style={{ color: "rgba(148,163,184,1)", fontSize: 13, fontWeight: 600, textDecoration: "none", padding: "9px 12px" }} className="nav-btn-text">Anmelden</a>
+            <a href="/registrieren" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", boxShadow: "0 0 20px rgba(37,99,235,0.35)", textDecoration: "none" }}>
+              Kostenlos starten →
+            </a>
           </div>
         </div>
       </nav>
@@ -413,7 +413,7 @@ export default function Landing() {
         <div className="hero-grid" style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px 56px", position: "relative", zIndex: 1, width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center", boxSizing: "border-box" }}>
           <div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "rgba(37,99,235,0.12)", border: "1px solid rgba(37,99,235,0.3)", color: "#93c5fd", fontSize: 11, fontWeight: 700, marginBottom: 20 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3b82f6", boxShadow: "0 0 8px #3b82f6", display: "inline-block" }} /> Early Access – Jetzt Platz sichern
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 8px #4ade80", display: "inline-block" }} /> Jetzt live – Sofort startklar
             </div>
             <h1 style={{ fontSize: "clamp(28px,5vw,66px)", fontWeight: 900, lineHeight: 1.1, letterSpacing: -1, marginBottom: 18, wordBreak: "break-word" }}>
               Mehr Firmenkunden.<br />
@@ -425,15 +425,15 @@ export default function Landing() {
               Vertriebo findet automatisch passende Firmenkontakte, bewertet sie per KI und sagt Ihnen täglich, wen Sie als Nächstes anrufen sollten.
             </p>
             <div className="hero-btns" style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
-              <button onClick={scrollToForm} style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "13px 24px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 40px rgba(37,99,235,0.5)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, flex: "1 1 auto" }}>
-                Frühen Zugang sichern <ArrowRight size={16} />
-              </button>
+              <a href="/registrieren" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "13px 24px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 40px rgba(37,99,235,0.5)", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, flex: "1 1 auto", textDecoration: "none" }}>
+                Kostenlos testen <ArrowRight size={16} />
+              </a>
               <button onClick={() => document.getElementById("wie-es-funktioniert")?.scrollIntoView({ behavior: "smooth" })} style={{ color: "rgba(148,163,184,1)", fontWeight: 600, fontSize: 14, padding: "13px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, cursor: "pointer", fontFamily: "inherit", flex: "0 0 auto", textAlign: "center" }}>
                 Wie es funktioniert ↓
               </button>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
-              {["In 5 Min. startklar", "Keine Kreditkarte", "DSGVO-konform", "Monatlich kündbar"].map(c => (
+              {["In 5 Min. startklar", "14 Tage kostenlos", "DSGVO-konform", "Monatlich kündbar"].map(c => (
                 <div key={c} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 999, background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.15)" }}>
                   <CheckCircle2 size={10} color="#4ade80" /><span style={{ fontSize: 11, fontWeight: 600, color: "rgba(203,213,225,1)" }}>{c}</span>
                 </div>
@@ -462,8 +462,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* LAUNCH COUNTDOWN */}
-      <LaunchCountdown />
+
 
       {/* HOW IT WORKS */}
       <section id="wie-es-funktioniert" className="mobile-pad" style={{ padding: "64px 20px", background: "#020617" }}>
@@ -643,27 +642,25 @@ export default function Landing() {
             Kein vergessener Rückruf mehr.<br />
             <span style={{ background: "linear-gradient(135deg,#60a5fa,#a78bfa,#f472b6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Kein Lead mehr verloren.</span>
           </h2>
-          <p style={{ fontSize: 16, color: "rgba(148,163,184,1)", marginBottom: 32, lineHeight: 1.7 }}>Starten Sie mit Vertriebo. Die ersten Early-Access-Plätze sind limitiert.</p>
-          <button onClick={scrollToForm} style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 16, padding: "16px 34px", borderRadius: 14, border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 50px rgba(37,99,235,0.5)", display: "inline-flex", alignItems: "center", gap: 10 }}>
-            Frühen Zugang sichern <ArrowRight size={18} />
-          </button>
-          <p style={{ fontSize: 12, color: "rgba(71,85,105,1)", marginTop: 14 }}>Kostenlos eintragen · Persönlicher Kontakt · Keine Kreditkarte</p>
+          <p style={{ fontSize: 16, color: "rgba(148,163,184,1)", marginBottom: 32, lineHeight: 1.7 }}>Starten Sie jetzt mit Vertriebo – 14 Tage kostenlos, keine Kreditkarte nötig.</p>
+          <a href="/registrieren" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 16, padding: "16px 34px", borderRadius: 14, border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 50px rgba(37,99,235,0.5)", display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+            Jetzt kostenlos starten <ArrowRight size={18} />
+          </a>
+          <p style={{ fontSize: 12, color: "rgba(71,85,105,1)", marginTop: 14 }}>14 Tage gratis · Keine Kreditkarte · Monatlich kündbar</p>
         </div>
       </section>
 
-      {/* WAITLIST FORM */}
+      {/* PRICING CTA */}
       <section id="waitlist-form" style={{ padding: "64px 20px", background: "#020617", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ maxWidth: 580, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 36 }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#4ade80", fontSize: 12, fontWeight: 700, marginBottom: 18 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 6px #4ade80", display: "inline-block" }} />Limitierte Early-Access-Plätze
-            </div>
-            <h2 style={{ fontSize: "clamp(24px,3.5vw,38px)", fontWeight: 900, lineHeight: 1.15, marginBottom: 12, letterSpacing: -1 }}>Frühen Zugang sichern</h2>
-            <p style={{ fontSize: 14, color: "rgba(148,163,184,1)", lineHeight: 1.7 }}>Tragen Sie sich jetzt ein. Wir melden uns persönlich bei Ihnen – bevor Vertriebo öffentlich verfügbar wird.</p>
+        <div style={{ maxWidth: 580, margin: "0 auto", textAlign: "center" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#4ade80", fontSize: 12, fontWeight: 700, marginBottom: 18 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 6px #4ade80", display: "inline-block" }} /> Jetzt verfügbar
           </div>
+          <h2 style={{ fontSize: "clamp(24px,3.5vw,38px)", fontWeight: 900, lineHeight: 1.15, marginBottom: 12, letterSpacing: -1 }}>Bereit loszulegen?</h2>
+          <p style={{ fontSize: 14, color: "rgba(148,163,184,1)", lineHeight: 1.7, marginBottom: 32 }}>14 Tage kostenlos testen – keine Kreditkarte nötig. Danach ab 99 €/Monat.</p>
 
-          <div className="form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
-            {[{ icon: "🚀", text: "Erster Zugang vor dem offiziellen Launch" }, { icon: "💰", text: "Frühbucherkonditionen sichern" }, { icon: "🤝", text: "Persönliches Onboarding durch unser Team" }, { icon: "🎁", text: "Kostenloser Setup & Konfiguration" }].map(p => (
+          <div className="form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 32, textAlign: "left" }}>
+            {[{ icon: "🚀", text: "Sofort einsatzbereit in 5 Minuten" }, { icon: "🤖", text: "KI-Recherche startet automatisch" }, { icon: "📋", text: "Priorisierte Tagesliste ab Tag 1" }, { icon: "💳", text: "Monatlich kündbar, keine Bindung" }].map(p => (
               <div key={p.icon} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10 }}>
                 <span style={{ fontSize: 15 }}>{p.icon}</span>
                 <span style={{ fontSize: 11, color: "rgba(203,213,225,1)", fontWeight: 500 }}>{p.text}</span>
@@ -671,61 +668,15 @@ export default function Landing() {
             ))}
           </div>
 
-          {submitted ? (
-            <div style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 20, padding: 44, textAlign: "center" }}>
-              <div style={{ width: 60, height: 60, borderRadius: "50%", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 18px", fontSize: 26 }}>🎉</div>
-              <h3 style={{ fontSize: 20, fontWeight: 800, color: "white", marginBottom: 10 }}>Sie sind dabei!</h3>
-              <p style={{ fontSize: 14, color: "rgba(148,163,184,1)", lineHeight: 1.7 }}>Unser Team meldet sich persönlich bei Ihnen. Sie erhalten als einer der Ersten Zugang zu Vertriebo.</p>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 14 }}>
-                <CheckCircle2 size={13} color="#4ade80" /><span style={{ fontSize: 12, color: "#4ade80", fontWeight: 600 }}>Anmeldung erfolgreich</span>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 18, padding: 28, display: "flex", flexDirection: "column", gap: 13 }}>
-              <input type="text" name="website_hidden" value={form.website_hidden} onChange={e => set("website_hidden", e.target.value)} style={{ display: "none" }} tabIndex={-1} autoComplete="off" />
-
-              <div className="form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Name</label>
-                  <input type="text" placeholder="Max Mustermann" value={form.name} onChange={e => set("name", e.target.value)} style={inp} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>E-Mail <span style={{ color: "#f87171" }}>*</span></label>
-                  <input type="email" placeholder="max@firma.de" value={form.email} onChange={e => set("email", e.target.value)} required style={inp} />
-                </div>
-              </div>
-              <div className="form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Firma</label>
-                  <input type="text" placeholder="Muster GmbH" value={form.company_name} onChange={e => set("company_name", e.target.value)} style={inp} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Telefon</label>
-                  <input type="tel" placeholder="+49 123 456 789" value={form.phone} onChange={e => set("phone", e.target.value)} style={inp} />
-                </div>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Ihre Branche</label>
-                <input type="text" placeholder="z.B. Gebäudereinigung, IT-Service, Handwerk…" value={form.industry} onChange={e => set("industry", e.target.value)} style={inp} />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "rgba(148,163,184,1)", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.5 }}>Was ist Ihr größtes Vertriebsproblem?</label>
-                <textarea placeholder="z.B. Ich finde keine neuen Firmenkunden. Rückrufe werden vergessen…" value={form.message} onChange={e => set("message", e.target.value)} rows={3} style={{ ...inp, resize: "vertical" }} />
-              </div>
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
-                <input type="checkbox" checked={form.consent_accepted} onChange={e => set("consent_accepted", e.target.checked)} style={{ width: 15, height: 15, marginTop: 2, flexShrink: 0, accentColor: "#2563eb" }} />
-                <span style={{ fontSize: 11, color: "rgba(148,163,184,1)", lineHeight: 1.6 }}>
-                  Ich bin damit einverstanden, dass Vertriebo mich bezüglich Early Access kontaktiert.{" "}
-                  <a href="/datenschutz" style={{ color: "#60a5fa", textDecoration: "none" }}>Datenschutz</a>
-                </span>
-              </label>
-              {error && <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 9, padding: "9px 13px", fontSize: 12, color: "#fca5a5" }}>{error}</div>}
-              <button type="submit" disabled={submitting} style={{ background: submitting ? "rgba(37,99,235,0.4)" : "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 14, padding: "14px 20px", borderRadius: 11, border: "none", cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit", boxShadow: submitting ? "none" : "0 0 30px rgba(37,99,235,0.4)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                {submitting ? (<><span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", display: "inline-block", animation: "spin 0.8s linear infinite" }} />Wird gespeichert…</>) : (<>Frühen Zugang sichern <ArrowRight size={15} /></>)}
-              </button>
-              <p style={{ textAlign: "center", fontSize: 11, color: "rgba(71,85,105,1)" }}>🔒 Kein Spam · Keine Weitergabe an Dritte · Jederzeit abmeldbar</p>
-            </form>
-          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
+            <a href="/registrieren" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "15px 36px", borderRadius: 12, border: "none", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 0 40px rgba(37,99,235,0.5)", display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", width: "100%", justifyContent: "center" }}>
+              Jetzt kostenlos starten <ArrowRight size={16} />
+            </a>
+            <a href="/preise" style={{ color: "rgba(148,163,184,1)", fontSize: 13, fontWeight: 600, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              Alle Pläne & Preise ansehen →
+            </a>
+          </div>
+          <p style={{ fontSize: 11, color: "rgba(71,85,105,1)", marginTop: 16 }}>🔒 DSGVO-konform · Keine Kreditkarte · Jederzeit kündbar</p>
         </div>
       </section>
 
