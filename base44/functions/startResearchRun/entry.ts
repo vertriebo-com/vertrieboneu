@@ -106,7 +106,16 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Nicht eingeloggt', success: false }, { status: 401 });
 
-    const body = await req.json();
+    let body: any = {};
+    try {
+      const text = await req.text();
+      if (text && text.trim()) {
+        body = JSON.parse(text);
+      }
+    } catch (parseErr) {
+      console.error('[startResearchRun] Body parse error:', parseErr?.message);
+      return Response.json({ error: 'Ungültiger Request-Body', success: false }, { status: 400 });
+    }
     const { organization_id, target_count = 25 } = body;
     if (!organization_id) return Response.json({ error: 'organization_id fehlt', success: false }, { status: 400 });
 
