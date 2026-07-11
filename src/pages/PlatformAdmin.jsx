@@ -42,12 +42,19 @@ const STATUS_LABELS = {
 
 const BILLING_LABELS = {
   active: { label: 'Aktiv / Zahlend', color: 'bg-emerald-50 text-emerald-700' },
-  trialing: { label: 'Testphase', color: 'bg-blue-50 text-blue-700' },
+  trialing: { label: 'Trial (Stripe)', color: 'bg-blue-50 text-blue-700' },
+  preview: { label: 'Vorschau', color: 'bg-slate-100 text-slate-600' },
   past_due: { label: 'Zahlung offen', color: 'bg-amber-50 text-amber-700' },
   unpaid: { label: 'Unbezahlt', color: 'bg-red-50 text-red-700' },
   canceled: { label: 'Gekündigt', color: 'bg-slate-50 text-slate-700' },
   incomplete: { label: 'Unvollständig', color: 'bg-slate-50 text-slate-700' },
   incomplete_expired: { label: 'Abgelaufen', color: 'bg-red-50 text-red-700' },
+};
+
+const TRIAL_STAGE_LABELS = {
+  free_preview: { label: 'Vorschau', color: 'bg-slate-100 text-slate-600' },
+  verified_trial: { label: 'Verifizierter Trial', color: 'bg-cyan-50 text-cyan-700' },
+  paid: { label: 'Bezahlt', color: 'bg-emerald-50 text-emerald-700' },
 };
 
 export default function PlatformAdmin() {
@@ -321,6 +328,7 @@ export default function PlatformAdmin() {
                   <th className="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Owner</th>
                   <th className="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Plan</th>
                   <th className="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Billing</th>
+                  <th className="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Trial-Stufe</th>
                   <th className="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Status</th>
                   <th className="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Leads</th>
                   <th className="px-5 py-3 text-left text-xs font-bold text-slate-600 uppercase">Aktionen</th>
@@ -351,7 +359,12 @@ export default function PlatformAdmin() {
                       <td className="px-5 py-4 text-sm text-slate-700">{getPlanName(org.plan_id)}</td>
                       <td className="px-5 py-4">
                         <span className={`text-[11px] font-bold px-2 py-1 rounded ${BILLING_LABELS[org.billing_status]?.color || 'bg-slate-100 text-slate-600'}`}>
-                          {BILLING_LABELS[org.billing_status]?.label || org.billing_status}
+                          {BILLING_LABELS[org.billing_status]?.label || org.billing_status || '–'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className={`text-[11px] font-bold px-2 py-1 rounded ${TRIAL_STAGE_LABELS[org.trial_stage]?.color || 'bg-slate-100 text-slate-600'}`}>
+                          {TRIAL_STAGE_LABELS[org.trial_stage]?.label || org.trial_stage || '–'}
                         </span>
                       </td>
                       <td className="px-5 py-4">

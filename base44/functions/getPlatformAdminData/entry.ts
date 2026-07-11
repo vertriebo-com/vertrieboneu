@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
     // ── Load Data via Service Role ────────────────────────────────────────
     const periodMonth = getPeriodMonth();
-    const [orgs, plans, usageLogs, researchRuns, supportNotes, auditLogs, platformConfigs, orgSettings, learnedSignals, allCompanies] = await Promise.all([
+    const [orgs, plans, usageLogs, researchRuns, supportNotes, auditLogs, platformConfigs, orgSettings, learnedSignals, allCompanies, subscriptions] = await Promise.all([
       base44.asServiceRole.entities.Organization.list(),
       base44.asServiceRole.entities.Plan.list(),
       base44.asServiceRole.entities.UsageLog.filter({ period_month: periodMonth }),
@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
       base44.asServiceRole.entities.OrganizationSettings.filter({}),
       base44.asServiceRole.entities.OrgLearnedSignals.filter({}),
       base44.asServiceRole.entities.Company.list('-created_date', 5000),
+      base44.asServiceRole.entities.Subscription.filter({}),
     ]);
 
     // ── Build Safe Response ───────────────────────────────────────────────
@@ -48,6 +49,22 @@ Deno.serve(async (req) => {
       )?.value;
       const serviceAreaRadiusKm = org.service_area_radius_km || (radiusFromSettings ? parseInt(radiusFromSettings) : 25);
 
+      // ── Subscription-Abgleich: echte Daten haben Vorrang vor Organization-Snapshot ──
+      const sub = (subscriptions || [])
+        .filter(s => s.organization_id === org.id)
+        .sort((a, b) => new Date(b.updated_date || b.created_date) - new Date(a.updated_date || a.created_date))[0];
+
+      // Billing-Status: Subscription hat Vorrang, dann Organization-Feld
+      const billingStatus = sub?.status || org.billing_status || 'preview';
+      // Plan: Subscription-plan_id hat Vorrang, dann Organization
+      const planId = sub?.plan_id || org.plan_id || null;
+      // Stripe-Felder aus Subscription
+      const stripeCustomerId = sub?.stripe_customer_id || org.stripe_customer_id || null;
+      const stripeSubscriptionId = sub?.stripe_subscription_id || null;
+      const currentPeriodEnd = sub?.current_period_end || null;
+      const cancelAtPeriodEnd = sub?.cancel_at_period_end || false;
+      const trialEnd = sub?.trial_end || org.trial_ends_at || null;
+
       return {
         id: org.id,
         name: org.name,
@@ -55,8 +72,13 @@ Deno.serve(async (req) => {
         organization_type: org.organization_type,
         parent_agency_id: org.parent_agency_id || null,
         platform_status: org.platform_status,
-        billing_status: org.billing_status,
-        plan_id: org.plan_id,
+        billing_status: billingStatus,
+        plan_id: planId,
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: stripeSubscriptionId,
+        current_period_end: currentPeriodEnd,
+        cancel_at_period_end: cancelAtPeriodEnd,
+        trial_end: trialEnd,
         trial_stage: org.trial_stage || 'free_preview',
         trial_leads_granted: org.trial_leads_granted || 0,
         industry,

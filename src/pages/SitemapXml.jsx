@@ -22,11 +22,12 @@ const CITIES = [
 ];
 
 const BASE = "https://vertriebo.de";
+const TODAY = new Date().toISOString().slice(0, 10);
 
 function urls() {
   const lines = [];
-  const add = (loc, changefreq, priority) =>
-    lines.push(`  <url><loc>${loc}</loc><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`);
+  const add = (loc, changefreq, priority, lastmod = TODAY) =>
+    lines.push(`  <url><loc>${loc}</loc><lastmod>${lastmod}</lastmod><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`);
 
   // ── Hauptseiten ───────────────────────────────────────────────────────────
   add(`${BASE}/`, "weekly", "1.0");
