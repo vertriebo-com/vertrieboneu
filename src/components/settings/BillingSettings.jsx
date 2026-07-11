@@ -466,8 +466,8 @@ export default function BillingSettings({ org: orgProp, user }) {
         usageInfo={usageSummary}
       />
 
-      {/* Plan-Auswahl für Free Preview */}
-      {org?.trial_stage === 'free_preview' && allPlans.length > 0 && (
+      {/* Plan-Auswahl: für free_preview, verified_trial, und problemtatische Billing-Zustände */}
+      {(['free_preview', 'verified_trial'].includes(org?.trial_stage) || ['canceled', 'incomplete', 'incomplete_expired', 'unpaid', 'past_due'].includes(billingStatus)) && allPlans.length > 0 && (
         <div id="plan-selection" className="bg-white border-2 border-blue-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-start gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
@@ -476,9 +476,11 @@ export default function BillingSettings({ org: orgProp, user }) {
             <div>
               <h3 className="text-base font-bold text-slate-900">Plan auswählen & loslegen</h3>
               <p className="text-xs font-medium text-slate-600 mt-1">
-                Sie haben Ihre 10 Vorschau-Leads genutzt. Wählen Sie jetzt einen Plan, um weiter zu recherchieren.
+                {org?.trial_stage === 'free_preview'
+                  ? "Sie haben Ihre 10 Vorschau-Leads genutzt. Wählen Sie jetzt einen Plan, um weiter zu recherchieren."
+                  : "Wählen Sie einen Plan, um Vertriebo vollständig zu nutzen."}
                 <br />
-                <span className="text-slate-500">Starter: 14 Tage kostenlos. Professional und Gold starten direkt. Alle Pläne monatlich kündbar.</span>
+                <span className="text-slate-500">Starter: 14 Tage kostenlos testen. Professional und Gold starten direkt. Alle Pläne monatlich kündbar.</span>
               </p>
             </div>
           </div>

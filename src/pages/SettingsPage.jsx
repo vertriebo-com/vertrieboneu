@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Loader2, Info, User, Building, Mail, FileCheck, Zap } from "lucide-react";
+import { Loader2, Info, User, Building, FileCheck, Zap, CreditCard } from "lucide-react";
 import CompanySettings from "@/components/settings/CompanySettings";
 import EmailSettings from "@/components/settings/EmailSettings";
 import EmailTemplateSettings from "@/components/settings/EmailTemplateSettings";
 import BillingSettings from "@/components/settings/BillingSettings";
+import PlanSelection from "@/components/settings/PlanSelection";
 import LearnedIntelligencePanel from "@/components/settings/LearnedIntelligencePanel";
 import KeywordProfilePanel from "@/components/settings/KeywordProfilePanel";
 import { Button } from "@/components/ui/button";
@@ -30,9 +31,15 @@ const ADMIN_NAV_ITEMS = [
     icon: FileCheck 
   },
   { 
+    id: "plans", 
+    label: "Pläne & Preise", 
+    description: "Abo auswählen & wechseln",
+    icon: CreditCard 
+  },
+  { 
     id: "billing", 
-    label: "Abonnement", 
-    description: "Plan, Nutzung und Zahlung",
+    label: "Nutzung & Billing", 
+    description: "Verbrauch, Kontingente & Rechnungen",
     icon: Zap 
   },
 ];
@@ -89,7 +96,7 @@ export default function SettingsPage() {
     const salesRepDefault = "profile";
     const resolvedRole = foundRole || "sales_rep";
     const isAdminUser = resolvedRole === "organization_admin" || user.role === "admin";
-    const validAdminTabs = ["company", "keywords", "templates", "billing"];
+    const validAdminTabs = ["company", "keywords", "templates", "plans", "billing"];
     const defaultTab = isAdminUser ? adminDefault : salesRepDefault;
     if (tabParam && isAdminUser && validAdminTabs.includes(tabParam)) {
       setActiveTab(tabParam);
@@ -166,6 +173,7 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "templates" && isAdmin && <EmailTemplateSettings />}
+        {activeTab === "plans" && isAdmin && <PlanSelection org={org} user={currentUser} />}
         {activeTab === "billing" && isAdmin && <BillingSettings org={org} user={currentUser} />}
 
         {/* Sales Rep: Mein Profil */}
