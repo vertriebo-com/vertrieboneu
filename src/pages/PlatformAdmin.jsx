@@ -85,6 +85,8 @@ export default function PlatformAdmin() {
       }
     },
     enabled: authChecked && isPlatformAdmin, // SECURITY: Query nur für Admins
+    refetchInterval: 30000, // Alle 30s automatisch aktualisieren
+    refetchOnWindowFocus: true,
   });
 
   // Auth-Check useEffect
@@ -193,8 +195,7 @@ export default function PlatformAdmin() {
     }
   };
 
-  const getPlanName = (planId, billingStatus) => {
-    if (billingStatus === 'trialing') return 'Testphase';
+  const getPlanName = (planId) => {
     if (!planId) return 'Kein Plan';
     return plans.find(p => p.id === planId)?.name || 'Nicht zugeordnet';
   };
@@ -347,7 +348,7 @@ export default function PlatformAdmin() {
                         </span>
                       </td>
                       <td className="px-5 py-4 text-sm text-slate-700">{org.owner_email}</td>
-                      <td className="px-5 py-4 text-sm text-slate-700">{getPlanName(org.plan_id, org.billing_status)}</td>
+                      <td className="px-5 py-4 text-sm text-slate-700">{getPlanName(org.plan_id)}</td>
                       <td className="px-5 py-4">
                         <span className={`text-[11px] font-bold px-2 py-1 rounded ${BILLING_LABELS[org.billing_status]?.color || 'bg-slate-100 text-slate-600'}`}>
                           {BILLING_LABELS[org.billing_status]?.label || org.billing_status}
