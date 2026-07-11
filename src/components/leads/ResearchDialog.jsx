@@ -33,6 +33,7 @@ function getFriendlyResearchError(err, responseData) {
     return { type: 'quota', title: 'Monatskontingent erreicht', message: `Sie haben ${axiosMonthly?.monthly_used ?? '?'} von ${axiosMonthly?.monthly_limit ?? '?'} Leads diesen Monat genutzt.`, resetDate: axiosMonthly?.reset_date || null };
   }
   const status = err?.response?.status;
+  if (status === 401) return { type: 'ratelimit', title: 'Sitzung abgelaufen', message: 'Bitte laden Sie die Seite neu und melden Sie sich erneut an.', resetDate: null };
   if (status === 402 || axiosReason === 'billing_blocked') return { type: 'billing', title: 'Abo / Zahlung prüfen', message: 'Bitte prüfen Sie Ihren Abotstatus unter Einstellungen → Billing.', resetDate: null };
   if (status === 429) return { type: 'ratelimit', title: 'Recherche gerade ausgelastet', message: 'Bitte versuchen Sie es in wenigen Minuten erneut.', resetDate: null };
   if (status === 403) return { type: 'forbidden', title: 'Keine Berechtigung', message: 'Sie haben keine Berechtigung für diese Aktion.', resetDate: null };
@@ -40,6 +41,9 @@ function getFriendlyResearchError(err, responseData) {
   if (status === 409 || axiosReason === 'research_run_already_active' || reason === 'research_run_already_active') {
     return { type: 'already_active', title: 'Recherche läuft bereits', message: 'Für Ihre Organisation läuft bereits eine Recherche. Bitte warten Sie, bis diese abgeschlossen ist.', resetDate: null };
   }
+  // Zeige den echten Backend-Fehler wenn vorhanden (hilft bei Diagnose)
+  const backendMessage = reason || axiosReason;
+  if (backendMessage) return { type: 'error', title: 'Recherche konnte nicht gestartet werden', message: backendMessage, resetDate: null };
   return { type: 'error', title: 'Recherche konnte nicht gestartet werden', message: 'Bitte versuchen Sie es erneut oder kontaktieren Sie den Support.', resetDate: null };
 }
 
@@ -178,6 +182,14 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
     }
 
     try {
+      // Auth-Check vor dem API-Call (verhindert generischen Fehler bei abgelaufener Session auf Mobile)
+      const isAuthed = await base44.auth.isAuthenticated();
+      if (!isAuthed) {
+        clearTimeout(t1); clearTimeout(t2);
+        setErrorInfo({ type: 'ratelimit', title: 'Sitzung abgelaufen', message: 'Bitte laden Sie die Seite neu und melden Sie sich erneut an.' });
+        setPhase("error"); return;
+      }
+
       const res = await base44.functions.invoke("startResearchRun", { organization_id: orgId, target_count: 25 });
       clearTimeout(t1); clearTimeout(t2);
 
@@ -201,8 +213,15 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
       startPolling(runId);
     } catch (err) {
       clearTimeout(t1); clearTimeout(t2);
-      console.error("[ResearchDialog] Start error:", err?.message, err?.response?.data);
-      setErrorInfo(getFriendlyResearchError(err, err?.response?.data));
+      const errData = err?.response?.data || err?.data;
+      const errMsg = err?.message || '';
+      console.error("[ResearchDialog] Start error:", errMsg, errData);
+      // Network/timeout errors on mobile
+      if (!navigator.onLine || errMsg.includes('Network') || errMsg.includes('timeout') || errMsg.includes('fetch')) {
+        setErrorInfo({ type: 'ratelimit', title: 'Verbindungsfehler', message: 'Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.' });
+      } else {
+        setErrorInfo(getFriendlyResearchError(err, errData));
+      }
       setPhase("error");
     }
   };
