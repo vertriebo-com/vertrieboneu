@@ -76,10 +76,21 @@ export default function Dashboard() {
       return response.data;
     },
     enabled: !orgLoading && !!activeOrg?.id,
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
     placeholderData: null,
   });
+
+  // Realtime: Dashboard automatisch aktualisieren wenn neue Companies gespeichert werden
+  useEffect(() => {
+    if (!activeOrg?.id) return;
+    const unsubscribe = base44.entities.Company.subscribe((event) => {
+      if (event.type === 'create') {
+        refetch();
+      }
+    });
+    return unsubscribe;
+  }, [activeOrg?.id, refetch]);
 
   // Personalisierter Vorname
   const [displayName, setDisplayName] = useState("");
