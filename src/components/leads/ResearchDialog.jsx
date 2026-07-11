@@ -171,9 +171,9 @@ export default function ResearchDialog({ open, orgId, onClose, onSuccess }) {
     const t1 = setTimeout(() => setStartingTimeout(true), 3000);
     const t2 = setTimeout(() => setStartingLongWait(true), 10000);
 
-    if (!orgId) {
+    if (!orgId || orgId === 'null' || orgId === 'undefined') {
       clearTimeout(t1); clearTimeout(t2);
-      setErrorInfo({ type: 'error', title: 'Keine Organisation gefunden', message: 'Bitte stellen Sie sicher, dass Sie einer Organisation angehören.' });
+      setErrorInfo({ type: 'error', title: 'Keine Organisation gefunden', message: 'Bitte laden Sie die Seite neu und versuchen Sie es erneut.' });
       setPhase("error"); return;
     }
 

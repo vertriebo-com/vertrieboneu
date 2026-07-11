@@ -275,6 +275,7 @@ export default function Leads() {
         {isAdmin && (
           <Button
             onClick={() => setShowResearch(true)}
+            disabled={!orgId}
             size="sm"
             className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm shrink-0"
             aria-label="Firmen automatisch recherchieren"

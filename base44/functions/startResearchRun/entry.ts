@@ -122,6 +122,10 @@ Deno.serve(async (req) => {
     // ── Tenant-sicherer Access Check ─────────────────────────────────────────
     const isPlatformAdmin = ["admin","platform_owner","platform_admin"].includes(user.role);
 
+    // Validate org ID format before querying (avoids SDK 500 on invalid IDs)
+    if (!organization_id || typeof organization_id !== 'string' || organization_id.length < 10) {
+      return Response.json({ error: 'Ungültige Organisation ID', success: false }, { status: 400 });
+    }
     const orgs = await base44.asServiceRole.entities.Organization.filter({ id: organization_id }).catch(() => []);
     const org = orgs[0];
     if (!org) return Response.json({ error: 'Organisation nicht gefunden', success: false }, { status: 404 });
