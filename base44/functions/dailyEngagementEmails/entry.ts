@@ -4,7 +4,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 const BREVO_API = "https://api.brevo.com/v3/smtp/email";
 const FROM_EMAIL = "noreply@vertriebo.com";
 const FROM_NAME  = "Vertriebo";
-const APP_URL    = "https://app.vertriebo.de";
+const APP_URL = "https://app.vertriebo.de";
 
 // Tage ohne Login → Inaktivitäts-E-Mail
 const INACTIVITY_THRESHOLD_DAYS = 14;
@@ -44,7 +44,7 @@ async function setLastAutomationEmailSent(base44, organization_id) {
 }
 
 // ─── E-Mail: Inaktivitäts-Trigger ─────────────────────────────────────────────
-function buildInactivityEmail({ firstName, orgName, daysSince, newLeadsCount, openTasksCount, hotLeadsCount }) {
+function buildInactivityEmail({ firstName, orgName, daysSince, newLeadsCount, openTasksCount, hotLeadsCount, unsubscribeUrl }) {
   const leadsLine = newLeadsCount > 0
     ? `<tr><td style="padding:10px 14px;background:#eff6ff;border-radius:8px;margin-bottom:8px;">
         <span style="font-size:22px;font-weight:900;color:#1d4ed8;">${newLeadsCount}</span>
@@ -109,13 +109,14 @@ function buildInactivityEmail({ firstName, orgName, daysSince, newLeadsCount, op
 
     <p style="font-size:12px;color:#9ca3af;text-align:center;margin:0;">
       Du erhältst diese E-Mail weil du ${orgName ? `bei <strong>${orgName}</strong>` : ''} Vertriebo nutzt.<br/>
-      Diese Mail ist nur für dich – keine Abmeldung nötig, sie kommt maximal alle ${MIN_GAP_DAYS} Tage.
+      Diese Erinnerung kommt maximal alle ${MIN_GAP_DAYS} Tage. ·
+      <a href="${unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline;">Abmelden</a>
     </p>
   </td></tr>
 
   <!-- Footer -->
   <tr><td style="background:#0f172a;border-radius:0 0 16px 16px;padding:18px 36px;">
-    <p style="font-size:11px;color:#475569;margin:0;">© ${new Date().getFullYear()} Vertriebo – Automatisch generiert</p>
+    <p style="font-size:11px;color:#475569;margin:0;">© ${new Date().getFullYear()} Vertriebo · <a href="${unsubscribeUrl}" style="color:#64748b;text-decoration:underline;">E-Mail-Erinnerungen abmelden</a></p>
   </td></tr>
 
 </table></td></tr></table>
@@ -123,7 +124,7 @@ function buildInactivityEmail({ firstName, orgName, daysSince, newLeadsCount, op
 }
 
 // ─── E-Mail: Unbearbeitete Leads ───────────────────────────────────────────────
-function buildUnworkedLeadsEmail({ firstName, orgName, unworkedLeads, hotLeadsCount, overdueTasksCount }) {
+function buildUnworkedLeadsEmail({ firstName, orgName, unworkedLeads, hotLeadsCount, overdueTasksCount, unsubscribeUrl }) {
   const topLeads = unworkedLeads.slice(0, 5);
   const leadsRows = topLeads.map(c => `
     <tr>
@@ -194,17 +195,25 @@ function buildUnworkedLeadsEmail({ firstName, orgName, unworkedLeads, hotLeadsCo
 
     <p style="font-size:12px;color:#9ca3af;text-align:center;margin:0;">
       ${orgName ? `Für <strong>${orgName}</strong> – ` : ''}Automatisch generiert von Vertriebo.<br/>
-      Diese Erinnerung kommt maximal alle ${MIN_GAP_DAYS} Tage.
+      Diese Erinnerung kommt maximal alle ${MIN_GAP_DAYS} Tage. ·
+      <a href="${unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline;">Abmelden</a>
     </p>
   </td></tr>
 
   <!-- Footer -->
   <tr><td style="background:#0f172a;border-radius:0 0 16px 16px;padding:18px 36px;">
-    <p style="font-size:11px;color:#475569;margin:0;">© ${new Date().getFullYear()} Vertriebo – Automatisch generiert</p>
+    <p style="font-size:11px;color:#475569;margin:0;">© ${new Date().getFullYear()} Vertriebo · <a href="${unsubscribeUrl}" style="color:#64748b;text-decoration:underline;">E-Mail-Erinnerungen abmelden</a></p>
   </td></tr>
 
 </table></td></tr></table>
 </body></html>`;
+}
+
+// ─── Unsubscribe-Link generieren ──────────────────────────────────────────────
+function getUnsubscribeUrl(orgId, email) {
+  const appId = Deno.env.get("BASE44_APP_ID") || "";
+  const base = `https://api.base44.com/api/apps/${appId}/functions/unsubscribeEngagementEmails`;
+  return `${base}?org_id=${encodeURIComponent(orgId)}&email=${encodeURIComponent(email)}`;
 }
 
 // ─── Hauptfunktion ─────────────────────────────────────────────────────────────
@@ -233,6 +242,16 @@ Deno.serve(async (req) => {
     for (const org of orgs) {
       const orgId = org.id;
       const orgName = org.name || 'Deine Organisation';
+
+      // ── Abmeldung prüfen ──────────────────────────────────────────────────
+      const unsubSettings = await base44.asServiceRole.entities.OrganizationSettings.filter({
+        organization_id: orgId, key: 'engagement_emails_unsubscribed'
+      });
+      if (unsubSettings[0]?.value === 'true') {
+        console.log(`[dailyEngagementEmails] org=${orgId} skip (unsubscribed)`);
+        results.push({ org: orgId, orgName, skipped: true, reason: 'unsubscribed' });
+        continue;
+      }
 
       // ── Anti-Spam: letzte Automation-Mail prüfen ─────────────────────────
       const lastSent = await getLastAutomationEmailSent(base44, orgId);
@@ -297,6 +316,8 @@ Deno.serve(async (req) => {
       let html = '';
 
       // ── Trigger-Entscheidung ───────────────────────────────────────────
+      const unsubscribeUrl = getUnsubscribeUrl(orgId, ownerEmail);
+
       if (daysSinceLogin >= INACTIVITY_THRESHOLD_DAYS) {
         // INAKTIVITÄTS-MAIL hat Priorität
         emailType = 'inactivity';
@@ -304,7 +325,7 @@ Deno.serve(async (req) => {
         html = buildInactivityEmail({
           firstName, orgName,
           daysSince: Math.round(daysSinceLogin),
-          newLeadsCount, openTasksCount, hotLeadsCount,
+          newLeadsCount, openTasksCount, hotLeadsCount, unsubscribeUrl,
         });
       } else if (unworkedLeads.length >= UNWORKED_LEADS_THRESHOLD) {
         // LEAD-ENGAGEMENT-MAIL
@@ -312,7 +333,7 @@ Deno.serve(async (req) => {
         subject = `📋 ${firstName}, ${unworkedLeads.length} Firmenkontakte warten noch auf deinen ersten Schritt`;
         html = buildUnworkedLeadsEmail({
           firstName, orgName,
-          unworkedLeads, hotLeadsCount, overdueTasksCount,
+          unworkedLeads, hotLeadsCount, overdueTasksCount, unsubscribeUrl,
         });
       }
 
