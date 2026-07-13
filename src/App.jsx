@@ -26,6 +26,7 @@ import Onboarding from './pages/Onboarding';
 import Impressum from './pages/Impressum';
 import Datenschutz from './pages/Datenschutz';
 import AGB from './pages/AGB';
+import Abmelden from './pages/Abmelden';
 import AccountSuspended from './pages/AccountSuspended';
 import Investors from './pages/Investors';
 import AnmeldenPage from './pages/AnmeldenPage';
@@ -80,6 +81,7 @@ const PublicApp = () => {
       <Route path="/impressum" element={<Impressum />} />
       <Route path="/datenschutz" element={<Datenschutz />} />
       <Route path="/agb" element={<AGB />} />
+      <Route path="/abmelden" element={<Abmelden />} />
       <Route path="/account-suspended" element={<AccountSuspended />} />
       <Route path="/anmelden" element={<AnmeldenPage />} />
       <Route path="/registrieren" element={<RegisterPage />} />

@@ -211,9 +211,7 @@ function buildUnworkedLeadsEmail({ firstName, orgName, unworkedLeads, hotLeadsCo
 
 // ─── Unsubscribe-Link generieren ──────────────────────────────────────────────
 function getUnsubscribeUrl(orgId, email) {
-  const appId = Deno.env.get("BASE44_APP_ID") || "";
-  const base = `https://api.base44.com/api/apps/${appId}/functions/unsubscribeEngagementEmails`;
-  return `${base}?org_id=${encodeURIComponent(orgId)}&email=${encodeURIComponent(email)}`;
+  return `${APP_URL}/abmelden?org_id=${encodeURIComponent(orgId)}&email=${encodeURIComponent(email)}`;
 }
 
 // ─── Hauptfunktion ─────────────────────────────────────────────────────────────
