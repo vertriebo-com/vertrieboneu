@@ -57,7 +57,7 @@ function urls() {
     }
   }
 
-  // ── Rechtliches ───────────────────────────────────────────────────────────
+  // ── Rechtliches & sonstige öffentliche Seiten ─────────────────────────────
   add(`${BASE}/impressum`, "yearly", "0.3");
   add(`${BASE}/datenschutz`, "yearly", "0.3");
   add(`${BASE}/agb`, "yearly", "0.3");

@@ -18,9 +18,10 @@ const CITIES = [
 ];
 
 const BASE = "https://vertriebo.com";
+const TODAY = new Date().toISOString().slice(0, 10);
 
 function u(loc: string, changefreq: string, priority: string) {
-  return `  <url><loc>${loc}</loc><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`;
+  return `  <url><loc>${loc}</loc><lastmod>${TODAY}</lastmod><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`;
 }
 
 Deno.serve(async (_req) => {
@@ -52,7 +53,7 @@ Deno.serve(async (_req) => {
       CITIES.map(city => u(`${BASE}/branchen/${ind}/${city}`, "monthly", "0.7"))
     ),
 
-    // Rechtliches
+    // Rechtliches & sonstige öffentliche Seiten
     u(`${BASE}/impressum`, "yearly", "0.3"),
     u(`${BASE}/datenschutz`, "yearly", "0.3"),
     u(`${BASE}/agb`, "yearly", "0.3"),
