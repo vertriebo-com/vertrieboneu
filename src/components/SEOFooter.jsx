@@ -7,9 +7,7 @@ export default function SEOFooter() {
           <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo – B2B Leadgenerierung für lokale Dienstleister" style={{ height: 110, width: "auto", objectFit: "contain", marginBottom: 10, opacity: 0.7 }} />
           <p style={{ fontSize: 12, color: "rgba(71,85,105,1)", textAlign: "center" }}>Automatisierte B2B-Leadgenerierung · KI-Lead-Scoring · CRM für lokale Dienstleister</p>
           <p style={{ fontSize: 12, color: "rgba(71,85,105,1)" }}>
-            <a href="tel:026019131820" style={{ color: "rgba(100,116,139,1)", textDecoration: "none" }}>📞 02601/9131820</a>
-            {" · "}
-            <a href="mailto:info@huwa-gebaeudedienste.de" style={{ color: "rgba(100,116,139,1)", textDecoration: "none" }}>✉️ info@huwa-gebaeudedienste.de</a>
+            <a href="mailto:info@vertriebo.com" style={{ color: "rgba(100,116,139,1)", textDecoration: "none" }}>✉️ info@vertriebo.com</a>
           </p>
         </div>
 
@@ -124,7 +122,7 @@ export default function SEOFooter() {
 
         {/* RECHTLICHES */}
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 20, display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-          <p style={{ color: "rgba(51,65,85,1)", fontSize: 11 }}>© 2026 Vertriebo · Ein Produkt der Huwa Gebäudereinigung & Hausmeisterdienste, Mittelweg 24, 56566 Neuwied</p>
+          <p style={{ color: "rgba(51,65,85,1)", fontSize: 11 }}>© 2026 Vertriebo. Alle Rechte vorbehalten.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
             {[["Impressum", "/impressum"], ["Datenschutz", "/datenschutz"], ["AGB", "/agb"]].map(([l, h]) => (
               <a key={l} href={h} style={{ color: "rgba(71,85,105,1)", fontSize: 11, textDecoration: "none" }}>{l}</a>

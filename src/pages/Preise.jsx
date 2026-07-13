@@ -42,8 +42,8 @@ export default function Preise() {
         <a href="/">
           <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo" style={{ height: 120, objectFit: "contain" }} />
         </a>
-        <a href="/#waitlist-form" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>
-          Frühen Zugang sichern →
+        <a href="/registrieren" style={{ background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 700, fontSize: 13, padding: "9px 16px", borderRadius: 9, textDecoration: "none" }}>
+          Kostenlos starten →
         </a>
       </nav>
 
@@ -91,7 +91,7 @@ export default function Preise() {
                 <span style={{ fontSize: 13, color: "rgba(100,116,139,1)" }}>/Monat</span>
               </div>
               <p style={{ fontSize: 13, color: "rgba(100,116,139,1)", lineHeight: 1.65, marginBottom: 20, minHeight: 52 }}>{plan.desc}</p>
-              <a href="/#waitlist-form" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: plan.highlight ? "linear-gradient(135deg,#2563eb,#7c3aed)" : "rgba(255,255,255,0.07)", color: "white", fontWeight: 700, fontSize: 13, padding: "11px 16px", borderRadius: 10, textDecoration: "none", marginBottom: 20, border: plan.highlight ? "none" : "1px solid rgba(255,255,255,0.1)" }}>
+              <a href="/registrieren" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, background: plan.highlight ? "linear-gradient(135deg,#2563eb,#7c3aed)" : "rgba(255,255,255,0.07)", color: "white", fontWeight: 700, fontSize: 13, padding: "11px 16px", borderRadius: 10, textDecoration: "none", marginBottom: 20, border: plan.highlight ? "none" : "1px solid rgba(255,255,255,0.1)" }}>
                 {plan.cta} <ArrowRight size={14} />
               </a>
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
@@ -121,7 +121,7 @@ export default function Preise() {
           <div className="faq-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
             {[
               { q: "Kann ich monatlich kündigen?", a: "Ja. Vertriebo ist monatlich kündbar. Keine Mindestlaufzeit, keine Kündigungsfristen." },
-              { q: "Gibt es eine Testphase?", a: "Ja. Im Early Access erhalten Sie eine kostenlose Vorschau mit ersten Leads — ohne Kreditkarte." },
+              { q: "Gibt es eine Testphase?", a: "Ja. Sie können Vertriebo 14 Tage kostenlos testen — ohne Kreditkarte, ohne Verpflichtung." },
               { q: "Was sind 'Leads/Monat'?", a: "Das sind neue, qualifizierte Firmenkontakte die Vertriebo für Sie in einem Kalendermonat findet und speichert." },
               { q: "Was passiert nach Erreichen des Limits?", a: "Sie werden informiert. Sie können jederzeit upgraden oder bis zum nächsten Monat warten." },
             ].map((faq, i) => (
@@ -136,13 +136,13 @@ export default function Preise() {
 
       <section style={{ background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(37,99,235,0.2), #020617)", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "56px 20px", textAlign: "center" }}>
         <h2 style={{ fontSize: "clamp(22px,4vw,40px)", fontWeight: 900, marginBottom: 14, letterSpacing: -1 }}>
-          Frühen Zugang zu Sonderkonditionen sichern
+          Bereit loszulegen?
         </h2>
         <p style={{ fontSize: 15, color: "rgba(148,163,184,1)", marginBottom: 28, maxWidth: 500, margin: "0 auto 28px" }}>
-          Early-Access-Nutzer erhalten dauerhaft vergünstigte Konditionen. Jetzt eintragen.
+          14 Tage kostenlos testen – keine Kreditkarte nötig. Danach monatlich kündbar.
         </p>
-        <a href="/#waitlist-form" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 40px rgba(37,99,235,0.5)" }}>
-          Jetzt Platz sichern <ArrowRight size={16} />
+        <a href="/registrieren" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#2563eb,#7c3aed)", color: "white", fontWeight: 800, fontSize: 15, padding: "14px 28px", borderRadius: 12, textDecoration: "none", boxShadow: "0 0 40px rgba(37,99,235,0.5)" }}>
+          Jetzt kostenlos starten <ArrowRight size={16} />
         </a>
       </section>
 
