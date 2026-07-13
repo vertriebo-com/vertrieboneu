@@ -17,7 +17,7 @@ const CITIES = [
   "ludwigshafen","oldenburg","leverkusen","darmstadt","heidelberg","solingen",
 ];
 
-const BASE = "https://vertriebo.de";
+const BASE = "https://vertriebo.com";
 
 function u(loc: string, changefreq: string, priority: string) {
   return `  <url><loc>${loc}</loc><changefreq>${changefreq}</changefreq><priority>${priority}</priority></url>`;

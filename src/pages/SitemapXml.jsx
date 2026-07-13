@@ -21,7 +21,7 @@ const CITIES = [
   "ludwigshafen","oldenburg","leverkusen","darmstadt","heidelberg","solingen",
 ];
 
-const BASE = "https://vertriebo.de";
+const BASE = "https://vertriebo.com";
 const TODAY = new Date().toISOString().slice(0, 10);
 
 function urls() {
