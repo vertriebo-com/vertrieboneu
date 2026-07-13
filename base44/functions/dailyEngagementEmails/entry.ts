@@ -4,7 +4,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 const BREVO_API = "https://api.brevo.com/v3/smtp/email";
 const FROM_EMAIL = "noreply@vertriebo.com";
 const FROM_NAME  = "Vertriebo";
-const APP_URL = "https://app.vertriebo.de";
+const APP_URL = "https://app.vertriebo.com";
 
 // Tage ohne Login → Inaktivitäts-E-Mail
 const INACTIVITY_THRESHOLD_DAYS = 14;
