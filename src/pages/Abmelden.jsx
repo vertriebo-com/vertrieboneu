@@ -45,7 +45,7 @@ export default function Abmelden() {
             Du kannst diese Einstellung jederzeit in deinen Vertriebo-Einstellungen ändern.
           </p>
         )}
-        <a href="https://app.vertriebo.de" style={{ display: "inline-block", marginTop: "8px", background: "#2563eb", color: "#fff", fontWeight: "700", fontSize: "14px", textDecoration: "none", padding: "12px 28px", borderRadius: "8px" }}>
+        <a href="https://app.vertriebo.com" style={{ display: "inline-block", marginTop: "8px", background: "#2563eb", color: "#fff", fontWeight: "700", fontSize: "14px", textDecoration: "none", padding: "12px 28px", borderRadius: "8px" }}>
           Zurück zu Vertriebo
         </a>
       </div>
