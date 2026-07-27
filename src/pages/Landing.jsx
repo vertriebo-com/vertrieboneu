@@ -688,7 +688,7 @@ export default function Landing() {
             <img src="https://media.base44.com/images/public/69d8fb5b8dde510755b29a7e/8e6400f40_ChatGPTImage18Mai202615_39_07.png" alt="Vertriebo – B2B Leadgenerierung für lokale Dienstleister" style={{ height: 110, width: "auto", objectFit: "contain", marginBottom: 10, opacity: 0.7 }} />
             <p style={{ fontSize: 12, color: "rgba(71,85,105,1)", textAlign: "center" }}>Automatisierte B2B-Leadgenerierung · KI-Lead-Scoring · CRM für lokale Dienstleister</p>
             <p style={{ fontSize: 12, color: "rgba(71,85,105,1)" }}>
-              <a href="mailto:noreply@vertriebo.com" style={{ color: "rgba(100,116,139,1)", textDecoration: "none" }}>✉️ noreply@vertriebo.com</a>
+              <a href="mailto:info@vertriebo.com" style={{ color: "rgba(100,116,139,1)", textDecoration: "none" }}>✉️ info@vertriebo.com</a>
             </p>
           </div>
 

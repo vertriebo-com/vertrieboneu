@@ -16,7 +16,7 @@ export default function AGB() {
             <p className="mt-2 pl-4 border-l-4 border-blue-200">
               <strong>Huwa Gebäudereinigung & Hausmeisterdienste</strong><br />
               Mittelweg 24, 56566 Neuwied<br />
-              E-Mail: info@huwa-gebaeudedienste.de<br />
+              E-Mail: info@vertriebo.com<br />
               (nachfolgend „Anbieter")
             </p>
             <p className="mt-3">und dem Kunden (nachfolgend „Nutzer") über die Nutzung der SaaS-Software „<strong>Vertriebo</strong>" – einer webbasierten CRM- und Vertriebssoftware für B2B-Dienstleister.</p>
@@ -76,7 +76,7 @@ export default function AGB() {
               Der Vertrag läuft auf unbestimmte Zeit und ist monatlich zum Ende des laufenden Abrechnungsmonats kündbar.
             </p>
             <ul className="list-disc pl-5 mt-2 space-y-1">
-              <li>Kündigung durch den Nutzer: über das Kundenportal (Einstellungen → Abo) oder per E-Mail an <a href="mailto:info@huwa-gebaeudedienste.de" className="text-blue-600 hover:underline">info@huwa-gebaeudedienste.de</a></li>
+              <li>Kündigung durch den Nutzer: über das Kundenportal (Einstellungen → Abo) oder per E-Mail an <a href="mailto:info@vertriebo.com" className="text-blue-600 hover:underline">info@vertriebo.com</a></li>
               <li>Nach Kündigung bleibt der Zugang bis zum Ende des bezahlten Zeitraums aktiv</li>
               <li>Daten werden 30 Tage nach Vertragsende zur Abholung bereitgestellt und anschließend gelöscht</li>
               <li>Das Recht zur außerordentlichen Kündigung aus wichtigem Grund bleibt unberührt</li>

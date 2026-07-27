@@ -85,7 +85,7 @@ export default function Kontakt() {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {[
                 { icon: <Phone size={18} color="#60a5fa" />, title: "Telefon", value: "02601 / 9131820", href: "tel:026019131820" },
-                { icon: <Mail size={18} color="#a78bfa" />, title: "E-Mail", value: "info@huwa-gebaeudedienste.de", href: "mailto:info@huwa-gebaeudedienste.de" },
+                { icon: <Mail size={18} color="#a78bfa" />, title: "E-Mail", value: "info@vertriebo.com", href: "mailto:info@vertriebo.com" },
                 { icon: <MapPin size={18} color="#34d399" />, title: "Adresse", value: "Mittelweg 24, 56566 Neuwied", href: "https://maps.google.com/?q=Mittelweg+24+56566+Neuwied" },
               ].map((c, i) => (
                 <a key={i} href={c.href} target={c.title === "Adresse" ? "_blank" : undefined} rel="noopener noreferrer"

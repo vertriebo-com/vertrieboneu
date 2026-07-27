@@ -101,7 +101,7 @@ export default function UeberVertriebo() {
               },
               { icon: "📞", title: "Kontakt", lines: [
                   { text: "02601 / 9131820", href: "tel:026019131820" },
-                  { text: "info@huwa-gebaeudedienste.de", href: "mailto:info@huwa-gebaeudedienste.de" },
+                  { text: "info@vertriebo.com", href: "mailto:info@vertriebo.com" },
                   { text: "vertriebo.de", href: "/" },
                 ]
               },

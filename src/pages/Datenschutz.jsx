@@ -17,7 +17,7 @@ export default function Datenschutz() {
               56566 Neuwied<br />
               Deutschland<br /><br />
               Telefon: 02601/9131820<br />
-              E-Mail: <a href="mailto:info@huwa-gebaeudedienste.de" className="text-blue-600 hover:underline">info@huwa-gebaeudedienste.de</a>
+              E-Mail: <a href="mailto:info@vertriebo.com" className="text-blue-600 hover:underline">info@vertriebo.com</a>
             </p>
           </section>
 
@@ -132,7 +132,7 @@ export default function Datenschutz() {
           <section>
             <h2 className="text-lg font-bold text-slate-900 mb-3">8. Auftragsverarbeitung (AVV)</h2>
             <p>
-              Wir als Anbieter von Vertriebo handeln gegenüber unseren Kunden (die die Software zur Verwaltung von Firmenkontakten nutzen) als <strong>Auftragsverarbeiter</strong> im Sinne des Art. 28 DSGVO. Auf Anfrage stellen wir Ihnen einen Auftragsverarbeitungsvertrag (AVV) zur Verfügung. Bitte wenden Sie sich dazu an <a href="mailto:info@huwa-gebaeudedienste.de" className="text-blue-600 hover:underline">info@huwa-gebaeudedienste.de</a>.
+              Wir als Anbieter von Vertriebo handeln gegenüber unseren Kunden (die die Software zur Verwaltung von Firmenkontakten nutzen) als <strong>Auftragsverarbeiter</strong> im Sinne des Art. 28 DSGVO. Auf Anfrage stellen wir Ihnen einen Auftragsverarbeitungsvertrag (AVV) zur Verfügung. Bitte wenden Sie sich dazu an <a href="mailto:info@vertriebo.com" className="text-blue-600 hover:underline">info@vertriebo.com</a>.
             </p>
           </section>
 
@@ -174,7 +174,7 @@ export default function Datenschutz() {
               <li><strong>Widerruf von Einwilligungen</strong> (Art. 7 Abs. 3 DSGVO): Erteilte Einwilligungen können jederzeit mit Wirkung für die Zukunft widerrufen werden.</li>
             </ul>
             <p className="mt-3">
-              Zur Ausübung Ihrer Rechte wenden Sie sich an: <a href="mailto:info@huwa-gebaeudedienste.de" className="text-blue-600 hover:underline">info@huwa-gebaeudedienste.de</a>
+              Zur Ausübung Ihrer Rechte wenden Sie sich an: <a href="mailto:info@vertriebo.com" className="text-blue-600 hover:underline">info@vertriebo.com</a>
             </p>
             <p className="mt-2">
               Sie haben außerdem das Recht, sich bei der zuständigen Datenschutz-Aufsichtsbehörde zu beschweren. Die zuständige Behörde für Rheinland-Pfalz ist der <strong>Landesbeauftragte für den Datenschutz und die Informationsfreiheit Rheinland-Pfalz</strong>, Hintere Bleiche 34, 55116 Mainz, <a href="https://www.datenschutz.rlp.de" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.datenschutz.rlp.de</a>.

@@ -24,8 +24,8 @@ export default function Impressum() {
             <h2 className="text-lg font-bold text-slate-900 mb-3">Kontakt</h2>
             <p>
               Telefon: <a href="tel:026019131820" className="text-blue-600 hover:underline">02601/9131820</a><br />
-              E-Mail: <a href="mailto:info@huwa-gebaeudedienste.de" className="text-blue-600 hover:underline">info@huwa-gebaeudedienste.de</a><br />
-              Website: <a href="https://vertriebo.de" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">vertriebo.de</a>
+              E-Mail: <a href="mailto:info@vertriebo.com" className="text-blue-600 hover:underline">info@vertriebo.com</a><br />
+              Website: <a href="https://vertriebo.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">vertriebo.com</a>
             </p>
           </section>
 
