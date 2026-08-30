@@ -54,6 +54,10 @@
       "type": "string",
       "title": "Stripe Product ID"
     },
+    "digistore24_product_id": {
+      "type": "string",
+      "title": "Digistore24 Produkt-ID"
+    },
     "price_monthly": {
       "type": "number",
       "title": "Preis/Monat (Cent)"

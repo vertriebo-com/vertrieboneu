@@ -83,6 +83,7 @@ export default function SEOFooter() {
               {[
                 ["Über Vertriebo", "/ueber-uns"],
                 ["Kontakt", "/kontakt"],
+                ["Affiliate-Programm", "/affiliates"],
                 ["Investor Relations", "/investors"],
                 ["Preise", "/preise"],
                 ["Anmelden", "/anmelden"],

@@ -7,7 +7,7 @@ import {
   DollarSign, Eye, Lock, Unlock,
   Wrench, CheckCircle2, AlertCircle, ArrowLeft,
   FlaskConical, Activity, BarChart3, FileText,
-  MessageSquare, UserPlus, ShieldCheck, Monitor
+  MessageSquare, UserPlus, ShieldCheck, Monitor, ShoppingBag
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import ResearchRunDiagnostics from '@/components/platform-admin/ResearchRunDiagnostics';
@@ -21,6 +21,7 @@ import InvestorInquiriesPanel from '@/components/platform-admin/InvestorInquirie
 import OrgDetailDrawer from '@/components/platform-admin/OrgDetailDrawer';
 import SecurityAuditPanel from '@/components/platform-admin/SecurityAuditPanel';
 import SystemHealthPanel from '@/components/platform-admin/SystemHealthPanel';
+import Digistore24Panel from '@/components/platform-admin/Digistore24Panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -247,8 +248,11 @@ export default function PlatformAdmin() {
             <TabsTrigger value="security" className="gap-2 text-sm">
               <ShieldCheck className="w-4 h-4" /> Security
             </TabsTrigger>
+            <TabsTrigger value="digistore24" className="gap-2 text-sm">
+             <ShoppingBag className="w-4 h-4" /> Digistore24
+            </TabsTrigger>
             <TabsTrigger value="system" className="gap-2 text-sm">
-              <Monitor className="w-4 h-4" /> System
+             <Monitor className="w-4 h-4" /> System
             </TabsTrigger>
           </TabsList>
 
@@ -490,6 +494,14 @@ export default function PlatformAdmin() {
           <TabsContent value="security">
             <div className="max-w-4xl">
               <SecurityAuditPanel />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="digistore24">
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-1">Digistore24 Affiliate-Verkäufe</h2>
+              <p className="text-sm text-slate-500 mb-6">Alle Abonnements die über Digistore24-Affiliate-Links entstanden sind.</p>
+              <Digistore24Panel />
             </div>
           </TabsContent>
 

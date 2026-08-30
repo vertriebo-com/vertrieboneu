@@ -12,6 +12,15 @@
       "type": "string",
       "title": "Organisation ID"
     },
+    "source": {
+      "type": "string",
+      "title": "Quelle",
+      "enum": [
+        "stripe",
+        "digistore24"
+      ],
+      "default": "stripe"
+    },
     "stripe_subscription_id": {
       "type": "string",
       "title": "Stripe Subscription ID"
@@ -35,6 +44,18 @@
     "stripe_payment_intent_id": {
       "type": "string",
       "title": "Payment Intent ID"
+    },
+    "digistore24_order_id": {
+      "type": "string",
+      "title": "Digistore24 Order ID"
+    },
+    "digistore24_customer_id": {
+      "type": "string",
+      "title": "Digistore24 Customer ID"
+    },
+    "affiliate_id": {
+      "type": "string",
+      "title": "Affiliate ID (Digistore24)"
     },
     "plan_id": {
       "type": "string",
