@@ -28,6 +28,7 @@ import Datenschutz from './pages/Datenschutz';
 import AGB from './pages/AGB';
 import Abmelden from './pages/Abmelden';
 import Affiliates from './pages/Affiliates';
+import Danke from './pages/Danke';
 import AccountSuspended from './pages/AccountSuspended';
 import Investors from './pages/Investors';
 import AnmeldenPage from './pages/AnmeldenPage';
@@ -85,6 +86,7 @@ const PublicApp = () => {
       <Route path="/abmelden" element={<Abmelden />} />
       <Route path="/affiliates" element={<Affiliates />} />
       <Route path="/partners" element={<Affiliates />} />
+      <Route path="/danke" element={<Danke />} />
       <Route path="/account-suspended" element={<AccountSuspended />} />
       <Route path="/anmelden" element={<AnmeldenPage />} />
       <Route path="/registrieren" element={<RegisterPage />} />
