@@ -1,0 +1,37 @@
+{
+  "name": "Waitlist Lead Notification",
+  "description": "Interner Admin-Log bei neuem WaitlistLead. Kein E-Mail-Versand an Interessenten.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "entity",
+      "events": [
+        "create"
+      ],
+      "entity_name": "WaitlistLead"
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "waitlist_lead_notification",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "onWaitlistLeadCreated",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "onWaitlistLeadCreated"
+  }
+}

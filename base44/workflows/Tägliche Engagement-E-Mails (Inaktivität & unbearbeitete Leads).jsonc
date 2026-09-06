@@ -1,0 +1,44 @@
+{
+  "name": "T\u00e4gliche Engagement-E-Mails (Inaktivit\u00e4t & unbearbeitete Leads)",
+  "description": "L\u00e4uft t\u00e4glich um 08:00 Uhr (07 UTC = 08 Berlin). Pr\u00fcft pro Organisation: 1) Hat der Nutzer sich 14+ Tage nicht eingeloggt? \u2192 Inaktivit\u00e4ts-E-Mail. 2) Sind 3+ neue Leads seit 2+ Tagen unbearbeitet? \u2192 Lead-Engagement-E-Mail. Anti-Spam: max. 1 Mail alle 3 Tage pro Org.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 7 * * *",
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "t_gliche_engagement_e_mails_inaktivit_t_unbearbeitete_leads",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "dailyEngagementEmails",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "dailyEngagementEmails"
+  }
+}
